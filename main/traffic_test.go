@@ -508,9 +508,9 @@ func TestMakeTrafficReportMsg_AlertFlag(t *testing.T) {
 		expectAlert       bool
 		expectedAlertByte byte
 	}{
-		{"Close traffic", 3700, true, true, 0x10},  // Within 2nm, alert bit set
-		{"Far traffic", 5000, true, false, 0x00},   // Beyond 2nm, no alert
-		{"No bearing", 1000, false, true, 0x10},    // Conservative: alert
+		{"Close traffic", 3700, true, true, 0x10}, // Within 2nm, alert bit set
+		{"Far traffic", 5000, true, false, 0x00},  // Beyond 2nm, no alert
+		{"No bearing", 1000, false, true, 0x10},   // Conservative: alert
 	}
 
 	for _, tc := range testCases {
@@ -892,9 +892,9 @@ func TestExtrapolateTraffic_TurnRate(t *testing.T) {
 		Lat:                  40.0,
 		Lng:                  -100.0,
 		Alt:                  10000,
-		Track:                90,   // East
-		TurnRate:             3.0,  // 3 deg/sec right turn
-		Speed:                120,  // 120 knots
+		Track:                90,  // East
+		TurnRate:             3.0, // 3 deg/sec right turn
+		Speed:                120, // 120 knots
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
@@ -916,8 +916,8 @@ func TestExtrapolateTraffic_TurnRate(t *testing.T) {
 // Verifies: FR-405 (Signal-Based Range Estimation)
 func TestEstimateDistance_EdgeCases(t *testing.T) {
 	testCases := []struct {
-		name   string
-		ti     TrafficInfo
+		name           string
+		ti             TrafficInfo
 		expectEstimate bool
 	}{
 		{
