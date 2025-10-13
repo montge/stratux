@@ -1,0 +1,199 @@
+name: Nightly Release
+
+on:
+  schedule:
+    # Run at 2 AM UTC every day (6 PM PST / 7 PM PDT)
+    - cron: '0 2 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      commit_hash: ${{ steps.check.outputs.commit_hash }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if there are new commits since last nightly
+        id: check
+        run: |
+          # Get the latest commit hash
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          echo "commit_hash=${COMMIT_HASH}" >> $GITHUB_OUTPUT
+
+          # Check if there's a nightly release tag from today
+          TODAY=$(date +%Y%m%d)
+          if git tag -l "nightly-${TODAY}" | grep -q .; then
+            echo "Nightly release already exists for today"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            # Check if there are commits in the last 24 hours
+            COMMITS=$(git log --since="24 hours ago" --oneline | wc -l)
+            if [ "$COMMITS" -gt 0 ]; then
+              echo "Found ${COMMITS} commits in last 24 hours"
+              echo "should_build=true" >> $GITHUB_OUTPUT
+            else
+              echo "No commits in last 24 hours"
+              echo "should_build=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  build-us:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update submodules
+        run: git submodule update --init --recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make golang-go ncurses-dev libusb-1.0-0-dev wget
+          cd /tmp
+          wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb
+          sudo dpkg -i librtlsdr0_2.0.2-2_arm64.deb
+          wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb
+          sudo dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb
+
+      - name: Modify Makefile for US region
+        run: |
+          sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": true,\"OGN_Enabled\": false,\"DeveloperMode\": false,\"RegionSelected\": 1}'/" Makefile
+
+      - name: Build US .deb package
+        run: make dpkg
+
+      - name: Rename deb with region
+        run: |
+          DEB_FILE=$(ls -1t stratux-*.deb | head -1)
+          VERSION=$(echo "$DEB_FILE" | sed 's/stratux-\(.*\)-.*.deb/\1/')
+          ARCH=$(echo "$DEB_FILE" | sed 's/stratux-.*-\(.*\).deb/\1/')
+          mv "$DEB_FILE" "stratux-US-${VERSION}-${ARCH}.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stratux-US-debian-package
+          path: stratux-US-*.deb
+          if-no-files-found: error
+
+  build-eu:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update submodules
+        run: git submodule update --init --recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make golang-go ncurses-dev libusb-1.0-0-dev wget
+          cd /tmp
+          wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb
+          sudo dpkg -i librtlsdr0_2.0.2-2_arm64.deb
+          wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb
+          sudo dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb
+
+      - name: Modify Makefile for EU region
+        run: |
+          sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": false,\"OGN_Enabled\": true,\"DeveloperMode\": true,\"RegionSelected\": 2}'/" Makefile
+
+      - name: Build EU .deb package
+        run: make dpkg
+
+      - name: Rename deb with region
+        run: |
+          DEB_FILE=$(ls -1t stratux-*.deb | head -1)
+          VERSION=$(echo "$DEB_FILE" | sed 's/stratux-\(.*\)-.*.deb/\1/')
+          ARCH=$(echo "$DEB_FILE" | sed 's/stratux-.*-\(.*\).deb/\1/')
+          mv "$DEB_FILE" "stratux-EU-${VERSION}-${ARCH}.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stratux-EU-debian-package
+          path: stratux-EU-*.deb
+          if-no-files-found: error
+
+  create-release:
+    needs: [check-changes, build-us, build-eu]
+    if: needs.check-changes.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download US artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: stratux-US-debian-package
+          path: ./artifacts-us
+
+      - name: Download EU artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: stratux-EU-debian-package
+          path: ./artifacts-eu
+
+      - name: Create nightly tag
+        run: |
+          TODAY=$(date +%Y%m%d)
+          git tag "nightly-${TODAY}"
+          git push origin "nightly-${TODAY}"
+
+      - name: Create nightly release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly-${{ github.run_number }}
+          name: "Nightly Build ${{ github.run_number }} - $(date +%Y-%m-%d)"
+          body: |
+            ## Nightly Build
+
+            **Build Date**: $(date +%Y-%m-%d)
+            **Commit**: ${{ needs.check-changes.outputs.commit_hash }}
+
+            ### What's Included
+
+            - **stratux-US-*.deb**: US version (UAT enabled, 978 MHz)
+            - **stratux-EU-*.deb**: EU version (OGN enabled, 868 MHz)
+
+            ### Installation
+
+            ```bash
+            # Copy to your Raspberry Pi
+            scp stratux-US-*.deb pi@stratux.local:~/
+
+            # Install
+            ssh pi@stratux.local
+            sudo dpkg -i stratux-US-*.deb
+            sudo systemctl restart stratux
+            ```
+
+            ### Notes
+
+            - These are automated nightly builds for testing
+            - For stable releases, use tagged releases instead
+            - Built on ARM64 runners (native compilation)
+
+            🤖 Automatically generated nightly build
+          files: |
+            ./artifacts-us/*.deb
+            ./artifacts-eu/*.deb
+          prerelease: true
+          draft: false

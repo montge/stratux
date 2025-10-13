@@ -1,0 +1,250 @@
+name: Release Full Images
+
+on:
+  # Trigger on version tags (e.g., v1.6.0)
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*"
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'Release name (e.g., v1.6.0)'
+        required: true
+        type: string
+
+jobs:
+  build-us-image:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Update submodules
+        run: git submodule update --init --recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make golang-go ncurses-dev libusb-1.0-0-dev wget \
+            coreutils quilt parted qemu-user-static debootstrap zerofree zip dosfstools \
+            libarchive-tools libcap2-bin rsync grep udev xz-utils curl xxd file kmod bc \
+            binfmt-support ca-certificates
+          cd /tmp
+          wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb
+          sudo dpkg -i librtlsdr0_2.0.2-2_arm64.deb
+          wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb
+          sudo dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb
+
+      - name: Modify Makefile for US region
+        run: |
+          sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": true,\"OGN_Enabled\": false,\"DeveloperMode\": false,\"RegionSelected\": 1}'/" Makefile
+
+      - name: Build US image
+        run: |
+          cd image_build
+          ./build.sh
+
+      - name: Rename US image
+        run: |
+          cd image_build/pi-gen/deploy
+          for file in *.img; do
+            if [ -f "$file" ]; then
+              base="${file%.img}"
+              mv "$file" "${base}-US.img"
+            fi
+          done
+          for file in *.zip; do
+            if [ -f "$file" ]; then
+              base="${file%.zip}"
+              mv "$file" "${base}-US.zip"
+            fi
+          done
+
+      - name: Rename US .deb
+        run: |
+          cd image_build/pi-gen/stratux
+          DEB_FILE=$(ls -1t stratux-*.deb | head -1)
+          if [ -n "$DEB_FILE" ]; then
+            VERSION=$(echo "$DEB_FILE" | sed 's/stratux-\(.*\)-.*.deb/\1/')
+            ARCH=$(echo "$DEB_FILE" | sed 's/stratux-.*-\(.*\).deb/\1/')
+            mv "$DEB_FILE" "stratux-US-${VERSION}-${ARCH}.deb"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: us-release-files
+          path: |
+            image_build/pi-gen/deploy/*-US.*
+            image_build/pi-gen/stratux/stratux-US-*.deb
+          if-no-files-found: error
+
+  build-eu-image:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Update submodules
+        run: git submodule update --init --recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make golang-go ncurses-dev libusb-1.0-0-dev wget \
+            coreutils quilt parted qemu-user-static debootstrap zerofree zip dosfstools \
+            libarchive-tools libcap2-bin rsync grep udev xz-utils curl xxd file kmod bc \
+            binfmt-support ca-certificates
+          cd /tmp
+          wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb
+          sudo dpkg -i librtlsdr0_2.0.2-2_arm64.deb
+          wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb
+          sudo dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb
+
+      - name: Modify Makefile for EU region
+        run: |
+          sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": false,\"OGN_Enabled\": true,\"DeveloperMode\": true,\"RegionSelected\": 2}'/" Makefile
+
+      - name: Build EU image
+        run: |
+          cd image_build
+          ./build.sh
+
+      - name: Rename EU image
+        run: |
+          cd image_build/pi-gen/deploy
+          for file in *.img; do
+            if [ -f "$file" ]; then
+              base="${file%.img}"
+              mv "$file" "${base}-EU.img"
+            fi
+          done
+          for file in *.zip; do
+            if [ -f "$file" ]; then
+              base="${file%.zip}"
+              mv "$file" "${base}-EU.zip"
+            fi
+          done
+
+      - name: Rename EU .deb
+        run: |
+          cd image_build/pi-gen/stratux
+          DEB_FILE=$(ls -1t stratux-*.deb | head -1)
+          if [ -n "$DEB_FILE" ]; then
+            VERSION=$(echo "$DEB_FILE" | sed 's/stratux-\(.*\)-.*.deb/\1/')
+            ARCH=$(echo "$DEB_FILE" | sed 's/stratux-.*-\(.*\).deb/\1/')
+            mv "$DEB_FILE" "stratux-EU-${VERSION}-${ARCH}.deb"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eu-release-files
+          path: |
+            image_build/pi-gen/deploy/*-EU.*
+            image_build/pi-gen/stratux/stratux-EU-*.deb
+          if-no-files-found: error
+
+  create-release:
+    needs: [build-us-image, build-eu-image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download US artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: us-release-files
+          path: ./release-us
+
+      - name: Download EU artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: eu-release-files
+          path: ./release-eu
+
+      - name: Get version info
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.release_name }}" ]; then
+            VERSION="${{ github.event.inputs.release_name }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Create release notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Stratux ${{ steps.version.outputs.version }}
+
+          ### What's Included
+
+          #### Full SD Card Images
+          - **`*-US.img.zip`**: US version bootable SD card image (UAT enabled, 978 MHz)
+          - **`*-EU.img.zip`**: EU version bootable SD card image (OGN enabled, 868 MHz)
+
+          #### Debian Packages (for upgrades)
+          - **`stratux-US-*.deb`**: US version package
+          - **`stratux-EU-*.deb`**: EU version package
+
+          ### Installation
+
+          #### New Installation (SD Card Image)
+          1. Download the appropriate `.img.zip` file for your region
+          2. Extract the `.img` file
+          3. Write to SD card using:
+             - **Raspberry Pi Imager** (recommended)
+             - **balenaEtcher**
+             - **dd** on Linux/Mac: `sudo dd if=stratux-US-*.img of=/dev/sdX bs=4M status=progress`
+          4. Insert SD card into Raspberry Pi and boot
+
+          #### Upgrade Existing Installation
+          ```bash
+          # Copy to your Raspberry Pi
+          scp stratux-US-*.deb pi@stratux.local:~/
+
+          # Install
+          ssh pi@stratux.local
+          sudo dpkg -i stratux-US-*.deb
+          sudo systemctl restart stratux
+          ```
+
+          ### Hardware Requirements
+          - Raspberry Pi 3B, 3B+, 4, or Zero 2 W
+          - 8GB+ microSD card (16GB+ recommended)
+          - RTL-SDR dongles (quantity depends on features needed)
+
+          ### Region Configuration
+          - **US**: Optimized for FAA ADS-B 978 MHz UAT reception
+          - **EU**: Optimized for FLARM/OGN 868 MHz reception
+
+          For more information, visit the [Stratux documentation](https://github.com/cyoung/stratux).
+
+          ---
+
+          🤖 Built with GitHub Actions on native ARM64 runners
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Stratux ${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          files: |
+            ./release-us/**/*
+            ./release-eu/**/*
+          draft: true
+          prerelease: false
