@@ -1,0 +1,70 @@
+Requirement ID,Category,Priority,Description,Test Cases,Test Level,HLD Section,Source Code,Verification Method,Status,Last Verified,Notes
+FR-101,Radio Reception,HIGH,"Receive and decode 1090 MHz ADS-B Extended Squitter messages",,,"4.1.1, 5.1","main/sdr.go",Test,Not Started,,DO-260B compliance
+FR-102,Radio Reception,HIGH,"Receive and decode 978 MHz UAT messages containing traffic and weather",,,"4.1.2, 5.1","main/sdr.go",Test,Not Started,,DO-282B compliance
+FR-103,Radio Reception,MEDIUM,"Receive and decode 868 MHz OGN/FLARM messages",,,"4.1.3, 5.1","main/ogn.go",Test,Not Started,,
+FR-104,Radio Reception,LOW,"Optionally receive and decode 162 MHz marine AIS messages",,,"4.1.4, 5.1","main/ais.go",Test,Not Started,,
+FR-105,Radio Reception,HIGH,"Automatically detect and configure RTL-SDR devices",,,"4.1, 5.1","main/sdr.go",Test,Not Started,,
+FR-201,GPS Subsystem,CRITICAL,"Acquire and maintain GPS position fix",,,"4.2, 5.2","main/gps.go",Test,Not Started,,
+FR-202,GPS Subsystem,HIGH,"Support multiple GPS receiver types (u-blox, Prolific, Generic NMEA, Network NMEA, OGN Tracker)",,,"4.2, 5.2","main/gps.go",Test,Not Started,,
+FR-203,GPS Subsystem,MEDIUM,"Configure GPS receivers for aviation use (Airborne <4g model, SBAS/WAAS, 10 Hz, power mgmt)",,,"4.2, 5.2","main/gps.go",Test,Not Started,,
+FR-204,GPS Subsystem,CRITICAL,"Validate GPS data before use (fix quality, HDOP, satellites, sanity checks)",,,"4.2, 5.2","main/gps.go",Test,Not Started,,
+FR-205,GPS Subsystem,HIGH,"Report GPS status to users (fix type, satellites, accuracy, timestamp, device type)",,,"4.2, 5.2","main/gps.go",Test,Not Started,,
+FR-301,AHRS Subsystem,MEDIUM,"Optionally support AHRS sensors (MPU-9250/9255, MPU-6500, ICM-20948, BMP-280/388)",,,"4.3, 5.3","main/sensors.go",Test,Not Started,,
+FR-302,AHRS Subsystem,MEDIUM,"Provide attitude data when AHRS sensors available (roll, pitch, heading, turn rate, slip/skid, G-load)",,,"4.3, 5.3","main/sensors.go",Test,Not Started,,
+FR-303,AHRS Subsystem,HIGH,"Provide barometric pressure altitude (relative to 29.92"" Hg, vertical speed, temperature compensated)",,,"4.3, 5.3","main/sensors.go",Test,Not Started,,
+FR-304,AHRS Subsystem,MEDIUM,"Support AHRS sensor calibration (magnetometer, accelerometer, persistent storage, status)",,,"4.3, 5.3","main/sensors.go",Test,Not Started,,
+FR-305,AHRS Subsystem,CRITICAL,"Mark AHRS data as advisory only (GDL90 indicator, Web UI warning, documentation disclaimer)",,,"4.3, 5.3","main/sensors.go, main/managementinterface.go",Inspection,Not Started,,Safety requirement
+FR-401,Traffic Fusion,HIGH,"Fuse traffic from multiple sources (1090ES, UAT, OGN, AIS) with duplicate suppression",,,"4.4.1, 5.4","main/traffic.go",Test,Not Started,,
+FR-402,Traffic Fusion,HIGH,"Extrapolate traffic positions between updates (dead reckoning, max 10s, indication, aging)",TestExtrapolateTraffic_ValidHeading,Unit,"4.4.2, 5.4","main/traffic.go",Test,In Progress,2025-10-13,Test exists but needs more cases
+FR-403,Traffic Fusion,CRITICAL,"Detect and filter ownship from traffic display (position-based, ICAO-based, altitude correlation)",TestIsOwnshipICAO_Match,Unit,"4.4.3, 5.4","main/traffic.go",Test,In Progress,2025-10-13,Test exists but needs more cases
+FR-404,Traffic Fusion,HIGH,"Calculate traffic relative position to ownship (distance, bearing, relative altitude, vertical rate)",,,"4.4.4, 5.4","main/traffic.go",Test,Not Started,,
+FR-405,Traffic Fusion,MEDIUM,"Estimate range using signal strength for Mode-S traffic without position",,,"4.4, 5.4","main/traffic.go",Test,Not Started,,
+FR-406,Traffic Fusion,LOW,"Convert ICAO addresses to registration numbers (US N-numbers, Canada C-numbers, Australia VH-numbers)","TestIcao2reg_USCivil, TestIcao2reg_Canada, TestIcao2reg_Australia",Unit,"4.4, 5.4","main/traffic.go",Test,Passed,2025-10-13,10 test cases implemented
+FR-407,Traffic Fusion,HIGH,"Alert on proximate traffic (<2 nm horizontal, <±500 ft vertical)","TestIsTrafficAlertable_WithinRange, TestIsTrafficAlertable_OutsideRange, TestIsTrafficAlertable_NoBearing",Unit,"4.4.5, 5.4","main/traffic.go",Test,Passed,2025-10-13,3 test cases implemented
+FR-501,Weather Processing,HIGH,"Receive and decode FIS-B weather products from UAT (NEXRAD, METAR, TAF, Winds, PIREPs, etc)",,,"4.5, 5.5","main/weather.go",Test,Not Started,,AC 00-63 compliance
+FR-502,Weather Processing,MEDIUM,"Manage weather product lifecycle (15 min retention, auto-purge, timestamp, product type)",,,"4.5, 5.5","main/weather.go",Test,Not Started,,
+FR-503,Weather Processing,LOW,"Optionally filter weather by geographic region (NEXRAD blocks, configurable)",,,"4.5, 5.5","main/weather.go",Test,Not Started,,
+FR-601,GDL90 Output,CRITICAL,"Output data in GDL90 format per FAA specification (framing, CRC, byte stuffing, message IDs)",,,"4.6.1, 5.6","main/gen_gdl90.go",Test,Not Started,,GDL90 ICD compliance
+FR-602,GDL90 Output,CRITICAL,"Transmit GDL90 heartbeat every 1.0 ±0.1 seconds (ID 0x00, GPS/UAT status, timestamp)",,,"4.6.2, 5.6","main/gen_gdl90.go",Test,Not Started,,
+FR-603,GDL90 Output,HIGH,"Transmit ownship position when GPS valid (ID 0x0A/0x0B, position accuracy, velocity)",,,"4.6.3, 5.6","main/gen_gdl90.go",Test,Not Started,,
+FR-604,GDL90 Output,HIGH,"Transmit traffic reports for all tracked targets (ID 0x14, position, altitude, velocity, callsign, alert)",,,"4.6.4, 5.6","main/gen_gdl90.go",Test,Not Started,,
+FR-605,GDL90 Output,HIGH,"Transmit FIS-B weather in GDL90 format (ID 0x63, segmentation, product type, timestamp)",,,"4.6.5, 5.6","main/gen_gdl90.go",Test,Not Started,,
+FR-606,GDL90 Output,MEDIUM,"Support ForeFlight-specific extensions (ID 0x65, AHRS attitude, device capabilities)",,,"4.6.6, 5.6","main/gen_gdl90.go",Test,Not Started,,
+FR-701,NMEA Output,MEDIUM,"Output GPS data in NMEA format ($GPRMC, $GPGGA, $GPGSA, $GPGSV, $PGRMZ)",,,"4.7.1, 5.7","main/gps.go",Test,Not Started,,NMEA 0183 compliance
+FR-702,NMEA Output,MEDIUM,"Output traffic in FLARM NMEA format ($PFLAU, $PFLAA, prioritized, max 10/sec)",,,"4.7.2, 5.7","main/flarm-nmea.go",Test,Not Started,,
+FR-801,Network Distribution,HIGH,"Broadcast GDL90 data via UDP (default port 4000, configurable, multicast optional)",,,"4.8.1, 5.8","main/network.go",Test,Not Started,,
+FR-802,Network Distribution,MEDIUM,"Support TCP streaming of NMEA data (port 2000, multiple clients, auto cleanup)",,,"4.8.2, 5.8","main/network.go",Test,Not Started,,
+FR-803,Network Distribution,MEDIUM,"Support serial output (configurable baud, GDL90/NMEA format, multiple devices, DTR/RTS)",,,"4.8.3, 5.8","main/network.go",Test,Not Started,,
+FR-804,Network Distribution,LOW,"Optionally support Bluetooth LE output (GATT service, SoftRF/Stratux profile, NMEA/GDL90)",,,"4.8.4, 5.8","main/network.go",Test,Not Started,,
+FR-805,Network Distribution,MEDIUM,"Detect sleeping/inactive clients (ICMP ping, message throttling, wake on alerts)",,,"4.8.5, 5.8","main/network.go",Test,Not Started,,
+FR-901,Web Management Interface,HIGH,"Provide web-based status display (GPS, traffic count, weather count, towers, uptime, errors)",,,"4.9.1, 5.9","main/managementinterface.go",Inspection,Not Started,,
+FR-902,Web Management Interface,HIGH,"Allow web-based configuration (GPS device, AHRS, region, network, ownship settings)",,,"4.9.2, 5.9","main/managementinterface.go",Test,Not Started,,
+FR-903,Web Management Interface,MEDIUM,"Display live traffic graphically (2D radar, symbols, ownship center, range rings, heading)",,,"4.9.3, 5.9","main/managementinterface.go",Inspection,Not Started,,
+FR-904,Web Management Interface,MEDIUM,"Display weather products (METAR text, TAF text, NEXRAD imagery, age indication)",,,"4.9.4, 5.9","main/managementinterface.go",Inspection,Not Started,,
+FR-905,Web Management Interface,HIGH,"Provide diagnostic logging via web UI (log viewer, filtering, download, rotation)",,,"4.9.5, 5.9","main/managementinterface.go, main/logging.go",Test,Not Started,,
+FR-1001,Data Logging,MEDIUM,"Log traffic and weather to SQLite database (messages, GPS track, rotation at 100MB, cleanup at 95%)",,,"4.10.1, 5.10","main/datalog.go",Test,Not Started,,
+FR-1002,Data Logging,MEDIUM,"Support replay of logged data (--replay option, compressed, timestamped, playback rate)",,,"4.10.2, 5.10","main/datalog.go",Test,Not Started,,
+FR-1003,Data Logging,LOW,"Log AHRS sensor data to CSV (timestamp, attitude, acceleration, angular rate, temp, pressure)",,,"4.10.3, 5.10","main/sensors.go",Test,Not Started,,
+FR-1101,System Management,HIGH,"Support over-the-air software updates (web UI, CLI, verification, rollback, progress)",,,"4.11.1, 5.11","main/managementinterface.go",Test,Not Started,,
+FR-1102,System Management,HIGH,"Persist configuration across reboots (stratux.conf, JSON, auto backup, factory reset)",,,"4.11.2, 5.11","main/gen_gdl90.go",Test,Not Started,,
+FR-1103,System Management,CRITICAL,"Handle errors gracefully (tracking, LED indication, auto reconnection, watchdog, degradation)",,,"4.11.3, 5.11","main/*.go",Test,Not Started,,
+FR-1104,System Management,HIGH,"Monitor system health (CPU temp, disk usage, memory, network, service status)",,,"4.11.4, 5.11","main/managementinterface.go",Test,Not Started,,
+NFR-101,Performance,MEDIUM,"Boot and be operational within 120 seconds",,System,5.12,,Test,Not Started,,
+NFR-102,Performance,HIGH,"Output messages with ≤ 100ms latency from reception",,System,5.12,,Test,Not Started,,
+NFR-103,Performance,MEDIUM,"Support ≥ 5 simultaneous clients without degradation",,System,5.12,,Test,Not Started,,
+NFR-104,Performance,HIGH,"Handle ≥ 500 ADS-B messages/second without loss",,System,5.12,,Test,Not Started,,
+NFR-105,Performance,LOW,"Use ≤ 80% CPU under normal conditions",,System,5.12,,Test,Not Started,,
+NFR-201,Reliability,HIGH,"Operate continuously for ≥ 8 hours without failure",,System,5.12,,Test,Not Started,,
+NFR-202,Reliability,HIGH,"Recover from transient errors without user intervention",,System,5.12,,Test,Not Started,,
+NFR-203,Reliability,CRITICAL,"Validate all received data before use",,,"All","main/*.go",Test,Not Started,,
+NFR-204,Reliability,CRITICAL,"Fail to safe state (no data) rather than incorrect data",,,"All","main/*.go",Test,Not Started,,
+NFR-301,Maintainability,MEDIUM,"Code SHALL be modular with clear interfaces",,,All,"main/*.go, common/*.go",Inspection,In Progress,,Ongoing improvement
+NFR-302,Maintainability,HIGH,"All modules SHALL have documentation",,,All,"main/*.go, common/*.go, docs/*",Inspection,In Progress,,Partially complete
+NFR-303,Maintainability,HIGH,"Log significant events with timestamps and severity",,,All,"main/*.go",Inspection,Partial,,Needs review
+NFR-401,Portability,HIGH,"Run on Raspberry Pi 3B, 3B+, 4, 5, Zero 2 W",,System,,,Test,Not Started,,
+NFR-402,Portability,HIGH,"Run on Debian Bookworm (ARM64)",,System,,,Test,Not Started,,
+NFR-403,Portability,HIGH,"Fit on ≥ 4 GB microSD card (recommend 8 GB)",,System,,,Test,Not Started,,
+NFR-501,Security,MEDIUM,"Web management interface SHALL support authentication (optional)",,,"4.9, 5.9","main/managementinterface.go",Test,Not Started,,
+NFR-502,Security,CRITICAL,"All user inputs SHALL be validated before use",,,All,"main/*.go",Test,Not Started,,
+NFR-503,Security,HIGH,"OTA updates SHALL be verified before installation",,,"4.11, 5.11","main/managementinterface.go",Test,Not Started,,
+NFR-504,Security,HIGH,"WiFi passwords SHALL be stored encrypted or protected",,,5.11,"main/networksettings.go",Inspection,Not Started,,
