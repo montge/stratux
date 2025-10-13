@@ -897,12 +897,73 @@ See `TEST_PLAN.md` for test case traceability (to be created).
 
 ## 9. References
 
-1. RTCA DO-278A: Software Integrity Assurance for CNS/ATM Systems
-2. RTCA DO-260B: Minimum Operational Performance Standards for 1090 MHz Extended Squitter ADS-B
-3. RTCA DO-282B: Minimum Operational Performance Standards for UAT ADS-B
-4. FAA GDL90 Public Interface Control Document
-5. NMEA 0183 Standard for Interfacing Marine Electronic Devices
-6. Stratux Code Repository: https://github.com/cyoung/stratux
+### 9.1 Aviation Standards
+
+1. **RTCA DO-278A**: "Guidelines for Communication, Navigation, Surveillance and Air Traffic Management (CNS/ATM) Systems Software Integrity Assurance," December 2011
+   - **Source**: RTCA, Inc. (https://www.rtca.org/)
+   - **Applicability**: SAL-3 classification for Stratux system
+
+2. **RTCA DO-260B**: "Minimum Operational Performance Standards for 1090 MHz Extended Squitter Automatic Dependent Surveillance-Broadcast (ADS-B) and Traffic Information Services-Broadcast (TIS-B)," December 2, 2009
+   - **Source**: RTCA, Inc., incorporated by reference in 14 CFR 91.225 and 91.227
+   - **Applicability**: FR-101 (1090 MHz ADS-B reception), FR-401 (traffic fusion)
+   - **European Equivalent**: EUROCAE ED-102A/ED-102B
+   - **Referenced TSO**: TSO-C166b
+
+3. **RTCA DO-282B**: "Minimum Operational Performance Standards for Universal Access Transceiver (UAT) Automatic Dependent Surveillance-Broadcast (ADS-B)," Section 2, December 2, 2009
+   - **Source**: RTCA, Inc., incorporated by reference in 14 CFR 91.225 and 91.227
+   - **Applicability**: FR-102 (978 MHz UAT reception), FR-501 (FIS-B weather)
+   - **Referenced TSO**: TSO-C154c
+   - **Update**: DO-282C published June 23, 2022
+
+4. **FAA GDL90 Public ICD**: "GDL 90 Data Interface Specification," Revision A, 560-1058-00, June 5, 2007
+   - **Source**: https://www.faa.gov/sites/faa.gov/files/air_traffic/technology/adsb/archival/GDL90_Public_ICD_RevA.PDF
+   - **Applicability**: FR-601 to FR-606 (GDL90 output protocol)
+   - **Extensions**: ForeFlight GDL 90 Extended Specification (https://www.foreflight.com/connect/spec/)
+
+5. **NMEA 0183**: Standard for Interfacing Marine Electronic Devices, Version 4.11
+   - **Source**: National Marine Electronics Association
+   - **Applicability**: FR-701 (NMEA GPS sentences), FR-702 (FLARM NMEA)
+
+6. **EUROCONTROL ESASSP**: "EUROCONTROL Specification for ATM Surveillance System Performance," Volumes 1-2, 2023
+   - **Source**: https://www.eurocontrol.int/publication/eurocontrol-specification-atm-surveillance-system-performance-esassp
+   - **Applicability**: European ADS-B requirements, system performance specifications
+
+7. **EUROCONTROL ASTERIX Category 021**: "ADS-B Target Reports," v2.6, December 2021
+   - **Source**: https://www.eurocontrol.int/sites/default/files/2021-12/asterix-adsbtr-cat021-part12-v2-6.pdf
+   - **Applicability**: European ADS-B data format standards
+
+8. **FAA Advisory Circular AC 00-63**: "Use of Cockpit Displays of Digital Weather and Operational Information"
+   - **Applicability**: FR-501 (FIS-B weather products), display requirements
+
+### 9.2 Regulatory Documents
+
+1. **14 CFR 91.225**: "Automatic Dependent Surveillance-Broadcast (ADS-B) Out equipment and use"
+   - **Source**: https://www.ecfr.gov/current/title-14/chapter-I/subchapter-F/part-91/subpart-C/section-91.225
+
+2. **14 CFR 91.227**: "Automatic Dependent Surveillance-Broadcast (ADS-B) Out equipment performance requirements"
+   - **Source**: https://www.ecfr.gov/current/title-14/chapter-I/subchapter-F/part-91/subpart-C/section-91.227
+
+3. **FAA TSO-C166b**: "Extended Squitter Automatic Dependent Surveillance-Broadcast (ADS-B) and Traffic Information Service-Broadcast (TIS-B) Equipment Operating on the Radio Frequency of 1090 Megahertz (MHz)"
+   - References DO-260B
+
+4. **FAA TSO-C154d**: "Universal Access Transceiver (UAT) Automatic Dependent Surveillance-Broadcast (ADS-B) Equipment"
+   - References DO-282B
+
+### 9.3 Project Documentation
+
+1. **Stratux Code Repository**: https://github.com/stratux/stratux
+2. **Stratux User Documentation**: https://stratux.me/
+3. **Stratux HIGH_LEVEL_DESIGN.md**: High-Level Design Document, Version 1.0
+4. **Stratux DO-278A-ANALYSIS.md**: DO-278A Compliance Analysis, Version 1.0
+5. **Stratux SOFTWARE_DEVELOPMENT_PROCESS.md**: Software Development Process, Version 1.0
+
+### 9.4 Source Accessibility Notes
+
+- **DO-278A, DO-260B, DO-282B**: Available for purchase from RTCA, Inc. (https://www.rtca.org/). These standards are incorporated by reference into FAA regulations and may be inspected at FAA offices or online at regulations.gov.
+- **GDL90 ICD**: Publicly available from FAA website (direct download link provided above)
+- **EUROCONTROL Documents**: Publicly available from EUROCONTROL website (links provided above)
+- **CFR Regulations**: Publicly available at ecfr.gov
+- **TSO Standards**: Available from FAA website or by reference to incorporated RTCA documents
 
 ---
 
