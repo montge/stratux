@@ -1393,3 +1393,195 @@ func TestCleanupOldEntries_RecentTraffic(t *testing.T) {
 		t.Error("Expected recent traffic (<60s) to be retained")
 	}
 }
+
+// TestIsOwnshipTrafficInfo_OGNTracker tests OGN tracker ownship detection
+// Verifies: FR-403 (Ownship Detection - OGN tracker)
+func TestIsOwnshipTrafficInfo_OGNTracker(t *testing.T) {
+	// Save original settings
+	origOwnship := globalSettings.OwnshipModeS
+	origOGNAddr := globalSettings.OGNAddr
+	origPrevAddr := globalStatus.OGNPrevRandomAddr
+	origGPSType := globalStatus.GPS_detected_type
+	defer func() {
+		globalSettings.OwnshipModeS = origOwnship
+		globalSettings.OGNAddr = origOGNAddr
+		globalStatus.OGNPrevRandomAddr = origPrevAddr
+		globalStatus.GPS_detected_type = origGPSType
+	}()
+
+	// Setup OGN tracker configuration
+	globalStatus.GPS_detected_type = GPS_TYPE_OGNTRACKER
+	globalSettings.OGNAddr = "ABC123"
+	globalStatus.OGNPrevRandomAddr = "DEF456"
+
+	// Initialize GPS as invalid for this test
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	globalStatus.GPS_connected = false
+
+	// Test traffic matching current OGN address
+	ti1 := TrafficInfo{
+		Icao_addr:      0xABC123,
+		Position_valid: true,
+	}
+
+	isOwnship1, shouldIgnore1 := isOwnshipTrafficInfo(ti1)
+
+	if !shouldIgnore1 {
+		t.Error("Expected OGN tracker address to be marked as shouldIgnore")
+	}
+	if !isOwnship1 {
+		t.Error("Expected OGN tracker with invalid GPS to be marked as ownship")
+	}
+
+	// Test traffic matching previous OGN address
+	ti2 := TrafficInfo{
+		Icao_addr:      0xDEF456,
+		Position_valid: true,
+	}
+
+	isOwnship2, shouldIgnore2 := isOwnshipTrafficInfo(ti2)
+
+	if !shouldIgnore2 {
+		t.Error("Expected previous OGN tracker address to be marked as shouldIgnore")
+	}
+	if !isOwnship2 {
+		t.Error("Expected previous OGN tracker with invalid GPS to be marked as ownship")
+	}
+}
+
+// TestIsOwnshipTrafficInfo_GNSSAltitude tests ownship detection with GNSS altitude
+// Verifies: FR-403 (Ownship Detection - GNSS altitude comparison)
+func TestIsOwnshipTrafficInfo_GNSSAltitude(t *testing.T) {
+	// Save original settings
+	origOwnship := globalSettings.OwnshipModeS
+	defer func() { globalSettings.OwnshipModeS = origOwnship }()
+
+	globalSettings.OwnshipModeS = "A12345"
+
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Setup valid GPS with GNSS altitude
+	mySituation.GPSLatitude = 43.99
+	mySituation.GPSLongitude = -88.56
+	mySituation.GPSAltitudeMSL = 5000
+	mySituation.GPSHeightAboveEllipsoid = 5100 // GNSS altitude (100ft above MSL)
+	mySituation.GPSHorizontalAccuracy = 5
+	mySituation.GPSGroundSpeed = 0
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 2
+	globalStatus.GPS_connected = true
+
+	// Test traffic with GNSS altitude close to ownship GNSS altitude
+	ti := TrafficInfo{
+		Icao_addr:      0xA12345,
+		Position_valid: true,
+		Lat:            43.99,
+		Lng:            -88.56,
+		Alt:            5100,     // Matches GNSS altitude
+		AltIsGNSS:      true,     // Use GNSS altitude comparison
+		Age:            1.0,
+	}
+
+	_, shouldIgnore := isOwnshipTrafficInfo(ti)
+
+	// With matching ICAO and close GNSS position/altitude, should be marked as ownship
+	if !shouldIgnore {
+		t.Error("Expected ownship with matching GNSS altitude to be marked as shouldIgnore")
+	}
+}
+
+// TestIsOwnshipTrafficInfo_FarAway tests ownship rejection when too far away
+// Verifies: FR-403 (Ownship Detection - distance rejection)
+func TestIsOwnshipTrafficInfo_FarAway(t *testing.T) {
+	// Save original settings
+	origOwnship := globalSettings.OwnshipModeS
+	defer func() { globalSettings.OwnshipModeS = origOwnship }()
+
+	globalSettings.OwnshipModeS = "A12345"
+
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Setup valid GPS
+	mySituation.GPSLatitude = 43.99
+	mySituation.GPSLongitude = -88.56
+	mySituation.GPSAltitudeMSL = 5000
+	mySituation.GPSHorizontalAccuracy = 5
+	mySituation.GPSGroundSpeed = 0
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 2
+	globalStatus.GPS_connected = true
+
+	// Test traffic with matching ICAO but very far away (>2000m)
+	ti := TrafficInfo{
+		Icao_addr:      0xA12345,
+		Position_valid: true,
+		Lat:            44.05,    // ~6 km north
+		Lng:            -88.56,
+		Alt:            5000,
+		Age:            1.0,
+	}
+
+	isOwnship, shouldIgnore := isOwnshipTrafficInfo(ti)
+
+	// Far away traffic should not be marked as ownship even with matching ICAO
+	if isOwnship {
+		t.Error("Expected far away traffic (>2000m) to not be marked as ownship")
+	}
+	// Should still iterate through codes, so shouldIgnore might be false
+	t.Logf("Far away ownship: isOwnship=%v, shouldIgnore=%v", isOwnship, shouldIgnore)
+}
+
+// TestIsOwnshipTrafficInfo_AltitudeTooHigh tests ownship rejection with large altitude difference
+// Verifies: FR-403 (Ownship Detection - altitude rejection)
+func TestIsOwnshipTrafficInfo_AltitudeTooHigh(t *testing.T) {
+	// Save original settings
+	origOwnship := globalSettings.OwnshipModeS
+	defer func() { globalSettings.OwnshipModeS = origOwnship }()
+
+	globalSettings.OwnshipModeS = "A12345"
+
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Setup valid GPS
+	mySituation.GPSLatitude = 43.99
+	mySituation.GPSLongitude = -88.56
+	mySituation.GPSAltitudeMSL = 5000
+	mySituation.BaroPressureAltitude = 5000
+	mySituation.GPSHorizontalAccuracy = 5
+	mySituation.GPSGroundSpeed = 0
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 2
+	globalStatus.GPS_connected = true
+
+	// Test traffic with matching ICAO and close position but altitude >500ft different
+	ti := TrafficInfo{
+		Icao_addr:      0xA12345,
+		Position_valid: true,
+		Lat:            43.99,
+		Lng:            -88.56,
+		Alt:            6000,     // 1000ft higher (>500ft threshold)
+		AltIsGNSS:      false,
+		Age:            1.0,
+	}
+
+	isOwnship, shouldIgnore := isOwnshipTrafficInfo(ti)
+
+	// Traffic with altitude difference >500ft should not be marked as ownship
+	if isOwnship {
+		t.Error("Expected traffic with >500ft altitude difference to not be marked as ownship")
+	}
+	// Should still iterate through codes, so shouldIgnore might be false
+	t.Logf("High altitude difference: isOwnship=%v, shouldIgnore=%v", isOwnship, shouldIgnore)
+}
