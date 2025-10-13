@@ -1,0 +1,80 @@
+name: Build US/EU Regions
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      region:
+        description: 'Which region(s) to build'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - US
+          - EU
+          - both
+
+jobs:
+  build-us:
+    if: inputs.region == 'US' || inputs.region == 'both'
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update submodules
+        run: git submodule update --init --recursive
+
+      - name: Modify Makefile for US region
+        run: |
+          sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": true,\"OGN_Enabled\": false,\"DeveloperMode\": false,\"RegionSelected\": 1}'/" Makefile
+
+      - name: Build US .deb package
+        run: make ddpkg
+
+      - name: Rename deb with region
+        run: |
+          DEB_FILE=$(ls -1t stratux-*.deb | head -1)
+          VERSION=$(echo "$DEB_FILE" | sed 's/stratux-\(.*\)-.*.deb/\1/')
+          ARCH=$(echo "$DEB_FILE" | sed 's/stratux-.*-\(.*\).deb/\1/')
+          mv "$DEB_FILE" "stratux-US-${VERSION}-${ARCH}.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stratux-US-debian-package
+          path: stratux-US-*.deb
+          if-no-files-found: error
+
+  build-eu:
+    if: inputs.region == 'EU' || inputs.region == 'both'
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update submodules
+        run: git submodule update --init --recursive
+
+      - name: Modify Makefile for EU region
+        run: |
+          sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": false,\"OGN_Enabled\": true,\"DeveloperMode\": true,\"RegionSelected\": 2}'/" Makefile
+
+      - name: Build EU .deb package
+        run: make ddpkg
+
+      - name: Rename deb with region
+        run: |
+          DEB_FILE=$(ls -1t stratux-*.deb | head -1)
+          VERSION=$(echo "$DEB_FILE" | sed 's/stratux-\(.*\)-.*.deb/\1/')
+          ARCH=$(echo "$DEB_FILE" | sed 's/stratux-.*-\(.*\).deb/\1/')
+          mv "$DEB_FILE" "stratux-EU-${VERSION}-${ARCH}.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stratux-EU-debian-package
+          path: stratux-EU-*.deb
+          if-no-files-found: error
