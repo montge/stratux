@@ -247,7 +247,8 @@ func TestComputeTrafficPriority_NoBearing(t *testing.T) {
 // Verifies: FR-402 (Traffic Position Extrapolation)
 func TestExtrapolateTraffic(t *testing.T) {
 	// Initialize stratuxClock for testing
-	stratuxClock = stratuxClockType{Time: time.Now()}
+	stratuxClock = NewMonotonic()
+	time.Sleep(10 * time.Millisecond) // Let the monotonic clock start
 
 	ti := TrafficInfo{
 		Lat:                  43.99,
@@ -263,9 +264,8 @@ func TestExtrapolateTraffic(t *testing.T) {
 		Last_extrapolation:   stratuxClock.Time,
 	}
 
-	// Simulate 1 second passing
-	time.Sleep(10 * time.Millisecond) // Small delay to avoid zero time diff
-	stratuxClock.Time = time.Now()
+	// Simulate time passing
+	time.Sleep(100 * time.Millisecond) // Wait for clock to advance
 
 	extrapolateTraffic(&ti)
 
