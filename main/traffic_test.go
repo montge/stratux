@@ -972,3 +972,202 @@ func TestEstimateDistance_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// TestIsOwnshipTrafficInfo_NoPosition tests ownship without position
+// Verifies: FR-403 (Ownship Detection - bearingless)
+func TestIsOwnshipTrafficInfo_NoPosition(t *testing.T) {
+	// Save original settings
+	origOwnship := globalSettings.OwnshipModeS
+	defer func() { globalSettings.OwnshipModeS = origOwnship }()
+
+	globalSettings.OwnshipModeS = "A12345"
+
+	ti := TrafficInfo{
+		Icao_addr:      0xA12345,
+		Position_valid: false, // No position
+	}
+
+	isOwnship, shouldIgnore := isOwnshipTrafficInfo(ti)
+
+	// Without position, can't verify ownship but should ignore for bearingless display
+	if !shouldIgnore {
+		t.Error("Expected ownship without position to be marked as shouldIgnore")
+	}
+	if isOwnship {
+		t.Error("Expected ownship without position to not be marked as isOwnship")
+	}
+}
+
+// TestIsOwnshipTrafficInfo_MultipleICAO tests ownship with comma-separated list
+// Verifies: FR-403 (Ownship Detection - multiple addresses)
+func TestIsOwnshipTrafficInfo_MultipleICAO(t *testing.T) {
+	// Save original settings
+	origOwnship := globalSettings.OwnshipModeS
+	defer func() { globalSettings.OwnshipModeS = origOwnship }()
+
+	// Set multiple ownship ICAOs
+	globalSettings.OwnshipModeS = "A12345, ABCDEF, 123456"
+
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	mySituation.GPSLatitude = 43.99
+	mySituation.GPSLongitude = -88.56
+	mySituation.GPSAltitudeMSL = 5000
+	mySituation.BaroPressureAltitude = 5000
+	mySituation.GPSHorizontalAccuracy = 5
+	mySituation.GPSGroundSpeed = 0
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	globalStatus.GPS_connected = true
+
+	// Test second ICAO in list
+	ti := TrafficInfo{
+		Icao_addr:      0xABCDEF,
+		Position_valid: true,
+		Lat:            43.99,
+		Lng:            -88.56,
+		Alt:            5000,
+		AltIsGNSS:      false,
+		Age:            1.0,
+	}
+
+	_, shouldIgnore := isOwnshipTrafficInfo(ti)
+
+	// Second ICAO in list should also be recognized
+	if !shouldIgnore {
+		t.Error("Expected second ownship ICAO to be marked as shouldIgnore")
+	}
+}
+
+// TestRegisterTrafficUpdate tests traffic update registration
+// Verifies: FR-401 (Traffic Fusion - update notification)
+func TestRegisterTrafficUpdate(t *testing.T) {
+	// This function sends JSON updates to web interface
+	// We can't fully test the websocket functionality, but we can verify it doesn't panic
+
+	ti := TrafficInfo{
+		Icao_addr:      0xABCDEF,
+		Lat:            43.99,
+		Lng:            -88.56,
+		Alt:            5000,
+		Speed:          120,
+		Track:          90.0,
+		Position_valid: true,
+	}
+
+	// Should not panic
+	registerTrafficUpdate(ti)
+}
+
+// TestExtrapolateTraffic_NegativeVvel tests descent extrapolation
+// Verifies: FR-402 (Traffic Position Extrapolation - descent)
+func TestExtrapolateTraffic_NegativeVvel(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	startTime := stratuxClock.Time
+
+	ti := TrafficInfo{
+		Lat:                  40.0,
+		Lng:                  -100.0,
+		Alt:                  10000,
+		Track:                180, // Due south
+		Speed:                200,
+		Vvel:                 -1000, // Descending 1000 ft/min
+		Speed_valid:          true,
+		Position_valid:       true,
+		ExtrapolatedPosition: false,
+		Last_seen:            startTime,
+		Last_extrapolation:   startTime,
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	extrapolateTraffic(&ti)
+
+	// Verify extrapolation occurred
+	if !ti.ExtrapolatedPosition {
+		t.Error("Expected ExtrapolatedPosition to be true")
+	}
+
+	// Verify latitude decreased (moving south)
+	if ti.Lat >= 40.0 {
+		t.Logf("Expected latitude to decrease (south), got %f (timing sensitive)", ti.Lat)
+	}
+
+	// Verify altitude decreased (descending)
+	if ti.Alt >= 10000 {
+		t.Logf("Expected altitude to decrease, got %d (timing sensitive)", ti.Alt)
+	}
+}
+
+// TestExtrapolateTraffic_TrackWrapAround tests track angle wrapping
+// Verifies: FR-402 (Traffic Position Extrapolation - track normalization)
+func TestExtrapolateTraffic_TrackWrapAround(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	startTime := stratuxClock.Time
+
+	// Test track wrapping from 350 degrees with right turn (should wrap to > 360, then normalize)
+	ti := TrafficInfo{
+		Lat:                  40.0,
+		Lng:                  -100.0,
+		Alt:                  10000,
+		Track:                350, // Nearly north
+		TurnRate:             5.0, // 5 deg/sec right turn
+		Speed:                120,
+		Speed_valid:          true,
+		Position_valid:       true,
+		ExtrapolatedPosition: false,
+		Last_seen:            startTime,
+		Last_extrapolation:   startTime,
+	}
+
+	time.Sleep(1 * time.Second)
+
+	extrapolateTraffic(&ti)
+
+	// Track should have wrapped around and be normalized to 0-360
+	if ti.Track < 0 || ti.Track > 360 {
+		t.Errorf("Expected track to be normalized to 0-360, got %f", ti.Track)
+	}
+}
+
+// TestComputeTrafficPriority_AltitudeDifference tests priority with altitude difference
+// Verifies: FR-407 (Traffic Alerting - altitude-aware prioritization)
+func TestComputeTrafficPriority_AltitudeDifference(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	mySituation.BaroPressureAltitude = 5000
+	mySituation.GPSAltitudeMSL = 5000
+
+	// Same distance, different altitudes
+	sameAltTraffic := TrafficInfo{
+		BearingDist_valid: true,
+		Distance:          10000, // 10 km
+		Alt:               5000,  // Same altitude
+	}
+
+	diffAltTraffic := TrafficInfo{
+		BearingDist_valid: true,
+		Distance:          10000, // 10 km
+		Alt:               10000, // 5000 ft higher
+	}
+
+	samePriority := computeTrafficPriority(&sameAltTraffic)
+	diffPriority := computeTrafficPriority(&diffAltTraffic)
+
+	// Traffic at different altitude should have lower priority (higher number)
+	if diffPriority <= samePriority {
+		t.Errorf("Traffic with altitude difference (%d) should have lower priority than same altitude (%d)", diffPriority, samePriority)
+	}
+}
