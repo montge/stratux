@@ -32,7 +32,7 @@ jobs:
           sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": true,\"OGN_Enabled\": false,\"DeveloperMode\": false,\"RegionSelected\": 1}'/" Makefile
 
       - name: Build US .deb package
-        run: make ddpkg
+        run: make dpkg
 
       - name: Rename deb with region
         run: |
@@ -64,7 +64,7 @@ jobs:
           sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": false,\"OGN_Enabled\": true,\"DeveloperMode\": true,\"RegionSelected\": 2}'/" Makefile
 
       - name: Build EU .deb package
-        run: make ddpkg
+        run: make dpkg
 
       - name: Rename deb with region
         run: |
