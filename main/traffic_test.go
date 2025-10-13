@@ -1153,17 +1153,18 @@ func TestComputeTrafficPriority_AltitudeDifference(t *testing.T) {
 
 	// Same distance, different altitudes
 	// Priority formula: (altDiff/3.33 + distance) / 10000.0
-	// At same alt: (0/3.33 + 5000) / 10000.0 = 0
-	// At 10000ft diff: (10000/3.33 + 5000) / 10000.0 = 3
+	// Need larger values to get integer differences
+	// At same alt: (0/3.33 + 20000) / 10000.0 = 2
+	// At 10000ft diff: (10000/3.33 + 20000) / 10000.0 = 5
 	sameAltTraffic := TrafficInfo{
 		BearingDist_valid: true,
-		Distance:          5000, // 5 km
-		Alt:               5000, // Same altitude
+		Distance:          20000, // 20 km
+		Alt:               5000,  // Same altitude
 	}
 
 	diffAltTraffic := TrafficInfo{
 		BearingDist_valid: true,
-		Distance:          5000,  // 5 km
+		Distance:          20000, // 20 km
 		Alt:               15000, // 10000 ft higher
 	}
 
