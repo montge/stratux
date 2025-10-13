@@ -1152,16 +1152,19 @@ func TestComputeTrafficPriority_AltitudeDifference(t *testing.T) {
 	mySituation.GPSAltitudeMSL = 5000
 
 	// Same distance, different altitudes
+	// Priority formula: (altDiff/3.33 + distance) / 10000.0
+	// At same alt: (0/3.33 + 5000) / 10000.0 = 0
+	// At 10000ft diff: (10000/3.33 + 5000) / 10000.0 = 3
 	sameAltTraffic := TrafficInfo{
 		BearingDist_valid: true,
-		Distance:          10000, // 10 km
-		Alt:               5000,  // Same altitude
+		Distance:          5000, // 5 km
+		Alt:               5000, // Same altitude
 	}
 
 	diffAltTraffic := TrafficInfo{
 		BearingDist_valid: true,
-		Distance:          10000, // 10 km
-		Alt:               10000, // 5000 ft higher
+		Distance:          5000,  // 5 km
+		Alt:               15000, // 10000 ft higher
 	}
 
 	samePriority := computeTrafficPriority(&sameAltTraffic)
