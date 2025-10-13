@@ -1,40 +1,134 @@
 name: CI
 
 on:
-  # Run on pull requests
-  pull_request:
-
-  # and pushes to main
   push:
-    branches:
-      - master
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  test:
+    name: Test & Coverage
     runs-on: ubuntu-24.04-arm
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc make libusb-1.0-0-dev wget
+        cd /tmp
+        wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb
+        sudo dpkg -i librtlsdr0_2.0.2-2_arm64.deb
+        wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb
+        sudo dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build dump978 library
+      run: |
+        cd dump978
+        make lib
+
+    - name: Run tests with coverage
+      run: |
+        # TODO: Add -race flag once stratuxClock race conditions are fixed (see monotonic.go)
+        go test -v -coverprofile=coverage.out -covermode=atomic ./main/...
+        go test -v ./common/...
+
+    - name: Generate coverage report
+      run: |
+        go tool cover -func=coverage.out -o=coverage.txt
+        go tool cover -html=coverage.out -o=coverage.html
+
+    - name: Display coverage summary
+      run: |
+        echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        tail -n 1 coverage.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Detailed Coverage" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        head -n 50 coverage.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: Check coverage threshold
+      run: |
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Total coverage: ${COVERAGE}%"
+        # For now, just report coverage. Will enforce 80% threshold once baseline is established
+        if (( $(echo "$COVERAGE < 80.0" | bc -l) )); then
+          echo "⚠️  Coverage is ${COVERAGE}%, target is 80%"
+          echo "::warning::Code coverage ${COVERAGE}% is below target of 80%"
+        else
+          echo "✅ Coverage ${COVERAGE}% meets target of 80%"
+        fi
+
+    - name: Upload coverage to artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report
+        path: |
+          coverage.out
+          coverage.txt
+          coverage.html
+        retention-days: 30
+
+    - name: Run static analysis
+      run: |
+        go vet ./main/...
+        go vet ./common/...
+
+    - name: Check formatting
+      run: |
+        if [ "$(gofmt -l ./main ./common | wc -l)" -gt 0 ]; then
+          echo "The following files are not formatted correctly:"
+          gofmt -l ./main ./common
+          exit 1
+        fi
+
+  build:
+    name: Build Debian Package
+    needs: test
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # fetch the full repository, necessary as the latest tag is used during the build of the deb
+          fetch-depth: 0
 
       - name: Update submodule
         run: git submodule update --init --recursive
 
-      - name: make ddpkg
+      - name: Build debian package
         run: make ddpkg
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload debian package
+        uses: actions/upload-artifact@v4
         with:
-          name: stratux debian package
+          name: stratux-debian-package
           path: |
             *.deb
           if-no-files-found: error
