@@ -1483,8 +1483,8 @@ func TestIsOwnshipTrafficInfo_GNSSAltitude(t *testing.T) {
 		Position_valid: true,
 		Lat:            43.99,
 		Lng:            -88.56,
-		Alt:            5100,     // Matches GNSS altitude
-		AltIsGNSS:      true,     // Use GNSS altitude comparison
+		Alt:            5100, // Matches GNSS altitude
+		AltIsGNSS:      true, // Use GNSS altitude comparison
 		Age:            1.0,
 	}
 
@@ -1524,7 +1524,7 @@ func TestIsOwnshipTrafficInfo_FarAway(t *testing.T) {
 	ti := TrafficInfo{
 		Icao_addr:      0xA12345,
 		Position_valid: true,
-		Lat:            44.05,    // ~6 km north
+		Lat:            44.05, // ~6 km north
 		Lng:            -88.56,
 		Alt:            5000,
 		Age:            1.0,
@@ -1570,7 +1570,7 @@ func TestIsOwnshipTrafficInfo_AltitudeTooHigh(t *testing.T) {
 		Position_valid: true,
 		Lat:            43.99,
 		Lng:            -88.56,
-		Alt:            6000,     // 1000ft higher (>500ft threshold)
+		Alt:            6000, // 1000ft higher (>500ft threshold)
 		AltIsGNSS:      false,
 		Age:            1.0,
 	}
@@ -1637,7 +1637,7 @@ func TestEstimateDistance_NegativeTimeDiff(t *testing.T) {
 		Alt:                     5000,
 		DistanceEstimated:       10000,
 		DistanceEstimatedLastTs: now.Add(1 * time.Second), // Future timestamp
-		Timestamp:               now,                       // Current time < last estimate time
+		Timestamp:               now,                      // Current time < last estimate time
 	}
 
 	initialEstimate := ti.DistanceEstimated
