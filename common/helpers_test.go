@@ -393,3 +393,324 @@ func TestRoundToInt16(t *testing.T) {
 		}
 	}
 }
+
+// TestLinRegWeighted tests weighted linear regression
+func TestLinRegWeighted(t *testing.T) {
+	testCases := []struct {
+		name              string
+		x                 []float64
+		y                 []float64
+		w                 []float64
+		expectValid       bool
+		expectedSlope     float64
+		expectedIntercept float64
+	}{
+		{
+			name:              "Equal weights (should match unweighted)",
+			x:                 []float64{1, 2, 3, 4, 5},
+			y:                 []float64{2, 4, 6, 8, 10},
+			w:                 []float64{1, 1, 1, 1, 1},
+			expectValid:       true,
+			expectedSlope:     2.0,
+			expectedIntercept: 0.0,
+		},
+		{
+			name:        "Different array lengths",
+			x:           []float64{1, 2, 3},
+			y:           []float64{1, 2},
+			w:           []float64{1, 1, 1},
+			expectValid: false,
+		},
+		{
+			name:        "Weights sum to zero",
+			x:           []float64{1, 2, 3},
+			y:           []float64{1, 2, 3},
+			w:           []float64{1, -1, 0},
+			expectValid: false,
+		},
+		{
+			name:        "Too few points",
+			x:           []float64{1},
+			y:           []float64{1},
+			w:           []float64{1},
+			expectValid: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			slope, intercept, valid := LinRegWeighted(tc.x, tc.y, tc.w)
+
+			if valid != tc.expectValid {
+				t.Errorf("LinRegWeighted() valid = %v, want %v", valid, tc.expectValid)
+			}
+
+			if tc.expectValid {
+				if math.Abs(slope-tc.expectedSlope) > 0.001 {
+					t.Errorf("LinRegWeighted() slope = %f, want %f", slope, tc.expectedSlope)
+				}
+				if math.Abs(intercept-tc.expectedIntercept) > 0.001 {
+					t.Errorf("LinRegWeighted() intercept = %f, want %f", intercept, tc.expectedIntercept)
+				}
+			}
+		})
+	}
+}
+
+// TestTriCubeWeight tests tricube weight function
+func TestTriCubeWeight(t *testing.T) {
+	testCases := []struct {
+		center    float64
+		halfwidth float64
+		x         float64
+		expected  float64
+	}{
+		{0, 1, 0, 1.0},         // At center, weight = 1
+		{0, 1, 1, 0.0},         // At edge, weight = 0
+		{0, 1, 2, 0.0},         // Beyond halfwidth, weight = 0
+		{5, 2, 5, 1.0},         // Different center
+		{5, 2, 6, 0.669922},    // x_t=0.5, weight=(1-0.5^3)^3 = 0.875^3
+		{0, 1, 0.5, 0.669922},  // x_t=0.5, same formula
+		{0, 1, -0.5, 0.669922}, // Symmetric (negative side)
+	}
+
+	for _, tc := range testCases {
+		result := TriCubeWeight(tc.center, tc.halfwidth, tc.x)
+		if math.Abs(result-tc.expected) > 0.001 {
+			t.Errorf("TriCubeWeight(%f, %f, %f) = %f, want %f",
+				tc.center, tc.halfwidth, tc.x, result, tc.expected)
+		}
+	}
+}
+
+// TestArrayRange tests array range calculation
+func TestArrayRange(t *testing.T) {
+	testCases := []struct {
+		name          string
+		data          []float64
+		expectedRange float64
+		expectValid   bool
+	}{
+		{
+			name:          "Positive numbers",
+			data:          []float64{1, 2, 3, 4, 5},
+			expectedRange: 4.0,
+			expectValid:   true,
+		},
+		{
+			name:          "Mixed values",
+			data:          []float64{-5, 0, 5},
+			expectedRange: 10.0,
+			expectValid:   true,
+		},
+		{
+			name:        "Empty array",
+			data:        []float64{},
+			expectValid: false,
+		},
+		{
+			name:          "Single value",
+			data:          []float64{42},
+			expectedRange: 0.0,
+			expectValid:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, valid := ArrayRange(tc.data)
+
+			if valid != tc.expectValid {
+				t.Errorf("ArrayRange() valid = %v, want %v", valid, tc.expectValid)
+			}
+
+			if tc.expectValid && math.Abs(result-tc.expectedRange) > 0.001 {
+				t.Errorf("ArrayRange() = %f, want %f", result, tc.expectedRange)
+			}
+		})
+	}
+}
+
+// TestStdev tests standard deviation calculation
+func TestStdev(t *testing.T) {
+	testCases := []struct {
+		name        string
+		data        []float64
+		expectedStd float64
+		expectValid bool
+	}{
+		{
+			name:        "Constant values",
+			data:        []float64{5, 5, 5, 5, 5},
+			expectedStd: 0.0,
+			expectValid: true,
+		},
+		{
+			name:        "Simple sequence",
+			data:        []float64{2, 4, 4, 4, 5, 5, 7, 9},
+			expectedStd: 2.138,
+			expectValid: true,
+		},
+		{
+			name:        "Too few points",
+			data:        []float64{5},
+			expectValid: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, valid := Stdev(tc.data)
+
+			if valid != tc.expectValid {
+				t.Errorf("Stdev() valid = %v, want %v", valid, tc.expectValid)
+			}
+
+			if tc.expectValid && math.Abs(result-tc.expectedStd) > 0.01 {
+				t.Errorf("Stdev() = %f, want %f", result, tc.expectedStd)
+			}
+		})
+	}
+}
+
+// TestRadiansRel tests relative angle conversion with wrapping
+func TestRadiansRel(t *testing.T) {
+	testCases := []struct {
+		degrees float64
+		radians float64
+	}{
+		{0, 0},
+		{90, math.Pi / 2},
+		{180, math.Pi},
+		{-180, -math.Pi},
+		{270, -math.Pi / 2}, // Wraps to -90
+		{360, 0},            // Wraps to 0
+		{450, math.Pi / 2},  // Wraps to 90
+		{-270, math.Pi / 2}, // Wraps to 90
+	}
+
+	for _, tc := range testCases {
+		result := RadiansRel(tc.degrees)
+		if math.Abs(result-tc.radians) > 0.0001 {
+			t.Errorf("RadiansRel(%f) = %f, want %f", tc.degrees, result, tc.radians)
+		}
+	}
+}
+
+// TestDegreesRel tests relative angle conversion from radians
+func TestDegreesRel(t *testing.T) {
+	testCases := []struct {
+		radians float64
+		degrees float64
+	}{
+		{0, 0},
+		{math.Pi / 2, 90},
+		{math.Pi, 180},
+		{-math.Pi, -180},
+		{3 * math.Pi / 2, -90}, // Wraps to -90
+		{2 * math.Pi, 0},       // Wraps to 0
+		{5 * math.Pi / 2, 90},  // Wraps to 90
+		{-3 * math.Pi / 2, 90}, // Wraps to 90
+	}
+
+	for _, tc := range testCases {
+		result := DegreesRel(tc.radians)
+		if math.Abs(result-tc.degrees) > 0.0001 {
+			t.Errorf("DegreesRel(%f) = %f, want %f", tc.radians, result, tc.degrees)
+		}
+	}
+}
+
+// TestDegreesHdg tests heading angle conversion
+func TestDegreesHdg(t *testing.T) {
+	testCases := []struct {
+		radians float64
+		heading float64
+	}{
+		{0, 0},
+		{math.Pi / 2, 90},
+		{math.Pi, 180},
+		{3 * math.Pi / 2, 270},
+		{2 * math.Pi, 360},
+		{-math.Pi / 2, 270},    // Negative wraps to 270
+		{-math.Pi, 180},        // Negative wraps to 180
+		{5 * math.Pi / 2, 450}, // Beyond 360 (doesn't wrap for headings)
+	}
+
+	for _, tc := range testCases {
+		result := DegreesHdg(tc.radians)
+		if math.Abs(result-tc.heading) > 0.0001 {
+			t.Errorf("DegreesHdg(%f) = %f, want %f", tc.radians, result, tc.heading)
+		}
+	}
+}
+
+// TestDistRectNorth tests north-south distance calculation
+func TestDistRectNorth(t *testing.T) {
+	// 1 degree of latitude is approximately 111 km
+	lat1, lat2 := 43.0, 44.0
+	result := DistRectNorth(lat1, lat2)
+
+	expectedDist := 111000.0 // Approximately 111 km
+	if math.Abs(result-expectedDist) > 2000 {
+		t.Errorf("DistRectNorth(%f, %f) = %f, want ~%f", lat1, lat2, result, expectedDist)
+	}
+
+	// Test negative direction (south)
+	resultSouth := DistRectNorth(lat2, lat1)
+	if resultSouth >= 0 {
+		t.Errorf("DistRectNorth(%f, %f) should be negative (moving south)", lat2, lat1)
+	}
+
+	t.Logf("North distance: %.1f m", result)
+}
+
+// TestDistRectEast tests east-west distance calculation
+func TestDistRectEast(t *testing.T) {
+	// At 45° latitude, 1 degree longitude ≈ 78.8 km
+	lat := 45.0
+	lon1, lon2 := -89.0, -88.0
+
+	result := DistRectEast(lat, lon1, lat, lon2)
+
+	expectedDist := 78800.0 // Approximately 78.8 km at 45° latitude
+	if math.Abs(result-expectedDist) > 2000 {
+		t.Errorf("DistRectEast(%f, %f, %f, %f) = %f, want ~%f",
+			lat, lon1, lat, lon2, result, expectedDist)
+	}
+
+	// Test negative direction (west)
+	resultWest := DistRectEast(lat, lon2, lat, lon1)
+	if resultWest >= 0 {
+		t.Errorf("DistRectEast should be negative when moving west")
+	}
+
+	t.Logf("East distance at 45° lat: %.1f m", result)
+}
+
+// TestLinReg_EdgeCase tests linear regression edge case (infinite slope)
+func TestLinReg_EdgeCase(t *testing.T) {
+	// All x values the same (infinite slope)
+	x := []float64{5, 5, 5, 5}
+	y := []float64{1, 2, 3, 4}
+
+	_, _, valid := LinReg(x, y)
+
+	if valid {
+		t.Error("LinReg should return invalid for infinite slope (all x values equal)")
+	}
+}
+
+// TestLinRegWeighted_InfiniteSlope tests weighted regression edge case
+func TestLinRegWeighted_InfiniteSlope(t *testing.T) {
+	// All x values the same (infinite slope)
+	x := []float64{5, 5, 5, 5}
+	y := []float64{1, 2, 3, 4}
+	w := []float64{1, 1, 1, 1}
+
+	_, _, valid := LinRegWeighted(x, y, w)
+
+	if valid {
+		t.Error("LinRegWeighted should return invalid for infinite slope")
+	}
+}
