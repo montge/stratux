@@ -68,7 +68,7 @@ func makeFlarmPFLAUString(ti TrafficInfo) (msg string) {
 		alarmType = 2
 	}
 
-	idstr := fmt.Sprintf("%.6X", ti.Icao_addr & 0xFFFFFF)
+	idstr := fmt.Sprintf("%.6X", ti.Icao_addr&0xFFFFFF)
 	if len(ti.Tail) > 0 {
 		idstr += "!" + ti.Tail
 	}
@@ -111,16 +111,26 @@ func computeRelativeVertical(ti TrafficInfo) (relativeVertical int32) {
 func gdl90EmitterCatToNMEA(emitterCat uint8) string {
 	acType := "0"
 	switch emitterCat {
-		case 1, 6: acType = "8" // light/"highly maneuverable > 5g" = piston
-		case 2, 3, 4, 5: acType = "9" // small/large/heavy = jet
-		case 7: acType = "3" // helicopter = helicopter
-		case 9: acType = "1" // glider = glider
-		case 10: acType = "B" // lighter than air = balloon
-		case 11: acType = "4" // skydiver/parachute = sky diver
-		case 12: acType = "7" // paraglider, hanglider
-		case 14: acType = "D" // UAV
-		case 17, 18: acType = "E" // Surface vehicle->Ground support (not in dataport spec, but OGN extension?)
-		case 19: acType = "F" // static object / point obstacle
+	case 1, 6:
+		acType = "8" // light/"highly maneuverable > 5g" = piston
+	case 2, 3, 4, 5:
+		acType = "9" // small/large/heavy = jet
+	case 7:
+		acType = "3" // helicopter = helicopter
+	case 9:
+		acType = "1" // glider = glider
+	case 10:
+		acType = "B" // lighter than air = balloon
+	case 11:
+		acType = "4" // skydiver/parachute = sky diver
+	case 12:
+		acType = "7" // paraglider, hanglider
+	case 14:
+		acType = "D" // UAV
+	case 17, 18:
+		acType = "E" // Surface vehicle->Ground support (not in dataport spec, but OGN extension?)
+	case 19:
+		acType = "F" // static object / point obstacle
 	}
 	return acType
 }
@@ -131,17 +141,27 @@ func nmeaAircraftTypeToGdl90(actype string) uint8 {
 		return 0
 	}
 	cat := uint8(0)
-	switch(acTypeInt) {
-		case 1: cat = 9 // glider = glider
-		case 2, 5, 8: cat = 1 // tow, drop, piston = light
-		case 3: cat = 7 // helicopter = helicopter
-		case 4: cat = 11 // skydiver
-		case 6, 7: cat = 12 // hang glider / paraglider
-		case 9: cat = 3 // jet = large
-		case 0xB, 0xC: cat = 10 // Balloon, airship = lighter than air
-		case 0xD: cat = 14 // UAV=UAV
-		case 0xE: cat = 18 // Ground support = surface vehicle (OGN extension?)
-		case 0xF: cat = 19 // point obstacle=static object
+	switch acTypeInt {
+	case 1:
+		cat = 9 // glider = glider
+	case 2, 5, 8:
+		cat = 1 // tow, drop, piston = light
+	case 3:
+		cat = 7 // helicopter = helicopter
+	case 4:
+		cat = 11 // skydiver
+	case 6, 7:
+		cat = 12 // hang glider / paraglider
+	case 9:
+		cat = 3 // jet = large
+	case 0xB, 0xC:
+		cat = 10 // Balloon, airship = lighter than air
+	case 0xD:
+		cat = 14 // UAV=UAV
+	case 0xE:
+		cat = 18 // Ground support = surface vehicle (OGN extension?)
+	case 0xF:
+		cat = 19 // point obstacle=static object
 	}
 	return cat
 }
@@ -235,7 +255,7 @@ func makeFlarmPFLAAString(ti TrafficInfo) (msg string, valid bool, alarmLevel ui
 
 	climbRate := float32(ti.Vvel) * 0.3048 / 60 // convert to m/s
 
-	idstr := fmt.Sprintf("%.6X", ti.Icao_addr & 0xFFFFFF)
+	idstr := fmt.Sprintf("%.6X", ti.Icao_addr&0xFFFFFF)
 	if len(ti.Tail) > 0 {
 		idstr += "!" + ti.Tail
 	}
@@ -460,7 +480,7 @@ func makeAHRSLevilReport() {
 
 	msg := fmt.Sprintf("$RPYL,%d,%d,%d,%d,%d,%d,0", roll, pitch, hdg, slip_skid, yaw_rate, g)
 	appendNmeaChecksum(msg)
-	sendNetFLARM(msg + "\r\n", 100 * time.Millisecond, 4)
+	sendNetFLARM(msg+"\r\n", 100*time.Millisecond, 4)
 }
 
 func atof32(val string) float32 {
@@ -485,9 +505,9 @@ func parseFlarmNmeaMessage(message []string) {
 
 func relativeGpsAltToBaro(relVert float32) (alt int32, altIsGnss bool) {
 	if isTempPressValid() {
-		return int32(mySituation.BaroPressureAltitude + relVert * 3.28084), false
+		return int32(mySituation.BaroPressureAltitude + relVert*3.28084), false
 	} else if isGPSValid() {
-		return int32(mySituation.GPSAltitudeMSL + relVert * 3.28084), true
+		return int32(mySituation.GPSAltitudeMSL + relVert*3.28084), true
 	}
 	return 0, false
 }
@@ -530,14 +550,14 @@ func parseFlarmPFLAU(message []string) {
 	thisMsg.MessageClass = MSGCLASS_OGN
 	thisMsg.TimeReceived = stratuxClock.Time
 	msgLogAppend(thisMsg)
-	
+
 	if !isGPSValid() {
 		return // can't convert relative to absolute without GPS
 	}
 
 	ognID, tail, address := getIdTail(message[10])
 
-	trafficBearing := int32(mySituation.GPSTrueCourse + atof32(message[6])) % 360
+	trafficBearing := int32(mySituation.GPSTrueCourse+atof32(message[6])) % 360
 	if trafficBearing < 0 {
 		trafficBearing += 360
 	}
@@ -547,11 +567,11 @@ func parseFlarmPFLAU(message []string) {
 	var ti TrafficInfo
 	trafficMutex.Lock()
 	defer trafficMutex.Unlock()
-	
+
 	// We don't know idType any more in PFLAU message.. just use anything we have.. Not optimal, but better than having multiple targets
 	key := address
 	existingTi, ok := traffic[key]
-	key = 1 << 24 | address
+	key = 1<<24 | address
 	if !ok {
 		existingTi, ok = traffic[key]
 	}
@@ -577,7 +597,7 @@ func parseFlarmPFLAU(message []string) {
 	ti.Last_source = TRAFFIC_SOURCE_OGN
 	ti.Alt, ti.AltIsGNSS = relativeGpsAltToBaro(relVertical)
 
-	lat, lng := calcLocationForBearingDistance(float64(mySituation.GPSLatitude), float64(mySituation.GPSLongitude), float64(trafficBearing), float64(relDist / 1852.0))
+	lat, lng := calcLocationForBearingDistance(float64(mySituation.GPSLatitude), float64(mySituation.GPSLongitude), float64(trafficBearing), float64(relDist/1852.0))
 	ti.Lat = float32(lat)
 	ti.Lng = float32(lng)
 	ti.Distance = float64(relDist)
@@ -609,7 +629,7 @@ func parseFlarmPFLAA(message []string) {
 	thisMsg.TimeReceived = stratuxClock.Time
 	// thisMsg.Data = ...?
 	msgLogAppend(thisMsg)
-	
+
 	relNorth := atof32(message[2])
 	relEast := atof32(message[3])
 	relVert := atof32(message[4])
@@ -617,9 +637,9 @@ func parseFlarmPFLAA(message []string) {
 	ognID, tail, address := getIdTail(message[6])
 	idType, _ := strconv.ParseInt(message[5], 10, 8)
 	if idType == 1 {
-		idType = 0; // ICAO ID
+		idType = 0 // ICAO ID
 	} else {
-		idType = 1; // non-ICAO ID
+		idType = 1 // non-ICAO ID
 	}
 
 	track := atof32(message[7])
@@ -632,14 +652,14 @@ func parseFlarmPFLAA(message []string) {
 
 	trafficMutex.Lock()
 	defer trafficMutex.Unlock()
-	
+
 	// check if traffic is already known
-	key := uint32(idType) << 24 | address
+	key := uint32(idType)<<24 | address
 	if existingTi, ok := traffic[key]; ok {
 		if existingTi.Last_source == TRAFFIC_SOURCE_1090ES && existingTi.Age < 5 {
 			// traffic has FLARM and 1090ES and was seen via 1090ES recently?
 			// -> ignore the flarm message. 1090ES has much less delay, so we prefer that.
-			return 
+			return
 		}
 
 		ti = existingTi
@@ -664,7 +684,7 @@ func parseFlarmPFLAA(message []string) {
 
 	// lat dist = 60nm = 111,12km
 	ti.Lat = mySituation.GPSLatitude + (relNorth / 111120.0)
-	avgLat := ti.Lat / 2.0 + mySituation.GPSLatitude / 2.0
+	avgLat := ti.Lat/2.0 + mySituation.GPSLatitude/2.0
 	lngFactor := float32(111120.0 * math.Cos(common.Radians(float64(avgLat))))
 	ti.Lng = mySituation.GPSLongitude + (relEast / lngFactor)
 
@@ -672,7 +692,7 @@ func parseFlarmPFLAA(message []string) {
 		ti.Distance, ti.Bearing = common.Distance(float64(mySituation.GPSLatitude), float64(mySituation.GPSLongitude), float64(ti.Lat), float64(ti.Lng))
 		ti.BearingDist_valid = true
 	}
-	
+
 	ti.Track = track
 	ti.TurnRate = turn
 	ti.Speed = uint16(speed * 1.94384) // m/s to knots

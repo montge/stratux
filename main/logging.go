@@ -24,11 +24,10 @@ import (
 	"github.com/ricochet2200/go-disk-usage/du"
 )
 
-const debugLogFile   = "stratux.log"
+const debugLogFile = "stratux.log"
 
-var debugLogf string    // Set according to OS config.
+var debugLogf string // Set according to OS config.
 var logFileHandle *os.File
-
 
 func getStratuxLogFiles() []string {
 	entries, err := os.ReadDir(logDir)
@@ -36,10 +35,9 @@ func getStratuxLogFiles() []string {
 	if err != nil {
 		return stratuxLogs
 	}
-	
 
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), debugLogFile + ".") {
+		if strings.HasPrefix(e.Name(), debugLogFile+".") {
 			stratuxLogs = append(stratuxLogs, filepath.Join(logDirf, e.Name()))
 		}
 	}
@@ -51,14 +49,14 @@ func rotateLogs() {
 	stratuxLogs := getStratuxLogFiles()
 
 	// rename suffix, remove if > 9
-	for i := len(stratuxLogs)-1; i >= 0; i-- {
+	for i := len(stratuxLogs) - 1; i >= 0; i-- {
 		parts := strings.Split(stratuxLogs[i], ".")
-		logNum, err := strconv.Atoi(parts[len(parts) - 1])
+		logNum, err := strconv.Atoi(parts[len(parts)-1])
 		if err != nil {
 			continue
 		}
-		
-		newPath := filepath.Join(logDirf, debugLogFile + "." + strconv.Itoa(logNum + 1))
+
+		newPath := filepath.Join(logDirf, debugLogFile+"."+strconv.Itoa(logNum+1))
 
 		if logNum == 9 {
 			os.Remove(stratuxLogs[i])
@@ -68,7 +66,7 @@ func rotateLogs() {
 	}
 
 	// Now rename current log file and re-open
-	os.Rename(debugLogf, debugLogf + ".1")
+	os.Rename(debugLogf, debugLogf+".1")
 	openLogFile()
 }
 
@@ -77,7 +75,7 @@ func deleteOldestLog() int64 {
 	if len(logs) == 0 {
 		return 0
 	}
-	oldest := logs[len(logs) - 1]
+	oldest := logs[len(logs)-1]
 	stat, err := os.Stat(oldest)
 	if err != nil {
 		return 0
@@ -117,18 +115,16 @@ func clearDebugLogFile() {
 	}
 }
 
-
-
 func logFileWatcher() {
 	for {
 		logSize, err := os.Stat(debugLogf)
-		if err == nil && logSize.Size() > 10 * 1024 * 1024 { // 10mb limit
+		if err == nil && logSize.Size() > 10*1024*1024 { // 10mb limit
 			rotateLogs()
 		}
 
 		usage := du.NewDiskUsage(logDirf)
 		freeBytes := int64(usage.Free())
-		for freeBytes < 50 * 1024 * 1024 { // leave 50mb free
+		for freeBytes < 50*1024*1024 { // leave 50mb free
 			deleted := deleteOldestLog()
 			if deleted == 0 {
 				break
@@ -162,18 +158,17 @@ func openLogFile() {
 
 func initLogging() {
 	openLogFile()
-	go logFileWatcher();
+	go logFileWatcher()
 }
 
-
 // Log allways
-func logInf(msg string, args ... any) { log.Printf(msg, args...) }
+func logInf(msg string, args ...any) { log.Printf(msg, args...) }
 
 // Log on error (no special proccessing right now)
-func logErr(msg string, args ... any) { log.Printf(msg, args...) }
+func logErr(msg string, args ...any) { log.Printf(msg, args...) }
 
 // Log if debug enabled ("verbose message log" in settings tab)
-func logDbg(msg string, args ... any) {
+func logDbg(msg string, args ...any) {
 	if globalSettings.DEBUG {
 		log.Printf(msg, args...)
 	}

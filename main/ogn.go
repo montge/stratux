@@ -26,34 +26,32 @@ import (
 
 // {"sys":"OGN","addr":"395F39","addr_type":3,"acft_type":"1","lat_deg":51.7657533,"lon_deg":-1.1918533,"alt_msl_m":124,"alt_std_m":63,"track_deg":0.0,"speed_mps":0.3,"climb_mps":-0.5,"turn_dps":0.0,"DOP":1.5}
 type OgnMessage struct {
-	Sys string
-	Time float64
-	Addr string
+	Sys       string
+	Time      float64
+	Addr      string
 	Addr_type int32
 	Acft_type string
-	Acft_cat string
-	Reg string
-	Lat_deg float32
-	Lon_deg float32
+	Acft_cat  string
+	Reg       string
+	Lat_deg   float32
+	Lon_deg   float32
 	Alt_msl_m float32
 	Alt_hae_m float32
 	Alt_std_m float32
 	Track_deg float64
 	Speed_mps float64
 	Climb_mps float64
-	Turn_dps float64
-	DOP float64
-	SNR_dB float64
-	Rx_err int32
-	Hard string
+	Turn_dps  float64
+	DOP       float64
+	SNR_dB    float64
+	Rx_err    int32
+	Hard      string
 
 	// Status message (Sys=status):
 	Bkg_noise_db float32
 	Gain_db      float32
 	Tx_enabled   bool
 }
-
-
 
 func ognPublishNmea(nmea string) {
 	if globalStatus.OGN_connected {
@@ -67,7 +65,6 @@ func ognPublishNmea(nmea string) {
 var ognOutgoingMsgChan chan string = make(chan string, 100)
 var ognIncomingMsgChan chan string = make(chan string, 100)
 var ognExitChan chan bool = make(chan bool, 1)
-
 
 func ognListen() {
 	//go predTest()
@@ -90,9 +87,8 @@ func ognListen() {
 
 		// Make sure the exit channel is empty, so we don't exit immediately
 		for len(ognExitChan) > 0 {
-			<- ognExitChan
+			<-ognExitChan
 		}
-
 
 		go func() {
 			scanner := bufio.NewScanner(ognReadWriter.Reader)
@@ -107,27 +103,28 @@ func ognListen() {
 
 		pgrmzTimer := time.NewTicker(100 * time.Millisecond)
 
-		loop: for globalSettings.OGN_Enabled {
+	loop:
+		for globalSettings.OGN_Enabled {
 			select {
-			case data := <- ognOutgoingMsgChan:
+			case data := <-ognOutgoingMsgChan:
 				//fmt.Printf(data)
 				ognReadWriter.Write([]byte(data))
 				ognReadWriter.Flush()
-			case data := <- ognIncomingMsgChan:
+			case data := <-ognIncomingMsgChan:
 				TraceLog.Record(CONTEXT_OGN_RX, []byte(data))
 				parseOgnMessage(data, false)
-			case <- pgrmzTimer.C:
+			case <-pgrmzTimer.C:
 				if isTempPressValid() && mySituation.BaroSourceType != BARO_TYPE_NONE && mySituation.BaroSourceType != BARO_TYPE_ADSBESTIMATE {
 					ognOutgoingMsgChan <- makePGRMZString()
 				}
-			case <- ognExitChan:
+			case <-ognExitChan:
 				break loop
 
 			}
 		}
 		globalStatus.OGN_connected = false
 		conn.Close()
-		time.Sleep(3*time.Second)
+		time.Sleep(3 * time.Second)
 	}
 }
 
@@ -160,7 +157,7 @@ func importOgnStatusMessage(msg OgnMessage) {
 	globalStatus.OGN_tx_enabled = msg.Tx_enabled
 
 	// If we have an RFM95 or OGN Tracker connected, provide the config to ogn-rx-eu, so that it sends the same ID (either via RFM95 or internet)
-	if msg.Tx_enabled || globalStatus.GPS_detected_type & GPS_TYPE_OGNTRACKER > 0 {
+	if msg.Tx_enabled || globalStatus.GPS_detected_type&GPS_TYPE_OGNTRACKER > 0 {
 		ognPublishNmea(formatOgnTrackerConfigString())
 	}
 }
@@ -180,8 +177,8 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 	addrType := uint8(1) // Non-ICAO Address
 	otherAddrType := uint8(0)
 	if msg.Addr_type == 1 { // ICAO Address
-		addrType = 0 
-		otherAddrType = 1;
+		addrType = 0
+		otherAddrType = 1
 	}
 	// Store in higher-order bytes in front of the 24 bit address so we can handle address collinsions gracefully.
 	// For ICAO it will be 0, so traffic is merged. For others it will be 1, so traffic is kept seperately
@@ -192,8 +189,8 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 	// To make the code a bit simpler, we don't actually update the existing traffic in the second case, but just let it time out
 	// and - from then on - only update the one with the correct AddrType
 
-	key := uint32(addrType) << 24 | address
-	otherKey := uint32(otherAddrType) << 24 | address
+	key := uint32(addrType)<<24 | address
+	otherKey := uint32(otherAddrType)<<24 | address
 
 	trafficMutex.Lock()
 	defer trafficMutex.Unlock()
@@ -228,7 +225,7 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 			traffic[key] = ti
 		}
 		if msg.Time > 0 && !ti.Timestamp.IsZero() {
- 			msgtime := time.Unix(int64(msg.Time), 0)
+			msgtime := time.Unix(int64(msg.Time), 0)
 			if ti.Position_valid && ti.Last_source == TRAFFIC_SOURCE_OGN && msgtime.Before(ti.Timestamp) {
 				return // We already have a newer message for this target. This message was probably relayed by another tracker -- skip
 			}
@@ -243,7 +240,7 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 
 	// Basic plausibility check:
 	dist, _, _, _ := common.DistRect(float64(mySituation.GPSLatitude), float64(mySituation.GPSLongitude), float64(msg.Lat_deg), float64(msg.Lon_deg))
-	if (isGPSValid() && dist >= 50000)  || (msg.Lat_deg == 0 && msg.Lon_deg == 0) {
+	if (isGPSValid() && dist >= 50000) || (msg.Lat_deg == 0 && msg.Lon_deg == 0) {
 		// more than 50km away? Ignore. Most likely invalid data
 		return
 	}
@@ -276,7 +273,7 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 	// Some OGN trackers are equiped with a baro sensor, but older firmwares send wrong data, so we usually can't rely on it.
 	alt := msg.Alt_msl_m * 3.28084
 	if alt == 0 {
-		alt = msg.Alt_hae_m * 3.28084 - mySituation.GPSGeoidSep
+		alt = msg.Alt_hae_m*3.28084 - mySituation.GPSGeoidSep
 	}
 	if isGPSValid() && isTempPressValid() {
 		ti.Alt = int32(alt - mySituation.GPSAltitudeMSL + mySituation.BaroPressureAltitude)
@@ -347,6 +344,7 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 }
 
 var ognTailNumberCache = make(map[string]string)
+
 func lookupOgnTailNumber(ognid string) string {
 	if len(ognTailNumberCache) == 0 {
 		log.Printf("Parsing OGN device db")

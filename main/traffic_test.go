@@ -64,12 +64,12 @@ func TestIcao2reg_USCivil(t *testing.T) {
 		expected string
 		valid    bool
 	}{
-		{0xA00001, "N1", true},       // First US registration
-		{0xADF7C7, "N99999", true},   // Last US civil registration (actual output)
-		{0xA12345, "N1722M", true},   // Sample registration (actual output)
-		{0xADF7C8, "US-MIL", false},  // First non-civil US
-		{0xAFFFFF, "US-MIL", false},  // Last US allocation
-		{0x900000, "OTHER", false},   // Not US
+		{0xA00001, "N1", true},      // First US registration
+		{0xADF7C7, "N99999", true},  // Last US civil registration (actual output)
+		{0xA12345, "N1722M", true},  // Sample registration (actual output)
+		{0xADF7C8, "US-MIL", false}, // First non-civil US
+		{0xAFFFFF, "US-MIL", false}, // Last US allocation
+		{0x900000, "OTHER", false},  // Not US
 	}
 
 	for _, tc := range testCases {
@@ -91,10 +91,10 @@ func TestIcao2reg_Canada(t *testing.T) {
 		expected string
 		valid    bool
 	}{
-		{0xC00001, "C-FAAA", true},    // First Canadian registration (actual output)
-		{0xC0CDF8, "C-IZZZ", true},    // Last Canadian civil
-		{0xC0CDF9, "CA-MIL", false},   // First non-civil Canadian
-		{0xC3FFFF, "CA-MIL", false},   // Last Canadian allocation
+		{0xC00001, "C-FAAA", true},  // First Canadian registration (actual output)
+		{0xC0CDF8, "C-IZZZ", true},  // Last Canadian civil
+		{0xC0CDF9, "CA-MIL", false}, // First non-civil Canadian
+		{0xC3FFFF, "CA-MIL", false}, // Last Canadian allocation
 	}
 
 	for _, tc := range testCases {
@@ -116,9 +116,9 @@ func TestIcao2reg_Australia(t *testing.T) {
 		expected string
 		valid    bool
 	}{
-		{0x7C0000, "VH-AAA", true},  // First Australian registration
-		{0x7C0001, "VH-AAB", true},  // Second
-		{0x7C1234, "VH-DVQ", true},  // Sample registration (actual output)
+		{0x7C0000, "VH-AAA", true}, // First Australian registration
+		{0x7C0001, "VH-AAB", true}, // Second
+		{0x7C1234, "VH-DVQ", true}, // Sample registration (actual output)
 	}
 
 	for _, tc := range testCases {
@@ -209,8 +209,8 @@ func TestComputeTrafficPriority(t *testing.T) {
 	// Close traffic should have low priority number (higher priority)
 	closeTraffic := TrafficInfo{
 		BearingDist_valid: true,
-		Distance:          1000,  // 1 km
-		Alt:               5000,  // 5000 ft
+		Distance:          1000, // 1 km
+		Alt:               5000, // 5000 ft
 	}
 
 	// Far traffic should have high priority number (lower priority)
@@ -265,9 +265,9 @@ func TestExtrapolateTraffic(t *testing.T) {
 		Lat:                  43.99,
 		Lng:                  -88.56,
 		Alt:                  5000,
-		Track:                90,    // Heading east
-		Speed:                120,   // 120 knots
-		Vvel:                 500,   // 500 ft/min climb
+		Track:                90,  // Heading east
+		Speed:                120, // 120 knots
+		Vvel:                 500, // 500 ft/min climb
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,

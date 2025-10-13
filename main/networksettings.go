@@ -21,24 +21,24 @@ import (
 )
 
 const (
-	WifiModeAp = 0
-	WifiModeDirect = 1
+	WifiModeAp       = 0
+	WifiModeDirect   = 1
 	WifiModeApClient = 2
 )
 
 // NetworkTemplateParams is passed to the template engine to write settings
 type NetworkTemplateParams struct {
-	WiFiMode         int
-	WiFiCountry      string
-	IpAddr           string
-	IpPrefix         string
-	DhcpRangeStart   string
-	DhcpRangeEnd     string
-	WiFiSSID         string
-	WiFiChannel      int
-	WiFiDirectPin    string
-	WiFiPassPhrase   string
-	WiFiClientNetworks []wifiClientNetwork
+	WiFiMode                       int
+	WiFiCountry                    string
+	IpAddr                         string
+	IpPrefix                       string
+	DhcpRangeStart                 string
+	DhcpRangeEnd                   string
+	WiFiSSID                       string
+	WiFiChannel                    int
+	WiFiDirectPin                  string
+	WiFiPassPhrase                 string
+	WiFiClientNetworks             []wifiClientNetwork
 	WiFiInternetPassThroughEnabled bool
 }
 type wifiClientNetwork struct {
@@ -47,7 +47,6 @@ type wifiClientNetwork struct {
 }
 
 var hasChanged bool
-
 
 func setWifiCountry(countryCode string) {
 	if countryCode != globalSettings.WiFiCountry {
@@ -72,14 +71,14 @@ func setWifiPassphrase(passphrase string) {
 
 func setWifiChannel(channel int) {
 	if channel != globalSettings.WiFiChannel {
-		globalSettings.WiFiChannel = channel;
+		globalSettings.WiFiChannel = channel
 		hasChanged = true
 	}
 }
 
 func setWifiSecurityEnabled(enabled bool) {
 	if globalSettings.WiFiSecurityEnabled != enabled {
-		globalSettings.WiFiSecurityEnabled = enabled;
+		globalSettings.WiFiSecurityEnabled = enabled
 		hasChanged = true
 	}
 }
@@ -128,11 +127,10 @@ func setWifiClientNetworks(networks []wifiClientNetwork) {
 
 func setWifiInternetPassthroughEnabled(enabled bool) {
 	if globalSettings.WiFiInternetPassThroughEnabled != enabled {
-		globalSettings.WiFiInternetPassThroughEnabled = enabled;
-		hasChanged = true;
+		globalSettings.WiFiInternetPassThroughEnabled = enabled
+		hasChanged = true
 	}
 }
-
 
 // if onlyWriteFiles is true, we only write the config files. Otherwise we also reconfigure the network
 // Also, if we only write the files, this function runs synchroneously. Otherwise the long-running network reconfiguration is done async.
@@ -144,12 +142,12 @@ func applyNetworkSettings(force bool, onlyWriteFiles bool) {
 
 	// Prepare all template strings and write settings files, then ifdown/ifup wlan0
 	ipAddr := globalSettings.WiFiIPAddress
-	log.Printf("Applying new network settings for IP %s", ipAddr);
+	log.Printf("Applying new network settings for IP %s", ipAddr)
 	if ipAddr == "" {
 		ipAddr = "192.168.10.1"
 	}
 	ipParts := strings.Split(ipAddr, ".")
-	
+
 	ipPrefix := ipParts[0] + "." + ipParts[1] + "." + ipParts[2]
 
 	myIP, _ := strconv.Atoi(ipParts[3])
@@ -173,14 +171,14 @@ func applyNetworkSettings(force bool, onlyWriteFiles bool) {
 	tplSettings.WiFiDirectPin = globalSettings.WiFiDirectPin
 	tplSettings.WiFiClientNetworks = globalSettings.WiFiClientNetworks
 	tplSettings.WiFiInternetPassThroughEnabled = globalSettings.WiFiInternetPassThroughEnabled
-	
+
 	if tplSettings.WiFiChannel == 0 {
 		tplSettings.WiFiChannel = 1
 	}
 	if globalSettings.WiFiSecurityEnabled || tplSettings.WiFiMode == WifiModeDirect {
 		tplSettings.WiFiPassPhrase = globalSettings.WiFiPassphrase
 	}
-	
+
 	if tplSettings.WiFiSSID == "" {
 		tplSettings.WiFiSSID = "Stratux"
 	}
@@ -198,10 +196,10 @@ func applyNetworkSettings(force bool, onlyWriteFiles bool) {
 		}
 
 		overlayctl("unlock")
-		writeTemplate(STRATUX_HOME + "/cfg/stratux-dnsmasq.conf.template", "/overlay/robase/etc/dnsmasq.d/stratux-dnsmasq.conf", tplSettings)
-		writeTemplate(STRATUX_HOME + "/cfg/interfaces.template", "/overlay/robase/etc/network/interfaces", tplSettings)
-		writeTemplate(STRATUX_HOME + "/cfg/wpa_supplicant.conf.template", "/overlay/robase/etc/wpa_supplicant/wpa_supplicant.conf", tplSettings)
-		writeTemplate(STRATUX_HOME + "/cfg/wpa_supplicant_ap.conf.template", "/overlay/robase/etc/wpa_supplicant/wpa_supplicant_ap.conf", tplSettings)
+		writeTemplate(STRATUX_HOME+"/cfg/stratux-dnsmasq.conf.template", "/overlay/robase/etc/dnsmasq.d/stratux-dnsmasq.conf", tplSettings)
+		writeTemplate(STRATUX_HOME+"/cfg/interfaces.template", "/overlay/robase/etc/network/interfaces", tplSettings)
+		writeTemplate(STRATUX_HOME+"/cfg/wpa_supplicant.conf.template", "/overlay/robase/etc/wpa_supplicant/wpa_supplicant.conf", tplSettings)
+		writeTemplate(STRATUX_HOME+"/cfg/wpa_supplicant_ap.conf.template", "/overlay/robase/etc/wpa_supplicant/wpa_supplicant_ap.conf", tplSettings)
 		overlayctl("lock")
 
 		if !onlyWriteFiles {
@@ -215,16 +213,12 @@ func applyNetworkSettings(force bool, onlyWriteFiles bool) {
 		}
 	}
 
-
 	if onlyWriteFiles {
 		f()
 	} else {
 		go f()
 	}
 }
-
-
-
 
 func writeTemplate(tplFile string, outFile string, settings NetworkTemplateParams) {
 	configTemplate, err := template.ParseFiles(tplFile)

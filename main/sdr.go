@@ -32,7 +32,7 @@ type Device struct {
 	closeCh chan int
 	indexID int
 	ppm     int
-	gain     float64
+	gain    float64
 	serial  string
 	idSet   bool
 }
@@ -75,19 +75,19 @@ func (e *ES) read() {
 	defer e.wg.Done()
 	log.Println("Entered ES read() ...")
 	// RTL SDR Standard Gains: 0.0 0.9 1.4 2.7 3.7 7.7 8.7 12.5 14.4 15.7 16.6 19.7 20.7 22.9 25.4 28.0 29.7 32.8 33.8 36.4 37.2 38.6 40.2 42.1 43.4 43.9 44.5 48.0 49.6
-	if(e.gain<0.9){
+	if e.gain < 0.9 {
 		e.gain = 37.2
 	}
-	cmd := exec.Command(STRATUX_HOME + "/bin/dump1090", "--fix", "--net-stratux-port", "30006",  "--net", "--device-index", strconv.Itoa(e.indexID),
+	cmd := exec.Command(STRATUX_HOME+"/bin/dump1090", "--fix", "--net-stratux-port", "30006", "--net", "--device-index", strconv.Itoa(e.indexID),
 		"--ppm", strconv.Itoa(e.ppm),
-		"--gain",strconv.FormatFloat(e.gain,'f',-1,32),
+		"--gain", strconv.FormatFloat(e.gain, 'f', -1, 32),
 		"--mlat") // display raw messages in Beast ascii mode
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
 
 	err := cmd.Start()
 	if err != nil {
-		log.Printf("Error executing " + STRATUX_HOME + "/bin/dump1090: %s\n", err)
+		log.Printf("Error executing "+STRATUX_HOME+"/bin/dump1090: %s\n", err)
 		// don't return immediately, use the proper shutdown procedure
 		shutdownES = true
 		for {
@@ -201,9 +201,10 @@ func (f *OGN) read() {
 	// ogn-rx doesn't like the time jumping forward while running.. delay initial startup until we have a valid system time
 	if !isGPSClockValid() {
 		log.Printf("Delaying ogn-rx start until we have a valid GPS time")
-		loop: for {
+	loop:
+		for {
 			select {
-			case <- f.closeCh:
+			case <-f.closeCh:
 				return
 			default:
 				if isGPSClockValid() {
@@ -215,11 +216,11 @@ func (f *OGN) read() {
 		}
 	}
 
-	args := []string {"-d", strconv.Itoa(f.indexID), "-p", strconv.Itoa(f.ppm), "-L/var/log/"}
+	args := []string{"-d", strconv.Itoa(f.indexID), "-p", strconv.Itoa(f.ppm), "-L/var/log/"}
 	if !globalSettings.OGNI2CTXEnabled {
 		args = append(args, "-t", "off")
 	}
-	cmd := exec.Command(STRATUX_HOME + "/bin/ogn-rx-eu", args...)
+	cmd := exec.Command(STRATUX_HOME+"/bin/ogn-rx-eu", args...)
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
 	autoRestart := true // automatically restart crashing child process
@@ -271,7 +272,7 @@ func (f *OGN) read() {
 			default:
 				line, err := reader.ReadString('\n')
 				line = strings.TrimSpace(line)
-				if err == nil  && len(line) > 0 /* && globalSettings.DEBUG */ {
+				if err == nil && len(line) > 0 /* && globalSettings.DEBUG */ {
 					log.Println("OGN: ogn-rx-eu stdout: ", line)
 				}
 			}
@@ -304,7 +305,7 @@ func (f *OGN) read() {
 	// goroutines...
 	close(done)
 
-	if autoRestart && !shutdownOGN{
+	if autoRestart && !shutdownOGN {
 		time.Sleep(5 * time.Second)
 		log.Println("OGN: restarting crashed ogn-rx-eu")
 		f.wg.Add(1)
@@ -315,13 +316,13 @@ func (f *OGN) read() {
 func (e *AIS) read() {
 	defer e.wg.Done()
 	log.Println("Entered AIS read() ...")
-	cmd := exec.Command(STRATUX_HOME + "/bin/rtl_ais", "-T", "-k", "-p", strconv.Itoa(e.ppm), "-d", strconv.Itoa(e.indexID))
+	cmd := exec.Command(STRATUX_HOME+"/bin/rtl_ais", "-T", "-k", "-p", strconv.Itoa(e.ppm), "-d", strconv.Itoa(e.indexID))
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
 
 	err := cmd.Start()
 	if err != nil {
-		log.Printf("Error executing " + STRATUX_HOME + "/bin/rtl_ais: %s\n", err)
+		log.Printf("Error executing "+STRATUX_HOME+"/bin/rtl_ais: %s\n", err)
 		// don't return immediately, use the proper shutdown procedure
 		shutdownES = true
 		for {
@@ -420,7 +421,7 @@ func getPPM(serial string) int {
 func (e *ES) sdrConfig() (err error) {
 	e.ppm = getPPM(e.serial)
 	e.gain = globalSettings.Dump1090Gain
-	log.Printf("===== ES Device Serial: %s PPM %d Gain %.1f =====\n", e.serial, e.ppm,e.gain)
+	log.Printf("===== ES Device Serial: %s PPM %d Gain %.1f =====\n", e.serial, e.ppm, e.gain)
 	return
 }
 
@@ -828,7 +829,7 @@ func sdrWatcher() {
 
 	// Got system uptime. Delay SDR start for a bit to reduce noise for the GPS to get a fix.
 	// Will give up waiting after 120s without fix
-	for err == nil && info.Uptime < 120 && !isGPSValid()  {
+	for err == nil && info.Uptime < 120 && !isGPSValid() {
 		time.Sleep(1 * time.Second)
 		err = syscall.Sysinfo(&info)
 	}
@@ -907,7 +908,7 @@ func sdrWatcher() {
 		}
 
 		if interfaceCount == prevCount && prevESEnabled == esEnabled && prevUATEnabled == uatEnabled && prevOGNEnabled == ognEnabled && prevAISEnabled == aisEnabled &&
-			prevOGNTXEnabled == ognTXEnabled  && prevdump1090Gain == dump1090Gain {
+			prevOGNTXEnabled == ognTXEnabled && prevdump1090Gain == dump1090Gain {
 			continue
 		}
 
@@ -940,20 +941,36 @@ func sdrWatcher() {
 
 		countEnabled := 0
 
-		if uatEnabled { countEnabled++ }
-		if esEnabled { countEnabled++ }
-		if ognEnabled { countEnabled++ }
-		if aisEnabled { countEnabled++ }
+		if uatEnabled {
+			countEnabled++
+		}
+		if esEnabled {
+			countEnabled++
+		}
+		if ognEnabled {
+			countEnabled++
+		}
+		if aisEnabled {
+			countEnabled++
+		}
 		if countEnabled > interfaceCount {
 			// User enabled too many protocols. Show error..
 			used := make([]string, 0)
-			if UATDev != nil { used = append(used, "UAT") }
-			if ESDev != nil { used = append(used, "1090ES") }
-			if OGNDev != nil { used = append(used, "OGN") }
-			if AISDev != nil { used = append(used, "AIS") }
-			addSingleSystemErrorf("sdrconfig", "You have enabled more protocols than you have receivers for. " +
+			if UATDev != nil {
+				used = append(used, "UAT")
+			}
+			if ESDev != nil {
+				used = append(used, "1090ES")
+			}
+			if OGNDev != nil {
+				used = append(used, "OGN")
+			}
+			if AISDev != nil {
+				used = append(used, "AIS")
+			}
+			addSingleSystemErrorf("sdrconfig", "You have enabled more protocols than you have receivers for. "+
 				"You have %d receivers, but enabled %d protocols. Please disable %d of them for things to work correctly. For now we are only using %s.",
-				count, countEnabled, countEnabled - count, strings.Join(used, ", "))
+				count, countEnabled, countEnabled-count, strings.Join(used, ", "))
 
 		} else {
 			removeSingleSystemError("sdrconfig")

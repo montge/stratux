@@ -18,7 +18,6 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-
 type TraceLogger struct {
 	fileHandle        *os.File
 	gzWriter          *gzip.Writer
@@ -30,17 +29,16 @@ type TraceLogger struct {
 }
 
 const (
-	CONTEXT_AIS = "ais"
-	CONTEXT_NMEA = "nmea"
-	CONTEXT_APRS = "aprs"
-	CONTEXT_OGN_RX = "ogn-rx"
-	CONTEXT_DUMP1090 = "dump1090"
-	CONTEXT_GODUMP978 = "godump978"
+	CONTEXT_AIS         = "ais"
+	CONTEXT_NMEA        = "nmea"
+	CONTEXT_APRS        = "aprs"
+	CONTEXT_OGN_RX      = "ogn-rx"
+	CONTEXT_DUMP1090    = "dump1090"
+	CONTEXT_GODUMP978   = "godump978"
 	CONTEXT_LOWPOWERUAT = "lowpower_uat"
 )
 
 var TraceLog TraceLogger
-
 
 // At startup, we usually don't know the precise time to generate a good filename.
 // Therefore, once we receive our first valid timestamp, we will rename the file to something more appropriate
@@ -70,7 +68,7 @@ func (tracer *TraceLogger) Record(context string, data []byte) {
 			return
 		}
 		ts := stratuxClock.Time.Format(time.RFC3339Nano)
-		tracer.csvWriter.Write([]string {ts, context, string(data)})
+		tracer.csvWriter.Write([]string{ts, context, string(data)})
 	}()
 }
 
@@ -90,7 +88,7 @@ func (tracer *TraceLogger) Start() {
 	os.MkdirAll("/var/log/stratux", os.ModePerm)
 	fname := "/var/log/stratux/" + ts + "_trace.txt.gz"
 
-	fileHandle, err := os.OpenFile(fname, os.O_CREATE | os.O_WRONLY, 0666)
+	fileHandle, err := os.OpenFile(fname, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Printf("Failed to open trace log file: %s", err.Error())
 		return
@@ -154,7 +152,6 @@ func (tracer *TraceLogger) Replay(fname string, speedMultiplier float64, traceSk
 			continue
 		}
 		ts = ts.Add(-time.Duration(traceSkip) * time.Minute)
-		
 
 		millis := float64(ts.Sub(time.Time{}).Milliseconds()) / speedMultiplier
 		ts = time.Time{}.Add(time.Duration(millis) * time.Millisecond)
@@ -197,7 +194,7 @@ func traceLoggerWatchdog() {
 
 		if TraceLog.IsActive() {
 			usage := du.NewDiskUsage("/")
-			if usage.Free() < 1024 * 1024 * 50 {
+			if usage.Free() < 1024*1024*50 {
 				// less than 50mb free? deactivate
 				log.Printf("Space running out - disable trace logging for this run")
 				TraceLog.Stop()
@@ -214,5 +211,3 @@ func traceLoggerWatchdog() {
 		TraceLog.Flush()
 	}
 }
-
-

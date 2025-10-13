@@ -25,9 +25,9 @@ import (
 type connection interface {
 	GetConnectionKey() string // e.g. "192.168.10.22:12345" for udp, "TCP:192.168.10.22:12345" for TCP, "/dev/serialout0" for serialout
 	MessageQueue() *MessageQueue
-	Writer()       io.Writer
-	IsThrottled()  bool
-	IsSleeping()   bool
+	Writer() io.Writer
+	IsThrottled() bool
+	IsSleeping() bool
 	Capabilities() uint8
 	GetDesiredPacketSize() int
 	OnError(error)
@@ -35,20 +35,20 @@ type connection interface {
 }
 
 type networkConnection struct {
-	Conn            *net.UDPConn
-	Ip              string
-	Port            uint32
-	Capability      uint8
-	Queue           *MessageQueue `json:"-"` // don't store in settings
+	Conn       *net.UDPConn
+	Ip         string
+	Port       uint32
+	Capability uint8
+	Queue      *MessageQueue `json:"-"` // don't store in settings
 
 	LastPingResponse time.Time // last time the client responded
 	LastPongResponse time.Time // last time the client responded
-	LastUnreachable time.Time // Last time the device sent an ICMP Unreachable packet.
+	LastUnreachable  time.Time // Last time the device sent an ICMP Unreachable packet.
 	/*
 		Sleep mode/throttle variables. "sleep mode" is actually now just a very reduced packet rate, since we don't know positively
 		 when a client is ready to accept packets - we just assume so if we don't receive ICMP Unreachable packets in 5 secs.
 	*/
-	SleepFlag       bool      // Whether or not this client has been marked as sleeping - only used for debugging
+	SleepFlag bool // Whether or not this client has been marked as sleeping - only used for debugging
 }
 
 func (conn *networkConnection) MessageQueue() *MessageQueue {
@@ -60,19 +60,22 @@ func (conn *networkConnection) MessageQueue() *MessageQueue {
 func (conn *networkConnection) Writer() io.Writer {
 	return conn.Conn
 }
+
 /*
-	isThrottled().
-	 Checks if a client identifier 'ip:port' is throttled.
-	 Throttle mode is for testing port open and giving some start-up time to the app.
-	 Throttling means that we only send important packets for first 15 seconds (location, status, very close traffic).
+isThrottled().
+
+	Checks if a client identifier 'ip:port' is throttled.
+	Throttle mode is for testing port open and giving some start-up time to the app.
+	Throttling means that we only send important packets for first 15 seconds (location, status, very close traffic).
 */
 func (conn *networkConnection) IsThrottled() bool {
 	return (rand.Int()%1000 != 0) && stratuxClock.Since(conn.LastUnreachable) < (15*time.Second)
 }
 
 /*
-	isSleeping().
-	 Check if a client identifier 'ip:port' is in either a sleep or active state.
+isSleeping().
+
+	Check if a client identifier 'ip:port' is in either a sleep or active state.
 */
 func (conn *networkConnection) IsSleeping() bool {
 	// Unable to listen to ICMP without root - send to everything. Just for debugging.
@@ -97,7 +100,7 @@ func (conn *networkConnection) Capabilities() uint8 {
 }
 
 func (conn *networkConnection) GetDesiredPacketSize() int {
-	if conn.Capabilities() & (NETWORK_POSITION_FFSIM | NETWORK_AHRS_FFSIM) > 0 {
+	if conn.Capabilities()&(NETWORK_POSITION_FFSIM|NETWORK_AHRS_FFSIM) > 0 {
 		// Hack: some software doesn't handle X-Plane as a stream correctly, e.g. SkyDemon, and requires each message in a separate packet, or it will crash.
 		return 1
 	}
@@ -116,8 +119,6 @@ func (conn *networkConnection) Close() {
 func (conn *networkConnection) GetConnectionKey() string {
 	return conn.Ip + ":" + strconv.Itoa(int(conn.Port))
 }
-
-
 
 type serialConnection struct {
 	DeviceString string
@@ -172,10 +173,10 @@ func (conn *serialConnection) GetConnectionKey() string {
 }
 
 type tcpConnection struct {
-	Conn         *net.TCPConn
-	Queue        *MessageQueue `json:"-"`
-	Capability   uint8
-	Key          string
+	Conn       *net.TCPConn
+	Queue      *MessageQueue `json:"-"`
+	Capability uint8
+	Key        string
 }
 
 func (conn *tcpConnection) MessageQueue() *MessageQueue {
@@ -219,19 +220,16 @@ func (conn *tcpConnection) Close() {
 	}
 }
 
-
 func (conn *tcpConnection) GetConnectionKey() string {
 	return conn.Key
 }
 
-
-
 type bleConnection struct {
-	Capability   uint8
-	UUIDService  string // SoftRF: 0xFFE0
-	UUIDGatt     string
+	Capability     uint8
+	UUIDService    string // SoftRF: 0xFFE0
+	UUIDGatt       string
 	Characteristic bluetooth.Characteristic
-	Queue        *MessageQueue `json:"-"` // don't store in settings
+	Queue          *MessageQueue `json:"-"` // don't store in settings
 }
 
 func (conn *bleConnection) MessageQueue() *MessageQueue {

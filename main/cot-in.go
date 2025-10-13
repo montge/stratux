@@ -22,13 +22,13 @@ import (
 )
 
 type CotEvent struct {
-	Version string  `xml:"version,attr"`
-	Uid     string  `xml:"uid,attr"`
-	Type_   string  `xml:"type,attr"`
-	Time    string  `xml:"time,attr"`
-	Start   string  `xml:"start,attr"`
-	Stale   string  `xml:"stale,attr"`
-	Point   CotPoint `xml:"point"`
+	Version string    `xml:"version,attr"`
+	Uid     string    `xml:"uid,attr"`
+	Type_   string    `xml:"type,attr"`
+	Time    string    `xml:"time,attr"`
+	Start   string    `xml:"start,attr"`
+	Stale   string    `xml:"stale,attr"`
+	Point   CotPoint  `xml:"point"`
 	Detail  CotDetail `xml:"detail"`
 }
 
@@ -45,10 +45,9 @@ type CotDetail struct {
 }
 
 type CotTrack struct {
-	Speed float32 `xml:"speed,attr"`
+	Speed  float32 `xml:"speed,attr"`
 	Course float32 `xml:"course,attr"`
 }
-
 
 func cotListen() {
 	server, err := net.ListenPacket("udp", ":8087")
@@ -60,14 +59,14 @@ func cotListen() {
 	buf := make([]byte, 2048)
 	for {
 		n, _, err := server.ReadFrom(buf)
-		if err != nil || n == 0{
+		if err != nil || n == 0 {
 			continue
 		}
 		messageBuf += string(buf[0:n])
 		startIndex := strings.Index(messageBuf, "<event")
 		endIndex := strings.Index(messageBuf, "</event>")
 		if startIndex >= 0 && endIndex > 0 {
-			msg := messageBuf[startIndex:endIndex+8]
+			msg := messageBuf[startIndex : endIndex+8]
 			processCotMessage(msg)
 			messageBuf = messageBuf[endIndex+8:]
 		}
@@ -91,15 +90,13 @@ func processCotMessage(msg string) {
 	hasher.Write([]byte(event.Uid))
 	addr := hasher.Sum32()
 	addr = addr & 0x00FFFFFF
-	key := 1 << 24 | addr // mark as non-icao
-
+	key := 1<<24 | addr // mark as non-icao
 
 	var ti TrafficInfo
 
 	trafficMutex.Lock()
 	defer trafficMutex.Unlock()
 
-	
 	if existingTi, ok := traffic[key]; ok {
 		ti = existingTi
 	}
@@ -129,8 +126,6 @@ func processCotMessage(msg string) {
 		ti.Alt = int32(alt)
 		ti.AltIsGNSS = true
 	}
-
-
 
 	traffic[key] = ti
 

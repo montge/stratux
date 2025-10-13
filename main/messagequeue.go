@@ -21,7 +21,6 @@ type QueueEntry struct {
 	data       interface{}
 }
 
-
 type MessageQueue struct {
 	maxSize       int
 	entries       []QueueEntry
@@ -31,9 +30,9 @@ type MessageQueue struct {
 }
 
 func NewMessageQueue(maxSize int) *MessageQueue {
-	return &MessageQueue {
-		maxSize: maxSize,
-		entries: make([]QueueEntry, 0),
+	return &MessageQueue{
+		maxSize:       maxSize,
+		entries:       make([]QueueEntry, 0),
 		DataAvailable: make(chan bool, 1),
 	}
 }
@@ -46,14 +45,14 @@ func (queue *MessageQueue) Put(prio int32, maxAge time.Duration, data interface{
 	defer queue.mutex.Unlock()
 
 	timeout := stratuxClock.Time.Add(maxAge)
-	entry := QueueEntry { prio, timeout, data }
+	entry := QueueEntry{prio, timeout, data}
 
 	if queue.entries == nil || len(queue.entries) == 0 {
 		queue.entries = make([]QueueEntry, 1)
-		queue.entries[0] = QueueEntry { prio, timeout, data }
+		queue.entries[0] = QueueEntry{prio, timeout, data}
 	} else {
 		index := queue.findInsertPosition(prio)
-		
+
 		if index == len(queue.entries) {
 			queue.entries = append(queue.entries, entry)
 		} else {
@@ -63,7 +62,7 @@ func (queue *MessageQueue) Put(prio int32, maxAge time.Duration, data interface{
 	}
 
 	// Allow 10% over-use before we prune, so the pruning is done in batches to save CPU
-	if float32(len(queue.entries)) > float32(queue.maxSize) * 1.1 {
+	if float32(len(queue.entries)) > float32(queue.maxSize)*1.1 {
 		queue.prune()
 	}
 	if len(queue.entries) != 0 {
@@ -74,7 +73,6 @@ func (queue *MessageQueue) Put(prio int32, maxAge time.Duration, data interface{
 func (queue *MessageQueue) PeekFirst() (interface{}, int32) {
 	return queue.getFirst(false)
 }
-
 
 func (queue *MessageQueue) PopFirst() (interface{}, int32) {
 	return queue.getFirst(true)
@@ -91,7 +89,7 @@ func (queue *MessageQueue) getFirst(remove bool) (interface{}, int32) {
 
 	// found one. Strip the queue and return it
 	entry := queue.entries[index]
-	if remove  {
+	if remove {
 		queue.entries = queue.entries[index+1:]
 	} else {
 		queue.entries = queue.entries[index:]

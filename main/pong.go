@@ -31,7 +31,6 @@ var closeChpong chan int
 var pongUpdateMode bool
 var pongDeviceSuccessfullyWorking bool
 
-
 type PongTermMessage struct {
 	Text   string
 	Source string
@@ -64,7 +63,7 @@ func initPongSerial() bool {
 		log.Printf("Clearing RTS returned %s\n", errRts.Error())
 	}
 
-	log.Printf("Pong opened serial port at %d baud\n",baudrate)
+	log.Printf("Pong opened serial port at %d baud\n", baudrate)
 
 	// No device configuration is needed, we should be ready
 	globalStatus.Pong_Heartbeats = 0
@@ -76,7 +75,7 @@ func initPongSerial() bool {
 func pongNetworkRepeater() {
 	defer pongWG.Done()
 	log.Println("Entered Pong network repeater ...")
-	cmd := exec.Command(STRATUX_HOME + "/bin/dump1090", "--net-only", "--net-stratux-port", "30006")
+	cmd := exec.Command(STRATUX_HOME+"/bin/dump1090", "--net-only", "--net-stratux-port", "30006")
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
 
@@ -165,7 +164,7 @@ func pongSerialReader() {
 		s = strings.TrimSpace(s)
 		if s[0] == '\'' {
 			report := strings.Split(s, "'")
-			logString :=  fmt.Sprintf("Pong ASCII: %s",report[1])
+			logString := fmt.Sprintf("Pong ASCII: %s", report[1])
 			log.Println(logString)
 		} else if s[0] == '.' {
 			//log.Println("Pong heartbeat\n")
@@ -206,7 +205,7 @@ func pongSerialReader() {
 			// -102dBm signal
 			o, msgtype := parseInput(s)
 			if o != nil && msgtype != 0 {
-				logString := fmt.Sprintf("Relaying UAT, type=%d: %s", msgtype,s)
+				logString := fmt.Sprintf("Relaying UAT, type=%d: %s", msgtype, s)
 				log.Println(logString)
 				relayMessage(msgtype, o)
 			} else if o == nil {
@@ -215,8 +214,8 @@ func pongSerialReader() {
 				log.Println("Not relaying message, msgtype == 0")
 			}
 		} else {
-			log.Printf("Pong ASCII: %s",s)
-			if strings.Contains(s,"ERROR SPI") {
+			log.Printf("Pong ASCII: %s", s)
+			if strings.Contains(s, "ERROR SPI") {
 				log.Printf("SPI error sent from Pong. Restarting Pong")
 			}
 		}
@@ -239,15 +238,15 @@ func pongSetUpdateMode() {
 
 func pongRunUpdateWithOutput() error {
 	/*
-	out, err2 := exec.Command("/bin/bash","-c", "\"/tmp/updpong/util/updatepong.sh\"").Output()
-	if err2 != nil {
-		return err2
-	} else {
-		log.Printf("Update ran ok:\n%s\n",out)
-	}
-	return nil
-*/
-	cmd := exec.Command("/bin/bash","-c", "\"/tmp/updpong/util/updatepong.sh\"")
+		out, err2 := exec.Command("/bin/bash","-c", "\"/tmp/updpong/util/updatepong.sh\"").Output()
+		if err2 != nil {
+			return err2
+		} else {
+			log.Printf("Update ran ok:\n%s\n",out)
+		}
+		return nil
+	*/
+	cmd := exec.Command("/bin/bash", "-c", "\"/tmp/updpong/util/updatepong.sh\"")
 	stdout, _ := cmd.StdoutPipe()
 	//stderr, _ := cmd.StderrPipe()
 
@@ -262,7 +261,7 @@ func pongRunUpdateWithOutput() error {
 	for scanStdout.Scan() {
 		m := PongTermMessage{Text: scanStdout.Text(), Source: "stdout"}
 		logPongTermMessage(m)
-		log.Printf("Pong Updater: %s\n",m.Text)
+		log.Printf("Pong Updater: %s\n", m.Text)
 	}
 
 	if err := scanStdout.Err(); err != nil {
@@ -314,20 +313,20 @@ func pongWatcher() {
 
 		if pongUpdateMode {
 			log.Printf("PONG UPDATE MODE SET run the steps we need to update it here!")
-			// File should be in /tmp/update_pong.zip 
+			// File should be in /tmp/update_pong.zip
 			pongUpdateMode = false
 			// Lets shut down the pong thread and run the update script
-			pongShutdown() 
+			pongShutdown()
 			time.Sleep(5 * time.Second)
 			log.Printf("Run update process\n")
-			_, err := exec.Command("/usr/bin/unzip","/tmp/update_pong.zip","-d","/tmp/updpong").Output()
+			_, err := exec.Command("/usr/bin/unzip", "/tmp/update_pong.zip", "-d", "/tmp/updpong").Output()
 			if err == nil {
 				err2 := pongRunUpdateWithOutput()
 				if err2 != nil {
-					log.Printf("Failed to run pongRunUpdateWithOutput(): %s\n",err2.Error())
+					log.Printf("Failed to run pongRunUpdateWithOutput(): %s\n", err2.Error())
 				}
 			} else {
-				log.Printf("Could not unpack the update file /tmp/update_pong.zip: %s\n",err.Error())
+				log.Printf("Could not unpack the update file /tmp/update_pong.zip: %s\n", err.Error())
 			}
 
 			time.Sleep(1 * time.Second)
@@ -339,8 +338,8 @@ func pongWatcher() {
 		} else {
 			pongDownCount = 0
 		}
-		// Autodetect Pong 
-		if (!globalSettings.Pong_Enabled && !prevPongEnabled && pongDownCount > 10) {
+		// Autodetect Pong
+		if !globalSettings.Pong_Enabled && !prevPongEnabled && pongDownCount > 10 {
 			if _, err := os.Stat("/dev/pong"); err == nil {
 				log.Printf("Pong device file detected - Enabling the pong radio\n")
 				globalSettings.Pong_Enabled = true
@@ -361,7 +360,7 @@ func pongWatcher() {
 				time.Sleep(10 * time.Second)
 				continue
 			}
-			if globalStatus.Pong_connected  {
+			if globalStatus.Pong_connected {
 				go pongNetworkRepeater()
 				go pongSerialReader()
 			}
@@ -376,4 +375,3 @@ func pongWatcher() {
 func pongInit() {
 	go pongWatcher()
 }
-

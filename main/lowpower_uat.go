@@ -66,8 +66,9 @@ func initUATRadioSerial(isTraceReplayMode bool) error {
 }
 
 /*
-	radioSerialPortReader().
-	 Loop to read data from the radio serial port.
+radioSerialPortReader().
+
+	Loop to read data from the radio serial port.
 */
 var radioMagic = []byte{0x0a, 0xb0, 0xcd, 0xe0}
 

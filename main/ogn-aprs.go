@@ -25,26 +25,24 @@ var aprsOutgoingMsgChan chan string = make(chan string, 100)
 var aprsIncomingMsgChan chan string = make(chan string, 100)
 var aprsExitChan chan bool = make(chan bool, 1)
 
-
 var aprsRegex = regexp.MustCompile(
-	`(?P<protocol>ICA|FLR|SKY|PAW|OGN|RND|FMT|MTK|XCG|FAN|FNT)(?P<id>[\dA-Z]{6})>` +        // protocol, id
-		`[A-Z]+,qAS,([\d\w]+):[\/]` +                                                       //
-		`(?P<time>\d{6})h(?P<longitude>\d*\.?\d*[NS])[\/\\](?P<lattitude>\d*\.?\d*[EW])` +  // time, lon, lat
-		`\D` +                                                                              // sep
-		`((?P<track>\d{3})\/(?P<speed>\d{3})\/A=(?P<altitude>\d*))*` +                      // optional track, speed, alt
-		`(\s!W(?P<lonlatprecision>\d+)!\s)*` +                                              // optional lon lat precision
-		`(id(?P<id>[\dA-F]{8}))*`)                                                          // optional id
-
+	`(?P<protocol>ICA|FLR|SKY|PAW|OGN|RND|FMT|MTK|XCG|FAN|FNT)(?P<id>[\dA-Z]{6})>` + // protocol, id
+		`[A-Z]+,qAS,([\d\w]+):[\/]` + //
+		`(?P<time>\d{6})h(?P<longitude>\d*\.?\d*[NS])[\/\\](?P<lattitude>\d*\.?\d*[EW])` + // time, lon, lat
+		`\D` + // sep
+		`((?P<track>\d{3})\/(?P<speed>\d{3})\/A=(?P<altitude>\d*))*` + // optional track, speed, alt
+		`(\s!W(?P<lonlatprecision>\d+)!\s)*` + // optional lon lat precision
+		`(id(?P<id>[\dA-F]{8}))*`) // optional id
 
 func authenticate(c net.Conn) {
 	filter := ""
 	if mySituation.GPSFixQuality > 0 {
 		filter = fmt.Sprintf(
-			"filter r/%.7f/%.7f/%d\r\n", 
-			mySituation.GPSLatitude, mySituation.GPSLongitude, 
-			globalSettings.RadarRange*2)   // RadarRange is an int in NM, APRS wants an int in km and 2~=1.852
+			"filter r/%.7f/%.7f/%d\r\n",
+			mySituation.GPSLatitude, mySituation.GPSLongitude,
+			globalSettings.RadarRange*2) // RadarRange is an int in NM, APRS wants an int in km and 2~=1.852
 	}
-	auth := fmt.Sprintf("user OGNNOCALL pass -1 vers stratux %s %s\r\n",  globalStatus.Version, filter)
+	auth := fmt.Sprintf("user OGNNOCALL pass -1 vers stratux %s %s\r\n", globalStatus.Version, filter)
 	log.Printf(auth)
 	fmt.Fprintf(c, auth)
 }
@@ -69,9 +67,9 @@ func updateFilter(c net.Conn) {
 			if globalStatus.APRS_connected {
 				if mySituation.GPSFixQuality > 0 {
 					filter := fmt.Sprintf(
-						"#filter r/%.7f/%.7f/%d\r\n", 
-						mySituation.GPSLatitude, mySituation.GPSLongitude, 
-						globalSettings.RadarRange*2)  // RadarRange is an int in NM, APRS wants an int in km and 2~=1.852
+						"#filter r/%.7f/%.7f/%d\r\n",
+						mySituation.GPSLatitude, mySituation.GPSLongitude,
+						globalSettings.RadarRange*2) // RadarRange is an int in NM, APRS wants an int in km and 2~=1.852
 					fmt.Fprintf(c, filter)
 				}
 			} else {
@@ -146,9 +144,6 @@ func aprsListen() {
 	}
 }
 
-
-
-
 func parseAprsMessage(data string, fakeCurrentTime bool) {
 
 	if globalSettings.DEBUG {
@@ -178,7 +173,6 @@ func parseAprsMessage(data string, fakeCurrentTime bool) {
 			return
 		}
 		ts = time.Date(ts.Year(), ts.Month(), ts.Day(), int(hh), int(mm), int(ss), 0, time.UTC)
-
 
 		lat, err := strconv.ParseFloat(res[5][:2], 64)
 		if err != nil {

@@ -27,12 +27,11 @@ import (
 	"tinygo.org/x/bluetooth"
 )
 
-
 var clientConnections map[string]connection // UDP out, TCP out, serial out
 
 var dhcpLeases map[string]string
-var networkGDL90Chan chan []byte      // For gdl90 web socket
-var netMutex *sync.Mutex              // netMutex needs to be locked before accessing dhcpLeases, pingResponse, and outSockets and calling isSleeping() and isThrottled().
+var networkGDL90Chan chan []byte // For gdl90 web socket
+var netMutex *sync.Mutex         // netMutex needs to be locked before accessing dhcpLeases, pingResponse, and outSockets and calling isSleeping() and isThrottled().
 
 var totalNetworkMessagesSent uint32
 
@@ -230,8 +229,6 @@ func tcpNMEAOutListener() {
 	}
 }
 
-
-
 /* Server that can be used to feed NMEA data to, e.g. to connect OGN Tracker wirelessly */
 func tcpNMEAInListener() {
 	ln, err := net.Listen("tcp", ":30011")
@@ -246,7 +243,7 @@ func tcpNMEAInListener() {
 			continue
 		}
 		go handleNmeaInConnection(conn)
-	}	
+	}
 }
 func handleNmeaInConnection(c net.Conn) {
 	defer c.Close()
@@ -276,7 +273,6 @@ func getNetworkStats() {
 	for {
 		<-timer.C
 		netMutex.Lock()
-		
 
 		var numNonSleepingClients uint
 
@@ -344,11 +340,11 @@ func refreshConnectedClients() {
 					continue
 				}
 				clientConnections[ipAndPort] = &networkConnection{
-					Conn: outConn,
-					Ip: ip,
-					Port: networkOutput.Port,
+					Conn:       outConn,
+					Ip:         ip,
+					Port:       networkOutput.Port,
 					Capability: networkOutput.Capability,
-					Queue: NewMessageQueue(1024),
+					Queue:      NewMessageQueue(1024),
 				}
 				go connectionWriter(clientConnections[ipAndPort])
 			}
@@ -381,6 +377,7 @@ func parseBleUuid(uuidStr string) (uuid bluetooth.UUID) {
 }
 
 var bleAdapter = bluetooth.DefaultAdapter
+
 func initBluetooth() {
 	if len(globalSettings.BleOutputs) == 0 {
 		return
@@ -400,7 +397,7 @@ func initBluetooth() {
 
 	adv := bleAdapter.DefaultAdvertisement()
 	adv.Configure(bluetooth.AdvertisementOptions{
-		LocalName: globalSettings.WiFiSSID,
+		LocalName:    globalSettings.WiFiSSID,
 		ServiceUUIDs: services,
 	})
 	if err := adv.Start(); err != nil {
@@ -411,7 +408,7 @@ func initBluetooth() {
 		conn := &globalSettings.BleOutputs[i]
 		err := bleAdapter.AddService(&bluetooth.Service{
 			UUID: parseBleUuid(conn.UUIDService),
-			Characteristics: []bluetooth.CharacteristicConfig {
+			Characteristics: []bluetooth.CharacteristicConfig{
 				{
 					Handle: &conn.Characteristic,
 					UUID:   parseBleUuid(conn.UUIDGatt),
@@ -422,7 +419,6 @@ func initBluetooth() {
 					//},
 				},
 			},
-
 		})
 		if err != nil {
 			log.Printf("Failed to bring up BLE Gatt Service %s: %s", conn.UUIDService, err.Error())
@@ -444,7 +440,6 @@ func onConnectionClosed(conn connection) {
 	delete(clientConnections, key)
 	netMutex.Unlock()
 }
-
 
 func collectMessages(conn connection) []byte {
 	data := make([]byte, 0)
@@ -472,7 +467,7 @@ func collectMessages(conn connection) []byte {
 		if len(msg) > maxMsgLen {
 			maxMsgLen = len(data)
 		}
-		if len(data) + maxMsgLen > conn.GetDesiredPacketSize() {
+		if len(data)+maxMsgLen > conn.GetDesiredPacketSize() {
 			// Probably can't fit in another message
 			return data
 		}
@@ -511,7 +506,6 @@ func connectionWriter(connection connection) {
 	}
 }
 
-
 func sendMsg(msg []byte, msgType uint8, maxAge time.Duration, priority int32) {
 	if (msgType & NETWORK_GDL90_STANDARD) != 0 {
 		// It's a GDL90 message - do ui broadcast.
@@ -542,7 +536,6 @@ func sendXPlane(msg []byte, maxAge time.Duration, priority int32) {
 func sendNetFLARM(msg string, maxAge time.Duration, priority int32) {
 	sendMsg([]byte(msg), NETWORK_FLARM_NMEA, maxAge, priority)
 }
-
 
 func monitorDHCPLeases() {
 	timer := time.NewTicker(30 * time.Second)
@@ -597,7 +590,7 @@ func getNetworkConn(ipAndPort string) *networkConnection {
 	if strings.Contains(ipAndPort, ":") {
 		if conn, ok := clientConnections[ipAndPort]; ok {
 			if netconn, ok := conn.(*networkConnection); ok {
-				return netconn;
+				return netconn
 			}
 		}
 	}
@@ -710,7 +703,6 @@ func networkStatsCounter() {
 	}
 }
 
-
 func initNetwork() {
 	networkGDL90Chan = make(chan []byte, 1024)
 	clientConnections = make(map[string]connection)
@@ -720,7 +712,7 @@ func initNetwork() {
 	go monitorDHCPLeases() // Checks for new UDP connections
 	go sleepMonitor()
 	go networkStatsCounter()
-	go serialOutWatcher() // Check for new Serial connections
+	go serialOutWatcher()  // Check for new Serial connections
 	go networkOutWatcher() // Pushes to websocket
 	go tcpNMEAOutListener()
 	go tcpNMEAInListener()

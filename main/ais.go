@@ -99,7 +99,7 @@ func parseAisMessage(data string) {
 	}
 }
 
-// Datastructure for AIS parsing 
+// Datastructure for AIS parsing
 // explanation can be found at https://www.navcen.uscg.gov/?pageName=AISMessages
 func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 	var ti TrafficInfo
@@ -144,7 +144,7 @@ func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 		ti.Tail = strings.TrimSpace(shipStaticData.Name)
 		ti.Reg = strings.TrimSpace(shipStaticData.CallSign)
 		ti.SurfaceVehicleType = uint16(shipStaticData.Type)
-		// Store in case this was the first message and we disgard die to GPS not available 
+		// Store in case this was the first message and we disgard die to GPS not available
 		traffic[key] = ti
 	}
 
@@ -180,7 +180,7 @@ func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 			ti.Last_speed = ti.Last_seen
 		}
 
-		// We assume that when we have speed, 
+		// We assume that when we have speed,
 		// we also have a proper course over ground so we take that over heading.
 		// Otherwise Track will be heading so boats will orient correctly
 		if positionReport.Sog > 0.0 && positionReport.Sog < 102.3 {

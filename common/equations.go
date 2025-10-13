@@ -335,7 +335,7 @@ func Distance(lat1, lon1, lat2, lon2 float64) (dist, bearing float64) {
 
 // CalcAltitude determines the pressure altitude (feet) from the atmospheric pressure (hPa)
 func CalcAltitude(press float64, altoffset int) (altitude float64) {
-	altitude = 145366.45 * (1.0 - math.Pow(press/1013.25, 0.190284)) + float64(altoffset)
+	altitude = 145366.45*(1.0-math.Pow(press/1013.25, 0.190284)) + float64(altoffset)
 	return
 }
 

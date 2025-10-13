@@ -38,7 +38,8 @@ type StratuxTimestamp struct {
 }
 
 // 'startup' table creates a new entry each time the daemon is started. This keeps track of sequential starts, even if the
-//  timestamp is ambiguous (units with no GPS). This struct is just a placeholder for an empty table (other than primary key).
+//
+//	timestamp is ambiguous (units with no GPS). This struct is just a placeholder for an empty table (other than primary key).
 type StratuxStartup struct {
 	id   int64
 	Fill string
