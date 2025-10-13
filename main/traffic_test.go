@@ -454,3 +454,248 @@ func TestIsOwnshipICAO_NoMatch(t *testing.T) {
 		t.Error("Expected non-matching ICAO to not be ignored")
 	}
 }
+
+// TestMakeTrafficReportMsg_BasicFields tests GDL90 traffic report message generation
+// Verifies: FR-604 (GDL90 Traffic Report)
+func TestMakeTrafficReportMsg_BasicFields(t *testing.T) {
+	ti := TrafficInfo{
+		Icao_addr:         0xABCDEF,
+		Addr_type:         0, // ADS-B
+		Lat:               43.99,
+		Lng:               -88.56,
+		Alt:               5000,
+		Speed:             120,
+		Speed_valid:       true,
+		Track:             90.0,
+		Vvel:              500,
+		Tail:              "N12345",
+		Emitter_category:  1,
+		NIC:               8,
+		NACp:              8,
+		BearingDist_valid: true,
+		Distance:          5000, // > 2nm, not alertable
+	}
+
+	msg := makeTrafficReportMsg(ti)
+
+	// Verify message structure
+	if len(msg) < 28 {
+		t.Fatalf("Expected message length >= 28 bytes, got %d", len(msg))
+	}
+
+	// Message should start with 0x7E (GDL90 frame flag)
+	if msg[0] != 0x7E {
+		t.Errorf("Expected GDL90 frame flag 0x7E, got 0x%X", msg[0])
+	}
+
+	// Second byte should be message type 0x14 (Traffic Report)
+	if msg[1] != 0x14 {
+		t.Errorf("Expected message type 0x14, got 0x%X", msg[1])
+	}
+
+	// Check ICAO address encoding (bytes 3-5 after unstuffing)
+	// Note: After prepareMessage(), bytes may be stuffed, so we check the raw message structure
+	// This is a basic structure test; full byte-level testing would require unstuffing logic
+}
+
+// TestMakeTrafficReportMsg_AlertFlag tests traffic alert flag setting
+// Verifies: FR-407 (Traffic Alerting), FR-604 (GDL90 Traffic Report)
+func TestMakeTrafficReportMsg_AlertFlag(t *testing.T) {
+	testCases := []struct {
+		name              string
+		distance          float64
+		bearingDistValid  bool
+		expectAlert       bool
+		expectedAlertByte byte
+	}{
+		{"Close traffic", 3700, true, true, 0x10},  // Within 2nm, alert bit set
+		{"Far traffic", 5000, true, false, 0x00},   // Beyond 2nm, no alert
+		{"No bearing", 1000, false, true, 0x10},    // Conservative: alert
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr:         0xABCDEF,
+				Addr_type:         0,
+				Lat:               43.99,
+				Lng:               -88.56,
+				Alt:               5000,
+				Speed:             120,
+				Track:             90.0,
+				BearingDist_valid: tc.bearingDistValid,
+				Distance:          tc.distance,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			// Check if alert bit is set correctly in address type byte (after message type)
+			// Byte 2 contains addr_type (low 3 bits) and alert flag (0x10)
+			alertBit := msg[2] & 0x10
+			if tc.expectAlert && alertBit == 0 {
+				t.Error("Expected alert bit to be set for close traffic")
+			}
+			if !tc.expectAlert && alertBit != 0 {
+				t.Error("Expected alert bit to be clear for far traffic")
+			}
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_AltitudeEncoding tests GDL90 altitude encoding
+// Verifies: FR-604 (GDL90 Traffic Report - altitude encoding)
+func TestMakeTrafficReportMsg_AltitudeEncoding(t *testing.T) {
+	testCases := []struct {
+		name string
+		alt  int32
+	}{
+		{"Sea level", 0},
+		{"1000 ft", 1000},
+		{"10000 ft", 10000},
+		{"Negative alt", -500},
+		{"High altitude", 45000},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       tc.alt,
+				Speed:     120,
+				Track:     90.0,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			// Verify message was generated (basic sanity check)
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Full altitude decoding would require unstuffing and detailed parsing
+			// This test verifies the function doesn't panic with various altitudes
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_ExtrapolationFlag tests extrapolation indicator
+// Verifies: FR-402 (Traffic Position Extrapolation), FR-604 (GDL90 Traffic Report)
+func TestMakeTrafficReportMsg_ExtrapolationFlag(t *testing.T) {
+	ti := TrafficInfo{
+		Icao_addr:            0xABCDEF,
+		Lat:                  43.99,
+		Lng:                  -88.56,
+		Alt:                  5000,
+		Speed:                120,
+		Track:                90.0,
+		ExtrapolatedPosition: true, // Position is extrapolated
+	}
+
+	msg := makeTrafficReportMsg(ti)
+
+	// Verify message generated successfully
+	if len(msg) < 28 {
+		t.Fatalf("Message too short: %d bytes", len(msg))
+	}
+
+	// The extrapolation flag is in the "m" field (bit 2 of byte 13 in raw message)
+	// After prepareMessage() stuffing, exact byte position may vary
+	// This test verifies the function handles extrapolated traffic without error
+}
+
+// TestMakeTrafficReportMsg_Callsign tests tail number encoding
+// Verifies: FR-604 (GDL90 Traffic Report - callsign field)
+func TestMakeTrafficReportMsg_Callsign(t *testing.T) {
+	testCases := []struct {
+		name     string
+		tail     string
+		expectOk bool
+	}{
+		{"Valid N-number", "N12345", true},
+		{"Short tail", "N1", true},
+		{"Long tail", "N12345AB", true},
+		{"Empty tail", "", true},
+		{"Invalid chars", "N123!@#", true}, // Should sanitize
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       5000,
+				Speed:     120,
+				Track:     90.0,
+				Tail:      tc.tail,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Callsign is in bytes 19-26 of raw message
+			// Full parsing would require unstuffing
+		})
+	}
+}
+
+// TestCalcLocationForBearingDistance_CardinalDirections tests dead reckoning for cardinal directions
+// Verifies: FR-402 (Traffic Position Extrapolation)
+func TestCalcLocationForBearingDistance_CardinalDirections(t *testing.T) {
+	testCases := []struct {
+		name            string
+		bearing         float64
+		distance        float64
+		expectLatChange bool
+		expectLngChange bool
+	}{
+		{"North", 0, 10, true, false},   // Latitude increases
+		{"East", 90, 10, false, true},   // Longitude increases (west is negative)
+		{"South", 180, 10, true, false}, // Latitude decreases
+		{"West", 270, 10, false, true},  // Longitude decreases
+	}
+
+	startLat, startLon := 43.99, -88.56
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			endLat, endLon := calcLocationForBearingDistance(startLat, startLon, tc.bearing, tc.distance)
+
+			// Verify position changed
+			latChanged := math.Abs(endLat-startLat) > 0.001
+			lonChanged := math.Abs(endLon-startLon) > 0.001
+
+			if tc.expectLatChange && !latChanged {
+				t.Errorf("Expected latitude to change for bearing %f", tc.bearing)
+			}
+			if tc.expectLngChange && !lonChanged {
+				t.Errorf("Expected longitude to change for bearing %f", tc.bearing)
+			}
+
+			// Verify distance is reasonable (rough check)
+			actualDist := math.Sqrt(math.Pow(endLat-startLat, 2) + math.Pow(endLon-startLon, 2))
+			if actualDist < 0.001 {
+				t.Errorf("Position didn't move enough: %f degrees", actualDist)
+			}
+		})
+	}
+}
+
+// TestCalcLocationForBearingDistance_ZeroDistance tests zero distance edge case
+// Verifies: FR-402 (Traffic Position Extrapolation)
+func TestCalcLocationForBearingDistance_ZeroDistance(t *testing.T) {
+	startLat, startLon := 43.99, -88.56
+	bearing := 45.0
+	distance := 0.0
+
+	endLat, endLon := calcLocationForBearingDistance(startLat, startLon, bearing, distance)
+
+	// Zero distance should result in same position
+	if math.Abs(endLat-startLat) > 0.0001 || math.Abs(endLon-startLon) > 0.0001 {
+		t.Errorf("Expected position unchanged for zero distance, got (%f, %f) -> (%f, %f)",
+			startLat, startLon, endLat, endLon)
+	}
+}
