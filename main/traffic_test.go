@@ -13,6 +13,7 @@ package main
 
 import (
 	"math"
+	"sync"
 	"testing"
 	"time"
 )
@@ -1169,5 +1170,222 @@ func TestComputeTrafficPriority_AltitudeDifference(t *testing.T) {
 	// Traffic at different altitude should have lower priority (higher number)
 	if diffPriority <= samePriority {
 		t.Errorf("Traffic with altitude difference (%d) should have lower priority than same altitude (%d)", diffPriority, samePriority)
+	}
+}
+
+// TestRemoveTarget tests traffic target removal
+// Verifies: FR-401 (Traffic Fusion - target removal)
+func TestRemoveTarget(t *testing.T) {
+	// Initialize traffic map
+	if traffic == nil {
+		traffic = make(map[uint32]TrafficInfo)
+	}
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	// Add a target
+	icao := uint32(0xABCDEF)
+	traffic[icao] = TrafficInfo{
+		Icao_addr:      icao,
+		Lat:            43.99,
+		Lng:            -88.56,
+		Alt:            5000,
+		Position_valid: true,
+	}
+
+	// Verify target exists
+	if _, exists := traffic[icao]; !exists {
+		t.Fatal("Target not added to traffic map")
+	}
+
+	// Remove target
+	removeTarget(icao)
+
+	// Verify target is removed
+	if _, exists := traffic[icao]; exists {
+		t.Error("Expected target to be removed from traffic map")
+	}
+}
+
+// TestRemoveTarget_NonExistent tests removing a target that doesn't exist
+// Verifies: FR-401 (Traffic Fusion - graceful handling of missing targets)
+func TestRemoveTarget_NonExistent(t *testing.T) {
+	// Initialize traffic map
+	if traffic == nil {
+		traffic = make(map[uint32]TrafficInfo)
+	}
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	// Try to remove non-existent target (should not panic)
+	icao := uint32(0x999999)
+	removeTarget(icao)
+
+	// Should complete without error
+}
+
+// TestCleanupOldEntries_NonAIS tests cleanup of old non-AIS traffic
+// Verifies: FR-401 (Traffic Fusion - 60 second timeout for non-AIS)
+func TestCleanupOldEntries_NonAIS(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	if traffic == nil {
+		traffic = make(map[uint32]TrafficInfo)
+	}
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	// Clear existing traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	oldTime := stratuxClock.Time.Add(-65 * time.Second) // More than 60 seconds old
+
+	// Add old non-AIS traffic
+	icao := uint32(0xABCDEF)
+	trafficMutex.Lock()
+	traffic[icao] = TrafficInfo{
+		Icao_addr:   icao,
+		Last_source: TRAFFIC_SOURCE_1090ES,
+		Last_seen:   oldTime,
+	}
+	trafficMutex.Unlock()
+
+	// Run cleanup (note: cleanupOldEntries is called without lock, but modifies traffic map)
+	trafficMutex.Lock()
+	cleanupOldEntries()
+	trafficMutex.Unlock()
+
+	// Verify old traffic was removed
+	trafficMutex.Lock()
+	_, exists := traffic[icao]
+	trafficMutex.Unlock()
+
+	if exists {
+		t.Error("Expected old non-AIS traffic (>60s) to be removed")
+	}
+}
+
+// TestCleanupOldEntries_AIS tests cleanup of old AIS traffic
+// Verifies: FR-401 (Traffic Fusion - 15 minute timeout for AIS)
+func TestCleanupOldEntries_AIS(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	if traffic == nil {
+		traffic = make(map[uint32]TrafficInfo)
+	}
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	// Clear existing traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// Add AIS traffic that's 10 minutes old (should NOT be removed)
+	recentAISIcao := uint32(0x111111)
+	recentTime := stratuxClock.Time.Add(-10 * time.Minute)
+
+	trafficMutex.Lock()
+	traffic[recentAISIcao] = TrafficInfo{
+		Icao_addr:   recentAISIcao,
+		Last_source: TRAFFIC_SOURCE_AIS,
+		Last_seen:   recentTime,
+	}
+	trafficMutex.Unlock()
+
+	// Run cleanup
+	trafficMutex.Lock()
+	cleanupOldEntries()
+	trafficMutex.Unlock()
+
+	// Verify recent AIS traffic still exists
+	trafficMutex.Lock()
+	_, exists := traffic[recentAISIcao]
+	trafficMutex.Unlock()
+
+	if !exists {
+		t.Error("Expected recent AIS traffic (<15min) to be retained")
+	}
+
+	// Now add very old AIS traffic (>15 minutes, should be removed)
+	oldAISIcao := uint32(0x222222)
+	oldTime := stratuxClock.Time.Add(-16 * time.Minute)
+
+	trafficMutex.Lock()
+	traffic[oldAISIcao] = TrafficInfo{
+		Icao_addr:   oldAISIcao,
+		Last_source: TRAFFIC_SOURCE_AIS,
+		Last_seen:   oldTime,
+	}
+	trafficMutex.Unlock()
+
+	// Run cleanup again
+	trafficMutex.Lock()
+	cleanupOldEntries()
+	trafficMutex.Unlock()
+
+	// Verify old AIS traffic was removed
+	trafficMutex.Lock()
+	_, exists = traffic[oldAISIcao]
+	trafficMutex.Unlock()
+
+	if exists {
+		t.Error("Expected old AIS traffic (>15min) to be removed")
+	}
+}
+
+// TestCleanupOldEntries_RecentTraffic tests that recent traffic is not removed
+// Verifies: FR-401 (Traffic Fusion - recent traffic retention)
+func TestCleanupOldEntries_RecentTraffic(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	if traffic == nil {
+		traffic = make(map[uint32]TrafficInfo)
+	}
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	// Clear existing traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	recentTime := stratuxClock.Time.Add(-30 * time.Second) // 30 seconds old
+
+	// Add recent non-AIS traffic
+	icao := uint32(0xABCDEF)
+	trafficMutex.Lock()
+	traffic[icao] = TrafficInfo{
+		Icao_addr:   icao,
+		Last_source: TRAFFIC_SOURCE_1090ES,
+		Last_seen:   recentTime,
+	}
+	trafficMutex.Unlock()
+
+	// Run cleanup
+	trafficMutex.Lock()
+	cleanupOldEntries()
+	trafficMutex.Unlock()
+
+	// Verify recent traffic still exists
+	trafficMutex.Lock()
+	_, exists := traffic[icao]
+	trafficMutex.Unlock()
+
+	if !exists {
+		t.Error("Expected recent traffic (<60s) to be retained")
 	}
 }
