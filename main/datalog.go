@@ -415,7 +415,6 @@ func dataLogWriter(db *sql.DB) {
 			return
 		}
 	}
-	log.Printf("datalog.go: dataLogWriter() shutting down\n")
 }
 
 func dataLog() {
@@ -499,8 +498,6 @@ func dataLog() {
 			return
 		}
 	}
-	log.Printf("datalog.go: dataLog() shutting down\n")
-	close(shutdownDataLog)
 }
 
 /*
