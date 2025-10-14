@@ -61,13 +61,13 @@
 				
 				<option value="file2">github.com/stratux/stratux/main/cot-in.go (0.0%)</option>
 				
-				<option value="file3">github.com/stratux/stratux/main/datalog.go (0.0%)</option>
+				<option value="file3">github.com/stratux/stratux/main/datalog.go (8.2%)</option>
 				
-				<option value="file4">github.com/stratux/stratux/main/flarm-nmea.go (0.0%)</option>
+				<option value="file4">github.com/stratux/stratux/main/flarm-nmea.go (18.0%)</option>
 				
-				<option value="file5">github.com/stratux/stratux/main/gen_gdl90.go (2.5%)</option>
+				<option value="file5">github.com/stratux/stratux/main/gen_gdl90.go (17.7%)</option>
 				
-				<option value="file6">github.com/stratux/stratux/main/gps.go (0.4%)</option>
+				<option value="file6">github.com/stratux/stratux/main/gps.go (5.5%)</option>
 				
 				<option value="file7">github.com/stratux/stratux/main/logging.go (0.0%)</option>
 				
@@ -75,7 +75,7 @@
 				
 				<option value="file9">github.com/stratux/stratux/main/managementinterface.go (0.0%)</option>
 				
-				<option value="file10">github.com/stratux/stratux/main/messagequeue.go (0.0%)</option>
+				<option value="file10">github.com/stratux/stratux/main/messagequeue.go (94.8%)</option>
 				
 				<option value="file11">github.com/stratux/stratux/main/monotonic.go (56.2%)</option>
 				
@@ -97,13 +97,13 @@
 				
 				<option value="file20">github.com/stratux/stratux/main/trace.go (0.0%)</option>
 				
-				<option value="file21">github.com/stratux/stratux/main/tracker.go (0.0%)</option>
+				<option value="file21">github.com/stratux/stratux/main/tracker.go (4.1%)</option>
 				
-				<option value="file22">github.com/stratux/stratux/main/traffic.go (28.2%)</option>
+				<option value="file22">github.com/stratux/stratux/main/traffic.go (44.3%)</option>
 				
 				<option value="file23">github.com/stratux/stratux/main/uibroadcast.go (14.3%)</option>
 				
-				<option value="file24">github.com/stratux/stratux/main/xplane.go (0.0%)</option>
+				<option value="file24">github.com/stratux/stratux/main/xplane.go (100.0%)</option>
 				
 				</select>
 			</div>
@@ -880,52 +880,52 @@ type SQLiteMarshal struct {
         Marshal   func(v reflect.Value) string
 }
 
-func boolMarshal(v reflect.Value) string <span class="cov0" title="0">{
+func boolMarshal(v reflect.Value) string <span class="cov3" title="3">{
         b := v.Bool()
-        if b </span><span class="cov0" title="0">{
+        if b </span><span class="cov2" title="2">{
                 return "1"
         }</span>
-        <span class="cov0" title="0">return "0"</span>
+        <span class="cov1" title="1">return "0"</span>
 }
 
-func intMarshal(v reflect.Value) string <span class="cov0" title="0">{
+func intMarshal(v reflect.Value) string <span class="cov6" title="10">{
         return strconv.FormatInt(v.Int(), 10)
 }</span>
 
-func uintMarshal(v reflect.Value) string <span class="cov0" title="0">{
+func uintMarshal(v reflect.Value) string <span class="cov5" title="8">{
         return strconv.FormatUint(v.Uint(), 10)
 }</span>
 
-func floatMarshal(v reflect.Value) string <span class="cov0" title="0">{
+func floatMarshal(v reflect.Value) string <span class="cov5" title="7">{
         return strconv.FormatFloat(v.Float(), 'f', 10, 64)
 }</span>
 
-func stringMarshal(v reflect.Value) string <span class="cov0" title="0">{
+func stringMarshal(v reflect.Value) string <span class="cov5" title="6">{
         return v.String()
 }</span>
 
-func notsupportedMarshal(v reflect.Value) string <span class="cov0" title="0">{
+func notsupportedMarshal(v reflect.Value) string <span class="cov2" title="2">{
         return ""
 }</span>
 
-func structCanBeMarshalled(v reflect.Value) bool <span class="cov0" title="0">{
+func structCanBeMarshalled(v reflect.Value) bool <span class="cov5" title="7">{
         m := v.MethodByName("String")
-        if m.IsValid() &amp;&amp; !m.IsNil() </span><span class="cov0" title="0">{
+        if m.IsValid() &amp;&amp; !m.IsNil() </span><span class="cov4" title="5">{
                 return true
         }</span>
-        <span class="cov0" title="0">return false</span>
+        <span class="cov2" title="2">return false</span>
 }
 
-func structMarshal(v reflect.Value) string <span class="cov0" title="0">{
-        if structCanBeMarshalled(v) </span><span class="cov0" title="0">{
+func structMarshal(v reflect.Value) string <span class="cov4" title="4">{
+        if structCanBeMarshalled(v) </span><span class="cov3" title="3">{
                 m := v.MethodByName("String")
                 in := make([]reflect.Value, 0)
                 ret := m.Call(in)
-                if len(ret) &gt; 0 </span><span class="cov0" title="0">{
+                if len(ret) &gt; 0 </span><span class="cov3" title="3">{
                         return ret[0].String()
                 }</span>
         }
-        <span class="cov0" title="0">return ""</span>
+        <span class="cov1" title="1">return ""</span>
 }
 
 var sqliteMarshalFunctions = map[string]SQLiteMarshal{
@@ -1344,7 +1344,7 @@ func logMsg(m msg) <span class="cov0" title="0">{
         }</span>
 }
 
-func logESMsg(m esmsg) <span class="cov0" title="0">{
+func logESMsg(m esmsg) <span class="cov10" title="48">{
         if globalSettings.ReplayLog &amp;&amp; isDataLogReady() </span><span class="cov0" title="0">{
                 dataLogChan &lt;- DataLogRow{tbl: "es_messages", data: m}
         }</span>
@@ -1469,16 +1469,16 @@ import (
 */
 
 // Append checksum and to nmea string
-func appendNmeaChecksum(nmea string) string <span class="cov0" title="0">{
+func appendNmeaChecksum(nmea string) string <span class="cov4" title="9">{
         start := 0
-        if nmea[0] == '$' </span><span class="cov0" title="0">{
+        if len(nmea) &gt; 0 &amp;&amp; nmea[0] == '$' </span><span class="cov3" title="4">{
                 start = 1
         }</span>
-        <span class="cov0" title="0">checksum := byte(0x00)
-        for i := start; i &lt; len(nmea); i++ </span><span class="cov0" title="0">{
+        <span class="cov4" title="9">checksum := byte(0x00)
+        for i := start; i &lt; len(nmea); i++ </span><span class="cov10" title="209">{
                 checksum = checksum ^ byte(nmea[i])
         }</span>
-        <span class="cov0" title="0">return fmt.Sprintf("%s*%02X", nmea, checksum)</span>
+        <span class="cov4" title="9">return fmt.Sprintf("%s*%02X", nmea, checksum)</span>
 }
 
 func makeFlarmPFLAUString(ti TrafficInfo) (msg string) <span class="cov0" title="0">{
@@ -1522,15 +1522,15 @@ func makeFlarmPFLAUString(ti TrafficInfo) (msg string) <span class="cov0" title=
 }
 
 // TODO: only very simplistic implementation
-func computeAlarmLevel(dist float64, relativeVertical int32) (alarmLevel uint8) <span class="cov0" title="0">{
-        if (dist &lt; 926) &amp;&amp; (relativeVertical &lt; 152) &amp;&amp; (relativeVertical &gt; -152) </span><span class="cov0" title="0">{ // 926 m = 0.5 NM; 152m = 500'
+func computeAlarmLevel(dist float64, relativeVertical int32) (alarmLevel uint8) <span class="cov6" title="21">{
+        if (dist &lt; 926) &amp;&amp; (relativeVertical &lt; 152) &amp;&amp; (relativeVertical &gt; -152) </span><span class="cov4" title="6">{ // 926 m = 0.5 NM; 152m = 500'
                 alarmLevel = 3
-        }</span> else<span class="cov0" title="0"> if (dist &lt; 1852) &amp;&amp; (relativeVertical &lt; 304) &amp;&amp; (relativeVertical &gt; -304) </span><span class="cov0" title="0">{ // 1852 m = 1.0 NM ; 304 m = 1000'
+        }</span> else<span class="cov5" title="15"> if (dist &lt; 1852) &amp;&amp; (relativeVertical &lt; 304) &amp;&amp; (relativeVertical &gt; -304) </span><span class="cov4" title="10">{ // 1852 m = 1.0 NM ; 304 m = 1000'
                 alarmLevel = 2
-        }</span> else<span class="cov0" title="0"> {
+        }</span> else<span class="cov3" title="5"> {
                 alarmLevel = 0
         }</span>
-        <span class="cov0" title="0">return</span>
+        <span class="cov6" title="21">return</span>
 }
 
 func computeRelativeVertical(ti TrafficInfo) (relativeVertical int32) <span class="cov0" title="0">{
@@ -1546,62 +1546,62 @@ func computeRelativeVertical(ti TrafficInfo) (relativeVertical int32) <span clas
         return</span>
 }
 
-func gdl90EmitterCatToNMEA(emitterCat uint8) string <span class="cov0" title="0">{
+func gdl90EmitterCatToNMEA(emitterCat uint8) string <span class="cov5" title="16">{
         acType := "0"
         switch emitterCat </span>{
-        case 1, 6:<span class="cov0" title="0">
+        case 1, 6:<span class="cov2" title="2">
                 acType = "8"</span> // light/"highly maneuverable &gt; 5g" = piston
-        case 2, 3, 4, 5:<span class="cov0" title="0">
+        case 2, 3, 4, 5:<span class="cov2" title="3">
                 acType = "9"</span> // small/large/heavy = jet
-        case 7:<span class="cov0" title="0">
+        case 7:<span class="cov1" title="1">
                 acType = "3"</span> // helicopter = helicopter
-        case 9:<span class="cov0" title="0">
+        case 9:<span class="cov1" title="1">
                 acType = "1"</span> // glider = glider
-        case 10:<span class="cov0" title="0">
+        case 10:<span class="cov1" title="1">
                 acType = "B"</span> // lighter than air = balloon
-        case 11:<span class="cov0" title="0">
+        case 11:<span class="cov1" title="1">
                 acType = "4"</span> // skydiver/parachute = sky diver
-        case 12:<span class="cov0" title="0">
+        case 12:<span class="cov1" title="1">
                 acType = "7"</span> // paraglider, hanglider
-        case 14:<span class="cov0" title="0">
+        case 14:<span class="cov1" title="1">
                 acType = "D"</span> // UAV
-        case 17, 18:<span class="cov0" title="0">
+        case 17, 18:<span class="cov2" title="2">
                 acType = "E"</span> // Surface vehicle-&gt;Ground support (not in dataport spec, but OGN extension?)
-        case 19:<span class="cov0" title="0">
+        case 19:<span class="cov1" title="1">
                 acType = "F"</span> // static object / point obstacle
         }
-        <span class="cov0" title="0">return acType</span>
+        <span class="cov5" title="16">return acType</span>
 }
 
-func nmeaAircraftTypeToGdl90(actype string) uint8 <span class="cov0" title="0">{
+func nmeaAircraftTypeToGdl90(actype string) uint8 <span class="cov5" title="17">{
         acTypeInt, err := strconv.ParseInt(actype, 16, 8)
-        if err != nil </span><span class="cov0" title="0">{
+        if err != nil </span><span class="cov1" title="1">{
                 return 0
         }</span>
-        <span class="cov0" title="0">cat := uint8(0)
+        <span class="cov5" title="16">cat := uint8(0)
         switch acTypeInt </span>{
-        case 1:<span class="cov0" title="0">
+        case 1:<span class="cov1" title="1">
                 cat = 9</span> // glider = glider
-        case 2, 5, 8:<span class="cov0" title="0">
+        case 2, 5, 8:<span class="cov2" title="3">
                 cat = 1</span> // tow, drop, piston = light
-        case 3:<span class="cov0" title="0">
+        case 3:<span class="cov1" title="1">
                 cat = 7</span> // helicopter = helicopter
-        case 4:<span class="cov0" title="0">
+        case 4:<span class="cov1" title="1">
                 cat = 11</span> // skydiver
-        case 6, 7:<span class="cov0" title="0">
+        case 6, 7:<span class="cov2" title="2">
                 cat = 12</span> // hang glider / paraglider
-        case 9:<span class="cov0" title="0">
+        case 9:<span class="cov1" title="1">
                 cat = 3</span> // jet = large
-        case 0xB, 0xC:<span class="cov0" title="0">
+        case 0xB, 0xC:<span class="cov2" title="2">
                 cat = 10</span> // Balloon, airship = lighter than air
-        case 0xD:<span class="cov0" title="0">
+        case 0xD:<span class="cov2" title="2">
                 cat = 14</span> // UAV=UAV
-        case 0xE:<span class="cov0" title="0">
+        case 0xE:<span class="cov1" title="1">
                 cat = 18</span> // Ground support = surface vehicle (OGN extension?)
-        case 0xF:<span class="cov0" title="0">
+        case 0xF:<span class="cov1" title="1">
                 cat = 19</span> // point obstacle=static object
         }
-        <span class="cov0" title="0">return cat</span>
+        <span class="cov5" title="16">return cat</span>
 }
 
 /*
@@ -1921,7 +1921,7 @@ func makeAHRSLevilReport() <span class="cov0" title="0">{
         sendNetFLARM(msg+"\r\n", 100*time.Millisecond, 4)</span>
 }
 
-func atof32(val string) float32 <span class="cov0" title="0">{
+func atof32(val string) float32 <span class="cov5" title="13">{
         res, _ := strconv.ParseFloat(val, 32)
         return float32(res)
 }</span>
@@ -1950,26 +1950,34 @@ func relativeGpsAltToBaro(relVert float32) (alt int32, altIsGnss bool) <span cla
         <span class="cov0" title="0">return 0, false</span>
 }
 
-func getIdTail(idReceived string) (idStr string, tail string, address uint32) <span class="cov0" title="0">{
+func getIdTail(idReceived string) (idStr string, tail string, address uint32) <span class="cov5" title="17">{
         ognIDAndTail := strings.Split(idReceived, "!")
         idStr = ognIDAndTail[0]
-        if len(idStr) &gt; 6 </span><span class="cov0" title="0">{
+        if len(idStr) &gt; 6 </span><span class="cov2" title="3">{
                 // OGN Tracker sometimes encodes address type in the address.. strip that
                 idStr = idStr[len(idStr)-6:]
         }</span>
-        <span class="cov0" title="0">tail = ""
-        if len(ognIDAndTail) == 2 </span><span class="cov0" title="0">{
+        <span class="cov5" title="17">tail = ""
+        if len(ognIDAndTail) == 2 </span><span class="cov4" title="8">{
                 tail = ognIDAndTail[1]
         }</span>
         // Some devices report ID as tail number, with a respective prefix. E.g. OGN_AAAAAA, FLR_BBBBBB, ....
         // Ignore that - it's not useful for us and we would rather check OGN DDB for a real tail number
-        <span class="cov0" title="0">if len(tail) &gt; 4 &amp;&amp; tail[3] == '_' </span><span class="cov0" title="0">{
+        <span class="cov5" title="17">if len(tail) &gt; 4 &amp;&amp; tail[3] == '_' </span><span class="cov2" title="3">{
                 tail = ""
         }</span>
 
-        <span class="cov0" title="0">addressBytes, _ := hex.DecodeString(idStr)
-        addressBytes = append([]byte{0}, addressBytes...)
-        address = binary.BigEndian.Uint32(addressBytes)
+        // Pad hex string with leading 0 if odd length (hex.DecodeString needs even length)
+        <span class="cov5" title="17">hexStr := idStr
+        if len(hexStr)%2 != 0 </span><span class="cov2" title="2">{
+                hexStr = "0" + hexStr
+        }</span>
+        <span class="cov5" title="17">addressBytes, _ := hex.DecodeString(hexStr)
+        // Pad to exactly 4 bytes by prepending zeros
+        for len(addressBytes) &lt; 4 </span><span class="cov6" title="25">{
+                addressBytes = append([]byte{0}, addressBytes...)
+        }</span>
+        <span class="cov5" title="17">address = binary.BigEndian.Uint32(addressBytes)
 
         return</span>
 }
@@ -2397,33 +2405,33 @@ var ADSBTowers map[string]ADSBTower // Running list of all towers seen. (lat,lng
 var ADSBTowerMutex *sync.Mutex
 
 // Construct the CRC table. Adapted from FAA ref above.
-func crcInit() <span class="cov0" title="0">{
+func crcInit() <span class="cov3" title="9">{
         var i uint16
         var bitctr uint16
         var crc uint16
-        for i = 0; i &lt; 256; i++ </span><span class="cov0" title="0">{
+        for i = 0; i &lt; 256; i++ </span><span class="cov8" title="2304">{
                 crc = (i &lt;&lt; 8)
-                for bitctr = 0; bitctr &lt; 8; bitctr++ </span><span class="cov0" title="0">{
+                for bitctr = 0; bitctr &lt; 8; bitctr++ </span><span class="cov10" title="18432">{
                         z := uint16(0)
-                        if (crc &amp; 0x8000) != 0 </span><span class="cov0" title="0">{
+                        if (crc &amp; 0x8000) != 0 </span><span class="cov9" title="9216">{
                                 z = 0x1021
                         }</span>
-                        <span class="cov0" title="0">crc = (crc &lt;&lt; 1) ^ z</span>
+                        <span class="cov10" title="18432">crc = (crc &lt;&lt; 1) ^ z</span>
                 }
-                <span class="cov0" title="0">Crc16Table[i] = crc</span>
+                <span class="cov8" title="2304">Crc16Table[i] = crc</span>
         }
 }
 
 // Compute CRC. Adapted from FAA ref above.
-func crcCompute(data []byte) uint16 <span class="cov4" title="15">{
+func crcCompute(data []byte) uint16 <span class="cov4" title="38">{
         ret := uint16(0)
-        for i := 0; i &lt; len(data); i++ </span><span class="cov9" title="420">{
+        for i := 0; i &lt; len(data); i++ </span><span class="cov6" title="664">{
                 ret = Crc16Table[ret&gt;&gt;8] ^ (ret &lt;&lt; 8) ^ uint16(data[i])
         }</span>
-        <span class="cov4" title="15">return ret</span>
+        <span class="cov4" title="38">return ret</span>
 }
 
-func prepareMessage(data []byte) []byte <span class="cov4" title="15">{
+func prepareMessage(data []byte) []byte <span class="cov4" title="33">{
         // Compute CRC before modifying the message.
         crc := crcCompute(data)
         // Add the two CRC16 bytes before replacing control characters.
@@ -2433,21 +2441,21 @@ func prepareMessage(data []byte) []byte <span class="cov4" title="15">{
         tmp := []byte{0x7E} // Flag start.
 
         // Copy the message over, escaping 0x7E (Flag Byte) and 0x7D (Control-Escape).
-        for i := 0; i &lt; len(data); i++ </span><span class="cov10" title="450">{
+        for i := 0; i &lt; len(data); i++ </span><span class="cov7" title="714">{
                 mv := data[i]
-                if (mv == 0x7E) || (mv == 0x7D) </span><span class="cov0" title="0">{
+                if (mv == 0x7E) || (mv == 0x7D) </span><span class="cov3" title="12">{
                         mv = mv ^ 0x20
                         tmp = append(tmp, 0x7D)
                 }</span>
-                <span class="cov10" title="450">tmp = append(tmp, mv)</span>
+                <span class="cov7" title="714">tmp = append(tmp, mv)</span>
         }
 
-        <span class="cov4" title="15">tmp = append(tmp, 0x7E) // Flag end.
+        <span class="cov4" title="33">tmp = append(tmp, 0x7E) // Flag end.
 
         return tmp</span>
 }
 
-func makeLatLng(v float32) []byte <span class="cov6" title="30">{
+func makeLatLng(v float32) []byte <span class="cov4" title="49">{
         ret := make([]byte, 3)
 
         v = v / LON_LAT_RESOLUTION
@@ -2460,7 +2468,7 @@ func makeLatLng(v float32) []byte <span class="cov6" title="30">{
         return ret
 }</span>
 
-func isDetectedOwnshipValid() bool <span class="cov0" title="0">{
+func isDetectedOwnshipValid() bool <span class="cov1" title="2">{
         return stratuxClock.Since(OwnshipTrafficInfo.Last_seen).Seconds() &lt; 10
 }</span>
 
@@ -2656,7 +2664,7 @@ func makeOwnshipGeometricAltitudeReport() bool <span class="cov0" title="0">{
 
 */
 
-func makeStratuxStatus() []byte <span class="cov0" title="0">{
+func makeStratuxStatus() []byte <span class="cov1" title="1">{
         msg := make([]byte, 29)
         msg[0] = 'S'
         msg[1] = 'X'
@@ -2672,7 +2680,7 @@ func makeStratuxStatus() []byte <span class="cov0" title="0">{
         tp := 0 // Build "type".
         mi_str := ""
         b_str := ""
-        if strings.Index(mib_str, "rc") != -1 </span><span class="cov0" title="0">{
+        if strings.Index(mib_str, "rc") != -1 </span><span class="cov1" title="1">{
                 tp = 3
                 mi_str = mib_str[0:strings.Index(mib_str, "rc")]
                 b_str = mib_str[strings.Index(mib_str, "rc")+2:]
@@ -2687,7 +2695,7 @@ func makeStratuxStatus() []byte <span class="cov0" title="0">{
         }</span>
 
         // Convert to strings.
-        <span class="cov0" title="0">m, _ := strconv.Atoi(m_str)
+        <span class="cov1" title="1">m, _ := strconv.Atoi(m_str)
         mi, _ := strconv.Atoi(mi_str)
         b, _ := strconv.Atoi(b_str)
 
@@ -2715,54 +2723,54 @@ func makeStratuxStatus() []byte <span class="cov0" title="0">{
         }
 
         // Valid/Enabled: AHRS portion.
-        <span class="cov0" title="0">if isAHRSValid() </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if isAHRSValid() </span><span class="cov0" title="0">{
                 msg[13] = msg[13] | (1 &lt;&lt; 2)
         }</span>
 
         // Valid/Enabled: Pressure altitude portion.
-        <span class="cov0" title="0">if isTempPressValid() </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if isTempPressValid() </span><span class="cov1" title="1">{
                 msg[13] = msg[13] | (1 &lt;&lt; 3)
         }</span>
 
         // Valid/Enabled: CPU temperature portion.
-        <span class="cov0" title="0">if common.IsCPUTempValid(globalStatus.CPUTemp) </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if common.IsCPUTempValid(globalStatus.CPUTemp) </span><span class="cov1" title="1">{
                 msg[13] = msg[13] | (1 &lt;&lt; 4)
         }</span>
 
         // Valid/Enabled: UAT portion.
-        <span class="cov0" title="0">if globalSettings.UAT_Enabled </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if globalSettings.UAT_Enabled </span><span class="cov0" title="0">{
                 msg[13] = msg[13] | (1 &lt;&lt; 5)
         }</span>
 
         // Valid/Enabled: ES portion.
-        <span class="cov0" title="0">if globalSettings.ES_Enabled </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if globalSettings.ES_Enabled </span><span class="cov0" title="0">{
                 msg[13] = msg[13] | (1 &lt;&lt; 6)
         }</span>
 
         // Ping provides ES and UAT
-        <span class="cov0" title="0">if globalSettings.Ping_Enabled </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if globalSettings.Ping_Enabled </span><span class="cov0" title="0">{
                 msg[13] = msg[13] | (1 &lt;&lt; 5) | (1 &lt;&lt; 6)
         }</span>
 
         // Pong provides ES and UAT
-        <span class="cov0" title="0">if globalSettings.Pong_Enabled </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if globalSettings.Pong_Enabled </span><span class="cov0" title="0">{
                 msg[13] = msg[13] | (1 &lt;&lt; 5) | (1 &lt;&lt; 6)
         }</span>
 
         // Valid/Enabled: GPS Enabled portion.
-        <span class="cov0" title="0">if globalSettings.GPS_Enabled </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if globalSettings.GPS_Enabled </span><span class="cov0" title="0">{
                 msg[13] = msg[13] | (1 &lt;&lt; 7)
         }</span>
 
         // Valid/Enabled: AHRS Enabled portion.
-        <span class="cov0" title="0">if globalSettings.IMU_Sensor_Enabled </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if globalSettings.IMU_Sensor_Enabled </span><span class="cov0" title="0">{
                 msg[12] = 1 &lt;&lt; 0
         }</span>
 
         // Valid/Enabled: last bit unused.
 
         // Connected hardware: number of radios.
-        <span class="cov0" title="0">msg[15] = msg[15] | (byte(globalStatus.Devices) &amp; 0x3)
+        <span class="cov1" title="1">msg[15] = msg[15] | (byte(globalStatus.Devices) &amp; 0x3)
 
         // Connected hardware: IMU (spec really says just RY835AI, could revise for other IMUs
         if globalStatus.IMUConnected </span><span class="cov0" title="0">{
@@ -2770,7 +2778,7 @@ func makeStratuxStatus() []byte <span class="cov0" title="0">{
         }</span>
 
         // Number of GPS satellites locked.
-        <span class="cov0" title="0">msg[16] = byte(globalStatus.GPS_satellites_locked)
+        <span class="cov1" title="1">msg[16] = byte(globalStatus.GPS_satellites_locked)
 
         // Number of satellites tracked
         msg[17] = byte(globalStatus.GPS_satellites_tracked)
@@ -2802,7 +2810,7 @@ func makeStratuxStatus() []byte <span class="cov0" title="0">{
         msg[28] = byte(num_towers)
 
         // List of ADS-B towers (lat, lng).
-        for _, tower := range ADSBTowers </span><span class="cov0" title="0">{
+        for _, tower := range ADSBTowers </span><span class="cov1" title="2">{
                 tmp := makeLatLng(float32(tower.Lat))
                 msg = append(msg, tmp[0]) // Latitude.
                 msg = append(msg, tmp[1]) // Latitude.
@@ -2813,7 +2821,7 @@ func makeStratuxStatus() []byte <span class="cov0" title="0">{
                 msg = append(msg, tmp[1]) // Longitude.
                 msg = append(msg, tmp[2]) // Longitude.
         }</span>
-        <span class="cov0" title="0">ADSBTowerMutex.Unlock()
+        <span class="cov1" title="1">ADSBTowerMutex.Unlock()
         return prepareMessage(msg)</span>
 }
 
@@ -2827,18 +2835,18 @@ func makeStratuxStatus() []byte <span class="cov0" title="0">{
         Protocol 1: GPS on/off | AHRS on/off.
 */
 
-func makeStratuxHeartbeat() []byte <span class="cov0" title="0">{
+func makeStratuxHeartbeat() []byte <span class="cov1" title="2">{
         msg := make([]byte, 2)
         msg[0] = 0xCC // Message type "Stratux".
         msg[1] = 0
         if isGPSValid() </span><span class="cov0" title="0">{
                 msg[1] = 0x02
         }</span>
-        <span class="cov0" title="0">if isAHRSValid() </span><span class="cov0" title="0">{
+        <span class="cov1" title="2">if isAHRSValid() </span><span class="cov0" title="0">{
                 msg[1] = msg[1] | 0x01
         }</span>
 
-        <span class="cov0" title="0">protocolVers := int8(1)
+        <span class="cov1" title="2">protocolVers := int8(1)
         msg[1] = msg[1] | byte(protocolVers&lt;&lt;2)
 
         return prepareMessage(msg)</span>
@@ -2849,26 +2857,26 @@ ForeFlight "ID Message".
 
 Sends device information to ForeFlight.
 */
-func makeFFIDMessage() []byte <span class="cov0" title="0">{
+func makeFFIDMessage() []byte <span class="cov1" title="1">{
         msg := make([]byte, 39)
         msg[0] = 0x65 // Message type "ForeFlight".
         msg[1] = 0    // ID message identifier.
         msg[2] = 1    // Message version.
         // Serial number. Set to "invalid" for now.
-        for i := 3; i &lt;= 10; i++ </span><span class="cov0" title="0">{
+        for i := 3; i &lt;= 10; i++ </span><span class="cov2" title="8">{
                 msg[i] = 0xFF
         }</span>
-        <span class="cov0" title="0">devShortName := "Stratux" // Temporary. Will be populated in the future with other names.
+        <span class="cov1" title="1">devShortName := "Stratux" // Temporary. Will be populated in the future with other names.
         if len(devShortName) &gt; 8 </span><span class="cov0" title="0">{
                 devShortName = devShortName[:8] // 8 chars.
         }</span>
-        <span class="cov0" title="0">copy(msg[11:], devShortName)
+        <span class="cov1" title="1">copy(msg[11:], devShortName)
 
         devLongName := fmt.Sprintf("%s-%s", stratuxVersion, stratuxBuild)
         if len(devLongName) &gt; 16 </span><span class="cov0" title="0">{
                 devLongName = devLongName[:16] // 16 chars.
         }</span>
-        <span class="cov0" title="0">copy(msg[19:], devLongName)
+        <span class="cov1" title="1">copy(msg[19:], devLongName)
 
         //if globalSettings.GDL90MSLAlt_Enabled {
         msg[38] = 0x00 // Capabilities mask. MSL altitude for Ownship Geometric report. We only support HAE as in spec.
@@ -2877,7 +2885,7 @@ func makeFFIDMessage() []byte <span class="cov0" title="0">{
         return prepareMessage(msg)</span>
 }
 
-func makeHeartbeat() []byte <span class="cov0" title="0">{
+func makeHeartbeat() []byte <span class="cov1" title="2">{
         msg := make([]byte, 7)
         // See p.10.
         msg[0] = 0x00 // Message type "Heartbeat".
@@ -2885,14 +2893,14 @@ func makeHeartbeat() []byte <span class="cov0" title="0">{
         if isGPSValid() </span><span class="cov0" title="0">{
                 msg[1] = msg[1] | 0x80
         }</span>
-        <span class="cov0" title="0">msg[1] = msg[1] | 0x10 //FIXME: Addr talkback.
+        <span class="cov1" title="2">msg[1] = msg[1] | 0x10 //FIXME: Addr talkback.
 
         // "Maintenance Req'd". Add flag if there are any current critical system errors.
         if len(globalStatus.Errors) &gt; 0 </span><span class="cov0" title="0">{
                 msg[1] = msg[1] | 0x40
         }</span>
 
-        <span class="cov0" title="0">nowUTC := time.Now().UTC()
+        <span class="cov1" title="2">nowUTC := time.Now().UTC()
         // Seconds since 0000Z.
         midnightUTC := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), 0, 0, 0, 0, time.UTC)
         secondsSinceMidnightUTC := uint32(nowUTC.Sub(midnightUTC).Seconds())
@@ -3009,7 +3017,7 @@ func heartBeatSender() <span class="cov0" title="0">{
         }
 }
 
-func msgLogAppend(m msg) <span class="cov0" title="0">{
+func msgLogAppend(m msg) <span class="cov4" title="48">{
         msgLogMutex.Lock()
         defer msgLogMutex.Unlock()
         msgLog = append(msgLog, m)
@@ -3324,17 +3332,17 @@ func parseInput(buf string) ([]byte, uint16) <span class="cov0" title="0">{
         return frame, msgtype</span>
 }
 
-func getProductNameFromId(product_id int) string <span class="cov0" title="0">{
+func getProductNameFromId(product_id int) string <span class="cov3" title="23">{
         name, present := product_name_map[product_id]
-        if present </span><span class="cov0" title="0">{
+        if present </span><span class="cov2" title="7">{
                 return name
         }</span>
 
-        <span class="cov0" title="0">if product_id == 600 || (product_id &gt;= 2000 &amp;&amp; product_id &lt;= 2005) </span><span class="cov0" title="0">{
+        <span class="cov3" title="16">if product_id == 600 || (product_id &gt;= 2000 &amp;&amp; product_id &lt;= 2005) </span><span class="cov3" title="9">{
                 return "Custom/Test"
         }</span>
 
-        <span class="cov0" title="0">return fmt.Sprintf("Unknown (%d)", product_id)</span>
+        <span class="cov2" title="7">return fmt.Sprintf("Unknown (%d)", product_id)</span>
 }
 
 type settings struct {
@@ -4215,13 +4223,13 @@ Poll Navigation Engine Settings
                 u-blox M8 Receiver Description.
 */
 
-func chksumUBX(msg []byte) []byte <span class="cov0" title="0">{
+func chksumUBX(msg []byte) []byte <span class="cov4" title="13">{
         ret := make([]byte, 2)
-        for i := 0; i &lt; len(msg); i++ </span><span class="cov0" title="0">{
+        for i := 0; i &lt; len(msg); i++ </span><span class="cov10" title="659">{
                 ret[0] = ret[0] + msg[i]
                 ret[1] = ret[1] + ret[0]
         }</span>
-        <span class="cov0" title="0">return ret</span>
+        <span class="cov4" title="13">return ret</span>
 }
 
 /*
@@ -4231,7 +4239,7 @@ makeUBXCFG()
         class, ID, payload length in bytes (2-byte little endian), payload, and checksum.
         See p. 95 of the u-blox M8 Receiver Description.
 */
-func makeUBXCFG(class, id byte, msglen uint16, msg []byte) []byte <span class="cov0" title="0">{
+func makeUBXCFG(class, id byte, msglen uint16, msg []byte) []byte <span class="cov2" title="3">{
         ret := make([]byte, 6)
         ret[0] = 0xB5
         ret[1] = 0x62
@@ -4246,12 +4254,12 @@ func makeUBXCFG(class, id byte, msglen uint16, msg []byte) []byte <span class="c
         return ret
 }</span>
 
-func makeNMEACmd(cmd string) []byte <span class="cov0" title="0">{
+func makeNMEACmd(cmd string) []byte <span class="cov2" title="3">{
         chk_sum := byte(0)
-        for i := range cmd </span><span class="cov0" title="0">{
+        for i := range cmd </span><span class="cov6" title="46">{
                 chk_sum = chk_sum ^ byte(cmd[i])
         }</span>
-        <span class="cov0" title="0">return []byte(fmt.Sprintf("$%s*%02x\x0d\x0a", cmd, chk_sum))</span>
+        <span class="cov2" title="3">return []byte(fmt.Sprintf("$%s*%02x\x0d\x0a", cmd, chk_sum))</span>
 }
 
 func logChipConfig(line1 string, chip string, device string, baudrate int, append string) <span class="cov0" title="0">{
@@ -4679,36 +4687,36 @@ func writeTrackerConfigFromSettings() <span class="cov0" title="0">{
 //
 // Checksum is calculated as XOR of all bytes between "$" and "*"
 
-func validateNMEAChecksum(s string) (string, bool) <span class="cov0" title="0">{
+func validateNMEAChecksum(s string) (string, bool) <span class="cov4" title="9">{
         //validate format. NMEA sentences start with "$" and end in "*xx" where xx is the XOR value of all bytes between
-        if !(strings.HasPrefix(s, "$") &amp;&amp; strings.Contains(s, "*")) </span><span class="cov0" title="0">{
+        if !(strings.HasPrefix(s, "$") &amp;&amp; strings.Contains(s, "*")) </span><span class="cov1" title="2">{
                 return "", false
         }</span>
 
         // strip leading "$" and split at "*"
-        <span class="cov0" title="0">s_split := strings.Split(strings.TrimPrefix(s, "$"), "*")
+        <span class="cov3" title="7">s_split := strings.Split(strings.TrimPrefix(s, "$"), "*")
         s_out := s_split[0]
         s_cs := s_split[1]
 
-        if len(s_cs) &lt; 2 </span><span class="cov0" title="0">{
+        if len(s_cs) &lt; 2 </span><span class="cov1" title="2">{
                 return "Missing checksum. Fewer than two bytes after asterisk", false
         }</span>
 
-        <span class="cov0" title="0">cs, err := strconv.ParseUint(s_cs[:2], 16, 8)
-        if err != nil </span><span class="cov0" title="0">{
+        <span class="cov3" title="5">cs, err := strconv.ParseUint(s_cs[:2], 16, 8)
+        if err != nil </span><span class="cov1" title="1">{
                 return "Invalid checksum", false
         }</span>
 
-        <span class="cov0" title="0">cs_calc := byte(0)
-        for i := range s_out </span><span class="cov0" title="0">{
+        <span class="cov2" title="4">cs_calc := byte(0)
+        for i := range s_out </span><span class="cov8" title="189">{
                 cs_calc = cs_calc ^ byte(s_out[i])
         }</span>
 
-        <span class="cov0" title="0">if cs_calc != byte(cs) </span><span class="cov0" title="0">{
+        <span class="cov2" title="4">if cs_calc != byte(cs) </span><span class="cov1" title="1">{
                 return fmt.Sprintf("Checksum failed. Calculated %#X; expected %#X", cs_calc, cs), false
         }</span>
 
-        <span class="cov0" title="0">return s_out, true</span>
+        <span class="cov2" title="3">return s_out, true</span>
 }
 
 //        Only count this heading if a "sustained" &gt;7 kts is obtained. This filters out a lot of heading
@@ -5052,24 +5060,24 @@ func calcGPSAttitude() bool <span class="cov0" title="0">{
         return true</span>
 }
 
-func calculateNACp(accuracy float32) uint8 <span class="cov0" title="0">{
+func calculateNACp(accuracy float32) uint8 <span class="cov5" title="32">{
         ret := uint8(0)
 
-        if accuracy &lt; 3 </span><span class="cov0" title="0">{
+        if accuracy &lt; 3 </span><span class="cov2" title="3">{
                 ret = 11
-        }</span> else<span class="cov0" title="0"> if accuracy &lt; 10 </span><span class="cov0" title="0">{
+        }</span> else<span class="cov5" title="29"> if accuracy &lt; 10 </span><span class="cov3" title="5">{
                 ret = 10
-        }</span> else<span class="cov0" title="0"> if accuracy &lt; 30 </span><span class="cov0" title="0">{
+        }</span> else<span class="cov5" title="24"> if accuracy &lt; 30 </span><span class="cov3" title="5">{
                 ret = 9
-        }</span> else<span class="cov0" title="0"> if accuracy &lt; 92.6 </span><span class="cov0" title="0">{
+        }</span> else<span class="cov5" title="19"> if accuracy &lt; 92.6 </span><span class="cov3" title="5">{
                 ret = 8
-        }</span> else<span class="cov0" title="0"> if accuracy &lt; 185.2 </span><span class="cov0" title="0">{
+        }</span> else<span class="cov4" title="14"> if accuracy &lt; 185.2 </span><span class="cov3" title="5">{
                 ret = 7
-        }</span> else<span class="cov0" title="0"> if accuracy &lt; 555.6 </span><span class="cov0" title="0">{
+        }</span> else<span class="cov4" title="9"> if accuracy &lt; 555.6 </span><span class="cov3" title="5">{
                 ret = 6
         }</span>
 
-        <span class="cov0" title="0">return ret</span>
+        <span class="cov5" title="32">return ret</span>
 }
 
 /*
@@ -6249,18 +6257,18 @@ and if the GPS subsystem has recently detected a GPS device.
 If false, 'GPSFixQuality` is set to 0 ("No fix"), as is the number of satellites in solution.
 */
 
-func isGPSValid() bool <span class="cov7" title="4">{
+func isGPSValid() bool <span class="cov6" title="68">{
         isValid := false
-        if (stratuxClock.Since(mySituation.GPSLastFixLocalTime) &lt; 3*time.Second) &amp;&amp; globalStatus.GPS_connected &amp;&amp; mySituation.GPSFixQuality &gt; 0 </span><span class="cov7" title="4">{
+        if (stratuxClock.Since(mySituation.GPSLastFixLocalTime) &lt; 3*time.Second) &amp;&amp; globalStatus.GPS_connected &amp;&amp; mySituation.GPSFixQuality &gt; 0 </span><span class="cov4" title="10">{
                 isValid = true
-        }</span> else<span class="cov0" title="0"> {
+        }</span> else<span class="cov6" title="58"> {
                 mySituation.GPSFixQuality = 0
                 mySituation.GPSSatellites = 0
                 mySituation.GPSHorizontalAccuracy = 999999
                 mySituation.GPSVerticalAccuracy = 999999
                 mySituation.GPSNACp = 0
         }</span>
-        <span class="cov7" title="4">return isValid</span>
+        <span class="cov6" title="68">return isValid</span>
 }
 
 /*
@@ -6277,13 +6285,13 @@ func isGPSClockValid() bool <span class="cov0" title="0">{
         return !mySituation.GPSLastGPSTimeStratuxTime.IsZero() &amp;&amp; stratuxClock.Since(mySituation.GPSLastGPSTimeStratuxTime).Seconds() &lt; 15
 }</span>
 
-func isAHRSValid() bool <span class="cov0" title="0">{
+func isAHRSValid() bool <span class="cov2" title="3">{
         // If attitude information gets to be over 1 second old, declare invalid.
         // If no GPS then we won't use or send attitude information.
         return isGPSValid() &amp;&amp; stratuxClock.Since(mySituation.AHRSLastAttitudeTime).Seconds() &lt; 1
 }</span>
 
-func isTempPressValid() bool <span class="cov10" title="6">{
+func isTempPressValid() bool <span class="cov4" title="12">{
         return stratuxClock.Since(mySituation.BaroLastMeasurementTime).Seconds() &lt; 15
 }</span>
 
@@ -8001,7 +8009,7 @@ type MessageQueue struct {
         mutex         sync.Mutex
 }
 
-func NewMessageQueue(maxSize int) *MessageQueue <span class="cov0" title="0">{
+func NewMessageQueue(maxSize int) *MessageQueue <span class="cov6" title="14">{
         return &amp;MessageQueue{
                 maxSize:       maxSize,
                 entries:       make([]QueueEntry, 0),
@@ -8009,126 +8017,126 @@ func NewMessageQueue(maxSize int) *MessageQueue <span class="cov0" title="0">{
         }
 }</span>
 
-func (queue *MessageQueue) Put(prio int32, maxAge time.Duration, data interface{}) <span class="cov0" title="0">{
-        if queue.Closed </span><span class="cov0" title="0">{
+func (queue *MessageQueue) Put(prio int32, maxAge time.Duration, data interface{}) <span class="cov9" title="48">{
+        if queue.Closed </span><span class="cov1" title="1">{
                 return
         }</span>
-        <span class="cov0" title="0">queue.mutex.Lock()
+        <span class="cov9" title="47">queue.mutex.Lock()
         defer queue.mutex.Unlock()
 
         timeout := stratuxClock.Time.Add(maxAge)
         entry := QueueEntry{prio, timeout, data}
 
-        if queue.entries == nil || len(queue.entries) == 0 </span><span class="cov0" title="0">{
+        if queue.entries == nil || len(queue.entries) == 0 </span><span class="cov6" title="11">{
                 queue.entries = make([]QueueEntry, 1)
                 queue.entries[0] = QueueEntry{prio, timeout, data}
-        }</span> else<span class="cov0" title="0"> {
+        }</span> else<span class="cov8" title="36"> {
                 index := queue.findInsertPosition(prio)
 
-                if index == len(queue.entries) </span><span class="cov0" title="0">{
+                if index == len(queue.entries) </span><span class="cov7" title="26">{
                         queue.entries = append(queue.entries, entry)
-                }</span> else<span class="cov0" title="0"> {
+                }</span> else<span class="cov5" title="10"> {
                         queue.entries = append(queue.entries[:index+1], queue.entries[index:]...)
                         queue.entries[index] = entry
                 }</span>
         }
 
         // Allow 10% over-use before we prune, so the pruning is done in batches to save CPU
-        <span class="cov0" title="0">if float32(len(queue.entries)) &gt; float32(queue.maxSize)*1.1 </span><span class="cov0" title="0">{
+        <span class="cov9" title="47">if float32(len(queue.entries)) &gt; float32(queue.maxSize)*1.1 </span><span class="cov5" title="10">{
                 queue.prune()
         }</span>
-        <span class="cov0" title="0">if len(queue.entries) != 0 </span><span class="cov0" title="0">{
+        <span class="cov9" title="47">if len(queue.entries) != 0 </span><span class="cov9" title="47">{
                 queue.notifyData()
         }</span>
 }
 
-func (queue *MessageQueue) PeekFirst() (interface{}, int32) <span class="cov0" title="0">{
+func (queue *MessageQueue) PeekFirst() (interface{}, int32) <span class="cov3" title="4">{
         return queue.getFirst(false)
 }</span>
 
-func (queue *MessageQueue) PopFirst() (interface{}, int32) <span class="cov0" title="0">{
+func (queue *MessageQueue) PopFirst() (interface{}, int32) <span class="cov7" title="19">{
         return queue.getFirst(true)
 }</span>
 
-func (queue *MessageQueue) getFirst(remove bool) (interface{}, int32) <span class="cov0" title="0">{
+func (queue *MessageQueue) getFirst(remove bool) (interface{}, int32) <span class="cov7" title="23">{
         queue.mutex.Lock()
         defer queue.mutex.Unlock()
 
         index := queue.getFirstUsableIndex()
-        if index &lt; 0 </span><span class="cov0" title="0">{
+        if index &lt; 0 </span><span class="cov2" title="2">{
                 return nil, 0 // nothing in queue
         }</span>
 
         // found one. Strip the queue and return it
-        <span class="cov0" title="0">entry := queue.entries[index]
-        if remove </span><span class="cov0" title="0">{
+        <span class="cov7" title="21">entry := queue.entries[index]
+        if remove </span><span class="cov7" title="18">{
                 queue.entries = queue.entries[index+1:]
-        }</span> else<span class="cov0" title="0"> {
+        }</span> else<span class="cov3" title="3"> {
                 queue.entries = queue.entries[index:]
         }</span>
-        <span class="cov0" title="0">return entry.data, entry.priority</span>
+        <span class="cov7" title="21">return entry.data, entry.priority</span>
 }
 
 // Returns the first entry that's not outdated
-func (queue *MessageQueue) getFirstUsableIndex() int <span class="cov0" title="0">{
-        for i, data := range queue.entries </span><span class="cov0" title="0">{
-                if data.outdatedAt.Before(stratuxClock.Time) </span><span class="cov0" title="0">{
+func (queue *MessageQueue) getFirstUsableIndex() int <span class="cov7" title="23">{
+        for i, data := range queue.entries </span><span class="cov7" title="22">{
+                if data.outdatedAt.Before(stratuxClock.Time) </span><span class="cov1" title="1">{
                         // entry already timed out..
                         continue</span>
                 }
                 // found one
-                <span class="cov0" title="0">return i</span>
+                <span class="cov7" title="21">return i</span>
         }
 
         // Nothing current in queue
-        <span class="cov0" title="0">if len(queue.entries) &gt; 0 </span><span class="cov0" title="0">{
+        <span class="cov2" title="2">if len(queue.entries) &gt; 0 </span><span class="cov0" title="0">{
                 queue.entries = make([]QueueEntry, 0)
         }</span>
 
-        <span class="cov0" title="0">return -1</span>
+        <span class="cov2" title="2">return -1</span>
 }
 
-func (queue *MessageQueue) GetQueueDump(pruneFirst bool) []interface{} <span class="cov0" title="0">{
+func (queue *MessageQueue) GetQueueDump(pruneFirst bool) []interface{} <span class="cov3" title="4">{
         queue.mutex.Lock()
         defer queue.mutex.Unlock()
 
-        if pruneFirst </span><span class="cov0" title="0">{
+        if pruneFirst </span><span class="cov1" title="1">{
                 queue.prune()
         }</span>
-        <span class="cov0" title="0">data := make([]interface{}, len(queue.entries))
-        for i, d := range queue.entries </span><span class="cov0" title="0">{
+        <span class="cov3" title="4">data := make([]interface{}, len(queue.entries))
+        for i, d := range queue.entries </span><span class="cov6" title="13">{
                 data[i] = d.data
         }</span>
-        <span class="cov0" title="0">return data</span>
+        <span class="cov3" title="4">return data</span>
 }
 
 // Removes elements from the queue so it fits its maxSize
 // - All outdated elements are discarded
 // - Low priority elements are discarded, starting with the oldest ones
-func (queue *MessageQueue) prune() <span class="cov0" title="0">{
+func (queue *MessageQueue) prune() <span class="cov6" title="11">{
         // Group into priority categories, so we can then strip the beginning of each category is needed (remove oldest messages)
         newEntries := make([][]QueueEntry, 0)
         //npruned := 0
         totalUsable := 0
         prevPrio := int32(999999999)
-        for _, entry := range queue.entries </span><span class="cov0" title="0">{
+        for _, entry := range queue.entries </span><span class="cov9" title="65">{
                 if entry.outdatedAt.Before(stratuxClock.Time) </span><span class="cov0" title="0">{
                         continue</span> // outdated, remove completely
                 }
-                <span class="cov0" title="0">totalUsable++
-                if len(newEntries) == 0 || entry.priority != prevPrio </span><span class="cov0" title="0">{
+                <span class="cov9" title="65">totalUsable++
+                if len(newEntries) == 0 || entry.priority != prevPrio </span><span class="cov9" title="65">{
                         // new prio-category
                         newEntries = append(newEntries, make([]QueueEntry, 0))
                 }</span>
-                <span class="cov0" title="0">newEntries[len(newEntries)-1] = append(newEntries[len(newEntries)-1], entry)
+                <span class="cov9" title="65">newEntries[len(newEntries)-1] = append(newEntries[len(newEntries)-1], entry)
                 prevPrio = entry.priority</span>
         }
-        <span class="cov0" title="0">toBeRemoved := totalUsable - queue.maxSize
-        if toBeRemoved &gt; 0 </span><span class="cov0" title="0">{
-                for i := len(newEntries) - 1; i &gt;= 0; i-- </span><span class="cov0" title="0">{
+        <span class="cov6" title="11">toBeRemoved := totalUsable - queue.maxSize
+        if toBeRemoved &gt; 0 </span><span class="cov5" title="10">{
+                for i := len(newEntries) - 1; i &gt;= 0; i-- </span><span class="cov5" title="10">{
                         //fmt.Printf("%p: Pruning %d prio %d entries (%d available)\n", queue, toBeRemoved, newEntries[i][0].priority, len(newEntries[i]))
                         // From lowerst to highest prio, remove the oldest messages of each category until we have few enough in total
-                        if len(newEntries[i]) &gt;= toBeRemoved </span><span class="cov0" title="0">{
+                        if len(newEntries[i]) &gt;= toBeRemoved </span><span class="cov5" title="10">{
                                 // can remove enough in this category
                                 newEntries[i] = newEntries[i][toBeRemoved:]
                                 break</span>
@@ -8141,36 +8149,36 @@ func (queue *MessageQueue) prune() <span class="cov0" title="0">{
         }
 
         // finally, copy everything back to our queue
-        <span class="cov0" title="0">queue.entries = make([]QueueEntry, 0)
-        for _, category := range newEntries </span><span class="cov0" title="0">{
-                if category != nil </span><span class="cov0" title="0">{
+        <span class="cov6" title="11">queue.entries = make([]QueueEntry, 0)
+        for _, category := range newEntries </span><span class="cov9" title="65">{
+                if category != nil </span><span class="cov9" title="65">{
                         queue.entries = append(queue.entries, category...)
                 }</span>
         }
 }
 
-func (queue *MessageQueue) findInsertPosition(priority int32) int <span class="cov0" title="0">{
-        index := sort.Search(len(queue.entries), func(i int) bool </span><span class="cov0" title="0">{
+func (queue *MessageQueue) findInsertPosition(priority int32) int <span class="cov8" title="39">{
+        index := sort.Search(len(queue.entries), func(i int) bool </span><span class="cov10" title="68">{
                 // &gt; instead of &gt;= so we get to the first entry that is larger - in order to keep insertion order
                 // for equal-priority messages
                 return queue.entries[i].priority &gt; priority
         }</span>)
 
-        <span class="cov0" title="0">return index</span>
+        <span class="cov8" title="39">return index</span>
 }
 
-func (queue *MessageQueue) notifyData() <span class="cov0" title="0">{
+func (queue *MessageQueue) notifyData() <span class="cov9" title="48">{
         select </span>{
-        case queue.DataAvailable &lt;- true:<span class="cov0" title="0"></span>
-        default:<span class="cov0" title="0"></span>
+        case queue.DataAvailable &lt;- true:<span class="cov6" title="12"></span>
+        default:<span class="cov8" title="36"></span>
         }
 }
 
-func (queue *MessageQueue) Close() <span class="cov0" title="0">{
-        if queue.Closed </span><span class="cov0" title="0">{
+func (queue *MessageQueue) Close() <span class="cov2" title="2">{
+        if queue.Closed </span><span class="cov1" title="1">{
                 return
         }</span>
-        <span class="cov0" title="0">queue.Closed = true
+        <span class="cov1" title="1">queue.Closed = true
         queue.notifyData()</span>
 }
 </pre>
@@ -8203,7 +8211,7 @@ type monotonic struct {
 }
 
 func (m *monotonic) Watcher() <span class="cov1" title="1">{
-        for </span><span class="cov10" title="402">{
+        for </span><span class="cov10" title="408">{
                 &lt;-m.ticker.C
                 m.Milliseconds += 10
                 m.Time = m.Time.Add(10 * time.Millisecond)
@@ -8213,7 +8221,7 @@ func (m *monotonic) Watcher() <span class="cov1" title="1">{
         }
 }
 
-func (m *monotonic) Since(t time.Time) time.Duration <span class="cov5" title="22">{
+func (m *monotonic) Since(t time.Time) time.Duration <span class="cov7" title="98">{
         return m.Time.Sub(t)
 }</span>
 
@@ -12564,19 +12572,19 @@ var typeMappingOgn2SoftRF = [][]int{
         {12, 11}, // Airship -&gt; Balloon
 }
 
-func mapAircraftType(mapping [][]int, forward bool, acType int) int <span class="cov0" title="0">{
-        for _, m := range mapping </span><span class="cov0" title="0">{
-                if forward </span><span class="cov0" title="0">{
-                        if m[0] == acType </span><span class="cov0" title="0">{
+func mapAircraftType(mapping [][]int, forward bool, acType int) int <span class="cov8" title="32">{
+        for _, m := range mapping </span><span class="cov10" title="68">{
+                if forward </span><span class="cov8" title="38">{
+                        if m[0] == acType </span><span class="cov6" title="14">{
                                 return m[1]
                         }</span>
-                } else<span class="cov0" title="0"> {
-                        if m[1] == acType </span><span class="cov0" title="0">{
+                } else<span class="cov8" title="30"> {
+                        if m[1] == acType </span><span class="cov5" title="10">{
                                 return m[0]
                         }</span>
                 }
         }
-        <span class="cov0" title="0">return -1</span>
+        <span class="cov5" title="8">return -1</span>
 }
 
 // Main interface that all tracker implementations need to implement
@@ -13121,22 +13129,22 @@ var seenTraffic map[uint32]bool // Historical list of all ICAO addresses seen.
 
 var OwnshipTrafficInfo TrafficInfo
 
-func convertFeetToMeters(feet float32) float32 <span class="cov4" title="4">{
+func convertFeetToMeters(feet float32) float32 <span class="cov4" title="8">{
         return feet * 0.3048
 }</span>
 
-func convertMetersToFeet(meters float32) float32 <span class="cov4" title="4">{
+func convertMetersToFeet(meters float32) float32 <span class="cov3" title="4">{
         return meters / 0.3048
 }</span>
 
-func cleanupOldEntries() <span class="cov4" title="4">{
-        for key, ti := range traffic </span><span class="cov5" title="5">{
+func cleanupOldEntries() <span class="cov3" title="4">{
+        for key, ti := range traffic </span><span class="cov3" title="5">{
 
                 if ti.Last_source != TRAFFIC_SOURCE_AIS &amp;&amp; stratuxClock.Since(ti.Last_seen).Seconds() &gt; 60 </span><span class="cov1" title="1">{ // keep it in the database for up to 60 seconds, so we don't lose tail number, etc...
                         delete(traffic, key)
                 }</span>
 
-                <span class="cov5" title="5">if ti.Last_source == TRAFFIC_SOURCE_AIS &amp;&amp; stratuxClock.Since(ti.Last_seen).Seconds() &gt; 60*15 </span><span class="cov1" title="1">{ // keep it in the database for up to 15 minutes, so we don't lose tail number, etc...
+                <span class="cov3" title="5">if ti.Last_source == TRAFFIC_SOURCE_AIS &amp;&amp; stratuxClock.Since(ti.Last_seen).Seconds() &gt; 60*15 </span><span class="cov1" title="1">{ // keep it in the database for up to 15 minutes, so we don't lose tail number, etc...
                         delete(traffic, key)
                 }</span>
         }
@@ -13158,25 +13166,25 @@ func removeTarget(id uint32) <span class="cov2" title="2">{
 // hex codes, this is able to smartly identify if it really is our ownship.
 // If the ti is very close and at same altitude, it is considered to be us
 // If it has no position information, we will not take it as ownship, but ignore its data (no mode-s detection for everything that is configured as ownship)
-func isOwnshipTrafficInfo(ti TrafficInfo) (isOwnshipInfo bool, shouldIgnore bool) <span class="cov4" title="4">{
+func isOwnshipTrafficInfo(ti TrafficInfo) (isOwnshipInfo bool, shouldIgnore bool) <span class="cov5" title="11">{
         // First, check if this is our own OGN tracker
 
-        if (globalStatus.GPS_detected_type &amp; 0x0f) == GPS_TYPE_OGNTRACKER </span><span class="cov0" title="0">{
+        if (globalStatus.GPS_detected_type &amp; 0x0f) == GPS_TYPE_OGNTRACKER </span><span class="cov2" title="3">{
                 ognTrackerCodeInt, _ := strconv.ParseUint(globalSettings.OGNAddr, 16, 32)
                 prevTrackerCodeInt, _ := strconv.ParseUint(globalStatus.OGNPrevRandomAddr, 16, 32)
-                if uint32(ognTrackerCodeInt) == ti.Icao_addr || uint32(prevTrackerCodeInt) == ti.Icao_addr </span><span class="cov0" title="0">{
+                if uint32(ognTrackerCodeInt) == ti.Icao_addr || uint32(prevTrackerCodeInt) == ti.Icao_addr </span><span class="cov2" title="3">{
                         isOwnshipInfo = !isGPSValid() // only use OGN tracker as ownship position if we are not equipped with a GPS..
                         shouldIgnore = true
                         return
                 }</span>
         }
 
-        <span class="cov4" title="4">codes := strings.Split(globalSettings.OwnshipModeS, ",")
+        <span class="cov4" title="8">codes := strings.Split(globalSettings.OwnshipModeS, ",")
         shouldIgnore = false
 
-        for _, ownCode := range codes </span><span class="cov5" title="5">{
+        for _, ownCode := range codes </span><span class="cov4" title="9">{
                 ownCodeInt, _ := strconv.ParseInt(strings.Trim(ownCode, " "), 16, 32)
-                if uint32(ownCodeInt) == ti.Icao_addr </span><span class="cov3" title="3">{
+                if uint32(ownCodeInt) == ti.Icao_addr </span><span class="cov4" title="7">{
                         if !ti.Position_valid </span><span class="cov1" title="1">{
                                 // Can't verify the ownship, ignore it for bearingless display
                                 shouldIgnore = true
@@ -13188,7 +13196,7 @@ func isOwnshipTrafficInfo(ti TrafficInfo) (isOwnshipInfo bool, shouldIgnore bool
                         // This is a sanity check to filter out such cases - only accept the ownship data if
                         // it somewhat matches our real data
                         // because of second-resolution in flarm we assume worst case of +1 second
-                        <span class="cov2" title="2">timeDiff := math.Abs(ti.Age-stratuxClock.Since(mySituation.GPSLastGPSTimeStratuxTime).Seconds()) + 1
+                        <span class="cov4" title="6">timeDiff := math.Abs(ti.Age-stratuxClock.Since(mySituation.GPSLastGPSTimeStratuxTime).Seconds()) + 1
                         //if ti.ExtrapolatedPosition {
                         //        timeDiff = math.Abs(ti.AgeExtrapolation - stratuxClock.Since(mySituation.GPSLastGPSTimeStratuxTime).Seconds()) + 1
                         //}
@@ -13196,49 +13204,49 @@ func isOwnshipTrafficInfo(ti TrafficInfo) (isOwnshipInfo bool, shouldIgnore bool
                         if ti.Speed_valid </span><span class="cov0" title="0">{
                                 speed = math.Max(float64(ti.Speed), mySituation.GPSGroundSpeed)
                         }</span>
-                        <span class="cov2" title="2">trafficDist := 0.0
-                        if isGPSValid() </span><span class="cov2" title="2">{
+                        <span class="cov4" title="6">trafficDist := 0.0
+                        if isGPSValid() </span><span class="cov4" title="6">{
                                 trafficDist, _, _, _ = common.DistRect(float64(mySituation.GPSLatitude), float64(mySituation.GPSLongitude), float64(ti.Lat), float64(ti.Lng))
                         }</span>
-                        <span class="cov2" title="2">altDiff := 99999.0
-                        if ti.AltIsGNSS &amp;&amp; ti.Alt != 0 </span><span class="cov0" title="0">{
+                        <span class="cov4" title="6">altDiff := 99999.0
+                        if ti.AltIsGNSS &amp;&amp; ti.Alt != 0 </span><span class="cov1" title="1">{
                                 altDiff = math.Abs(float64(mySituation.GPSHeightAboveEllipsoid) - float64(ti.Alt))
-                        }</span> else<span class="cov2" title="2"> if isTempPressValid() &amp;&amp; ti.Alt != 0 </span><span class="cov2" title="2">{
+                        }</span> else<span class="cov3" title="5"> if isTempPressValid() &amp;&amp; ti.Alt != 0 </span><span class="cov3" title="4">{
                                 altDiff = math.Abs(float64(mySituation.BaroPressureAltitude - float32(ti.Alt)))
-                        }</span> else<span class="cov0" title="0"> {
+                        }</span> else<span class="cov1" title="1"> {
                                 // Cant verify relative altitude.. ignore it but don't use
                                 shouldIgnore = true
                                 continue</span>
                         }
 
                         // Check if the distance to the ti is plausible
-                        <span class="cov2" title="2">maxDistMetersIgnore := (timeDiff*speed*0.514444 + float64(mySituation.GPSHorizontalAccuracy) + 50) * 3
-                        if trafficDist &gt; maxDistMetersIgnore </span><span class="cov0" title="0">{
+                        <span class="cov3" title="5">maxDistMetersIgnore := (timeDiff*speed*0.514444 + float64(mySituation.GPSHorizontalAccuracy) + 50) * 3
+                        if trafficDist &gt; maxDistMetersIgnore </span><span class="cov1" title="1">{
                                 log.Printf("Skipping ownship %s because it's too far away (%fm, speed=%f, max=%f)", ownCode, trafficDist, speed, maxDistMetersIgnore)
                                 continue</span>
                         }
 
                         // If we have a pressure sensor, and the pressure altitude of traffic and ownship is too big, skip...
-                        <span class="cov2" title="2">if altDiff &gt; 500 </span><span class="cov0" title="0">{
+                        <span class="cov3" title="4">if altDiff &gt; 500 </span><span class="cov1" title="1">{
                                 log.Printf("Skipping ownship %s because the altitude is off (%f ft)", ownCode, altDiff)
                                 continue</span>
                         }
 
                         // To really use the information from the ownship traffic info, we have much more
                         // strict requirements. At most 5s old and must be much closer
-                        <span class="cov2" title="2">maxDistMetersOwnship := (timeDiff*speed*0.514444 + float64(mySituation.GPSHorizontalAccuracy) + 20) * 1.4
+                        <span class="cov2" title="3">maxDistMetersOwnship := (timeDiff*speed*0.514444 + float64(mySituation.GPSHorizontalAccuracy) + 20) * 1.4
                         if !isGPSValid() || (ti.Age &lt;= 5 &amp;&amp; trafficDist &lt; maxDistMetersOwnship) &amp;&amp; !ti.AltIsGNSS </span><span class="cov2" title="2">{
                                 isOwnshipInfo = true
                         }</span>
-                        <span class="cov2" title="2">if globalSettings.DEBUG </span><span class="cov0" title="0">{
+                        <span class="cov2" title="3">if globalSettings.DEBUG </span><span class="cov0" title="0">{
                                 log.Printf("Using ownship %s. MaxDistIgnore: %f, maxDistOwnShip: %f, dist: %f, altDiff: %f, speed: %f, timeDiffS: %f, useForInfo: %t",
                                         ownCode, maxDistMetersIgnore, maxDistMetersOwnship, trafficDist, altDiff, speed, timeDiff, isOwnshipInfo)
                         }</span>
-                        <span class="cov2" title="2">shouldIgnore = true
+                        <span class="cov2" title="3">shouldIgnore = true
                         return</span>
                 }
         }
-        <span class="cov2" title="2">isOwnshipInfo = false
+        <span class="cov3" title="5">isOwnshipInfo = false
         return</span>
 }
 
@@ -13382,17 +13390,17 @@ func sendTrafficUpdates() <span class="cov0" title="0">{
         sendNetFLARM(msgPFLAU, time.Second, 0)</span>
 }
 
-func computeTrafficPriority(ti *TrafficInfo) int32 <span class="cov5" title="5">{
+func computeTrafficPriority(ti *TrafficInfo) int32 <span class="cov4" title="6">{
         if !ti.BearingDist_valid || ti.Alt == 0 </span><span class="cov1" title="1">{
                 return 9999999
         }</span>
-        <span class="cov4" title="4">var myAlt float32
-        if isTempPressValid() </span><span class="cov4" title="4">{
+        <span class="cov3" title="5">var myAlt float32
+        if isTempPressValid() </span><span class="cov3" title="5">{
                 myAlt = mySituation.BaroPressureAltitude
         }</span> else<span class="cov0" title="0"> {
                 myAlt = mySituation.GPSAltitudeMSL
         }</span>
-        <span class="cov4" title="4">altDiff := math.Abs(float64(myAlt) - float64(ti.Alt))
+        <span class="cov3" title="5">altDiff := math.Abs(float64(myAlt) - float64(ti.Alt))
         // assumes 333ft vertical difference has same priority 1000m horizontal
         // This will usually produce priorities ranging from around 0-10
         return int32((altDiff/3.33 + ti.Distance) / 10000.0)</span>
@@ -13406,21 +13414,21 @@ func computeTrafficPriority(ti *TrafficInfo) int32 <span class="cov5" title="5">
 // altitude buckets: &lt;5000ft, 5000-10000ft, &gt;10000ft
 var estimatedDistFactors [3]float64 = [3]float64{2500.0, 2800.0, 3000.0}
 
-func estimateDistance(ti *TrafficInfo) <span class="cov7" title="10">{
+func estimateDistance(ti *TrafficInfo) <span class="cov10" title="164">{
         if ti.Last_source != TRAFFIC_SOURCE_1090ES </span><span class="cov2" title="2">{
                 return
         }</span>
-        <span class="cov6" title="8">altClass := int32(math.Max(0.0, math.Min(float64(ti.Alt/5000), 2.0)))
+        <span class="cov9" title="162">altClass := int32(math.Max(0.0, math.Min(float64(ti.Alt/5000), 2.0)))
         dist := math.Pow(2.0, -ti.SignalLevel/6.0) * estimatedDistFactors[altClass] // distance approx. in meters, 6dB for double distance
 
         lambda := 0.2
         timeDiff := ti.Timestamp.Sub(ti.DistanceEstimatedLastTs).Seconds() * 1000
         ti.DistanceEstimatedLastTs = ti.Timestamp
-        if timeDiff &lt; 0.0 </span><span class="cov0" title="0">{
+        if timeDiff &lt; 0.0 </span><span class="cov1" title="1">{
                 return
         }</span>
 
-        <span class="cov6" title="8">expon := math.Exp(-timeDiff / 100 * lambda)
+        <span class="cov9" title="161">expon := math.Exp(-timeDiff / 100 * lambda)
         //log.Printf("timediff: %f, expon: %f", timeDiff, expon)
         ti.DistanceEstimated = ti.DistanceEstimated*expon + dist*(1-expon)
 
@@ -13428,16 +13436,16 @@ func estimateDistance(ti *TrafficInfo) <span class="cov7" title="10">{
         // We ignore targets that are too far away (a lot of signal strength fluctuation), too close (non-reception cone or ownship)
         // and of course extrapolated targets and invalid signal levels
         if ti.BearingDist_valid &amp;&amp; ti.Distance &lt; 50000 &amp;&amp; ti.Distance &gt; 1500 &amp;&amp; ti.Last_source == TRAFFIC_SOURCE_1090ES &amp;&amp;
-                ti.TargetType == TARGET_TYPE_ADSB &amp;&amp; ti.SignalLevel &gt; -30 &amp;&amp; ti.SignalLevel &lt; 0 &amp;&amp; !ti.ExtrapolatedPosition </span><span class="cov0" title="0">{
+                ti.TargetType == TARGET_TYPE_ADSB &amp;&amp; ti.SignalLevel &gt; -30 &amp;&amp; ti.SignalLevel &lt; 0 &amp;&amp; !ti.ExtrapolatedPosition </span><span class="cov9" title="102">{
                 var errorFactor float64
-                if ti.DistanceEstimated &gt; ti.Distance </span><span class="cov0" title="0">{
+                if ti.DistanceEstimated &gt; ti.Distance </span><span class="cov9" title="100">{
                         errorFactor = -(ti.DistanceEstimated / ti.Distance)
-                }</span> else<span class="cov0" title="0"> {
+                }</span> else<span class="cov2" title="2"> {
                         errorFactor = ti.Distance / ti.DistanceEstimated
                 }</span>
-                <span class="cov0" title="0">estimatedDistFactors[altClass] += errorFactor
+                <span class="cov9" title="102">estimatedDistFactors[altClass] += errorFactor
                 //log.Printf("Estimate off: %f, new factor: %f", errorFactor, estimatedDistFactor)
-                if estimatedDistFactors[altClass] &lt; 1.0 </span><span class="cov0" title="0">{
+                if estimatedDistFactors[altClass] &lt; 1.0 </span><span class="cov9" title="100">{
                         estimatedDistFactors[altClass] = 1.0
                 }</span>
         }
@@ -13445,7 +13453,7 @@ func estimateDistance(ti *TrafficInfo) <span class="cov7" title="10">{
 }
 
 // calculates coordinates of a point defined by a location, a bearing, and a distance, thanks to 0x74-0x62
-func calcLocationForBearingDistance(lat1, lon1, bearingDeg, distanceNm float64) (lat2, lon2 float64) <span class="cov8" title="19">{
+func calcLocationForBearingDistance(lat1, lon1, bearingDeg, distanceNm float64) (lat2, lon2 float64) <span class="cov6" title="19">{
         lat1Rad := common.Radians(lat1)
         lon1Rad := common.Radians(lon1)
         bearingRad := common.Radians(bearingDeg)
@@ -13463,7 +13471,7 @@ func calcLocationForBearingDistance(lat1, lon1, bearingDeg, distanceNm float64) 
 
 func calculateModeSFakeTargets(bearinglessTi TrafficInfo) []TrafficInfo <span class="cov1" title="1">{
         result := make([]TrafficInfo, 8)
-        for i := 0; i &lt; 8; i++ </span><span class="cov6" title="8">{
+        for i := 0; i &lt; 8; i++ </span><span class="cov4" title="8">{
                 ti := bearinglessTi
                 lat, lon := calcLocationForBearingDistance(float64(mySituation.GPSLatitude), float64(mySituation.GPSLongitude), float64(i*45), bearinglessTi.DistanceEstimated/1852.0)
                 ti.Lat = float32(lat)
@@ -13477,13 +13485,13 @@ func calculateModeSFakeTargets(bearinglessTi TrafficInfo) []TrafficInfo <span cl
         <span class="cov1" title="1">return result</span>
 }
 
-func postProcessTraffic(ti *TrafficInfo) <span class="cov2" title="2">{
+func postProcessTraffic(ti *TrafficInfo) <span class="cov7" title="50">{
         ti.ReceivedMsgs += 1
         estimateDistance(ti)
 }</span>
 
 // Send update to attached JSON client.
-func registerTrafficUpdate(ti TrafficInfo) <span class="cov2" title="2">{
+func registerTrafficUpdate(ti TrafficInfo) <span class="cov7" title="50">{
         //logTraffic(ti) // moved to sendTrafficUpdates() to reduce SQLite log size
         /*
                 if !ti.Position_valid { // Don't send unless a valid position exists.
@@ -13493,22 +13501,22 @@ func registerTrafficUpdate(ti TrafficInfo) <span class="cov2" title="2">{
         trafficUpdate.SendJSON(ti)
 }</span>
 
-func isTrafficAlertable(ti TrafficInfo) bool <span class="cov8" title="18">{
+func isTrafficAlertable(ti TrafficInfo) bool <span class="cov6" title="22">{
         // Set alert bit if possible and traffic is within some threshold
         // TODO: Could be more intelligent, taking into account headings etc.
-        if !ti.BearingDist_valid </span><span class="cov7" title="13">{
+        if !ti.BearingDist_valid </span><span class="cov5" title="17">{
                 // If not able to calculate the distance to the target, let the alert bit be set always.
                 return true
         }</span>
-        <span class="cov5" title="5">if ti.BearingDist_valid &amp;&amp;
+        <span class="cov3" title="5">if ti.BearingDist_valid &amp;&amp;
                 ti.Distance &lt; 3704 </span><span class="cov2" title="2">{ // 3704 meters, 2 nm.
                 return true
         }</span>
 
-        <span class="cov3" title="3">return false</span>
+        <span class="cov2" title="3">return false</span>
 }
 
-func makeTrafficReportMsg(ti TrafficInfo) []byte <span class="cov8" title="15">{
+func makeTrafficReportMsg(ti TrafficInfo) []byte <span class="cov6" title="19">{
         msg := make([]byte, 28)
         // See p.16.
         msg[0] = 0x14 // Message type "Traffic Report".
@@ -13517,13 +13525,13 @@ func makeTrafficReportMsg(ti TrafficInfo) []byte <span class="cov8" title="15">{
         msg[1] = ti.Addr_type
 
         // Set alert if needed
-        if isTrafficAlertable(ti) </span><span class="cov7" title="13">{
+        if isTrafficAlertable(ti) </span><span class="cov5" title="17">{
                 // Set the alert bit.  See pg. 18 of GDL90 ICD
                 msg[1] |= 0x10
         }</span>
 
         // ICAO Address.
-        <span class="cov8" title="15">msg[2] = byte((ti.Icao_addr &amp; 0x00FF0000) &gt;&gt; 16)
+        <span class="cov6" title="19">msg[2] = byte((ti.Icao_addr &amp; 0x00FF0000) &gt;&gt; 16)
         msg[3] = byte((ti.Icao_addr &amp; 0x0000FF00) &gt;&gt; 8)
         msg[4] = byte((ti.Icao_addr &amp; 0x000000FF))
 
@@ -13554,21 +13562,21 @@ func makeTrafficReportMsg(ti TrafficInfo) []byte <span class="cov8" title="15">{
         //
         // GDL90 expects barometric altitude in traffic reports
         var baroAlt int32
-        if ti.AltIsGNSS &amp;&amp; isTempPressValid() </span><span class="cov0" title="0">{
+        if ti.AltIsGNSS &amp;&amp; isTempPressValid() </span><span class="cov1" title="1">{
                 // Convert from GPS geoid height to barometric altitude
                 baroAlt = ti.Alt - int32(mySituation.GPSGeoidSep)
                 baroAlt = baroAlt - int32(mySituation.GPSAltitudeMSL) + int32(mySituation.BaroPressureAltitude)
-        }</span> else<span class="cov8" title="15"> {
+        }</span> else<span class="cov6" title="18"> {
                 baroAlt = ti.Alt
         }</span>
-        <span class="cov8" title="15">var encodedAlt int16
-        if baroAlt &lt; -1000 || baroAlt &gt; 101350 </span><span class="cov0" title="0">{
+        <span class="cov6" title="19">var encodedAlt int16
+        if baroAlt &lt; -1000 || baroAlt &gt; 101350 </span><span class="cov2" title="2">{
                 encodedAlt = 0x0FFF
-        }</span> else<span class="cov8" title="15"> {
+        }</span> else<span class="cov5" title="17"> {
                 // output guaranteed to be between 0x0000 and 0x0FFE
                 encodedAlt = int16((baroAlt / 25) + 40)
         }</span>
-        <span class="cov8" title="15">msg[11] = byte((encodedAlt &amp; 0xFF0) &gt;&gt; 4) // Altitude.
+        <span class="cov6" title="19">msg[11] = byte((encodedAlt &amp; 0xFF0) &gt;&gt; 4) // Altitude.
         msg[12] = byte((encodedAlt &amp; 0x00F) &lt;&lt; 4)
 
         // "m" field. Lower four bits define indicator bits:
@@ -13586,16 +13594,16 @@ func makeTrafficReportMsg(ti TrafficInfo) []byte <span class="cov8" title="15">{
                 msg[12] = msg[12] | 0x01 // assume true track
         }</span>
 
-        <span class="cov8" title="15">if ti.ExtrapolatedPosition </span><span class="cov1" title="1">{
+        <span class="cov6" title="19">if ti.ExtrapolatedPosition </span><span class="cov1" title="1">{
                 msg[12] = msg[12] | 0x04
         }</span>
 
-        <span class="cov8" title="15">if !ti.OnGround </span><span class="cov8" title="15">{
+        <span class="cov6" title="19">if !ti.OnGround </span><span class="cov6" title="18">{
                 msg[12] = msg[12] | 0x08 // Airborne.
         }</span>
 
         // Position containment / navigational accuracy
-        <span class="cov8" title="15">msg[13] = ((byte(ti.NIC) &lt;&lt; 4) &amp; 0xF0) | (byte(ti.NACp) &amp; 0x0F)
+        <span class="cov6" title="19">msg[13] = ((byte(ti.NIC) &lt;&lt; 4) &amp; 0xF0) | (byte(ti.NACp) &amp; 0x0F)
 
         // Horizontal velocity (speed).
 
@@ -13614,16 +13622,16 @@ func makeTrafficReportMsg(ti TrafficInfo) []byte <span class="cov8" title="15">{
         msg[18] = ti.Emitter_category
 
         // msg[19] to msg[26] are "call sign" (tail).
-        for i := 0; i &lt; len(ti.Tail) &amp;&amp; i &lt; 8; i++ </span><span class="cov10" title="29">{
+        for i := 0; i &lt; len(ti.Tail) &amp;&amp; i &lt; 8; i++ </span><span class="cov6" title="29">{
                 c := byte(ti.Tail[i])
-                if c != 0x20 &amp;&amp; !((c &gt;= 48) &amp;&amp; (c &lt;= 57)) &amp;&amp; !((c &gt;= 65) &amp;&amp; (c &lt;= 90)) &amp;&amp; c != 'e' &amp;&amp; c != 'u' &amp;&amp; c != 'a' &amp;&amp; c != 'r' &amp;&amp; c != 't' </span><span class="cov3" title="3">{ // See p.24, FAA ref.
+                if c != 0x20 &amp;&amp; !((c &gt;= 48) &amp;&amp; (c &lt;= 57)) &amp;&amp; !((c &gt;= 65) &amp;&amp; (c &lt;= 90)) &amp;&amp; c != 'e' &amp;&amp; c != 'u' &amp;&amp; c != 'a' &amp;&amp; c != 'r' &amp;&amp; c != 't' </span><span class="cov2" title="3">{ // See p.24, FAA ref.
                         c = byte(0x20)
                 }</span>
-                <span class="cov10" title="29">msg[19+i] = c</span>
+                <span class="cov6" title="29">msg[19+i] = c</span>
         }
 
         //msg[27] is priority / emergency status per GDL90 spec (DO260B and DO282B are same codes)
-        <span class="cov8" title="15">msg[27] = ti.PriorityStatus &lt;&lt; 4
+        <span class="cov6" title="19">msg[27] = ti.PriorityStatus &lt;&lt; 4
 
         return prepareMessage(msg)</span>
 }
@@ -14020,7 +14028,7 @@ func esListen() <span class="cov0" title="0">{
         }
 }
 
-func parseDump1090Message(buf string) <span class="cov0" title="0">{
+func parseDump1090Message(buf string) <span class="cov7" title="48">{
         // Log the message to the message counter in any case.
         var thisMsg msg
         thisMsg.MessageClass = MSGCLASS_ES
@@ -14033,39 +14041,39 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
         eslog.Data = buf
         logESMsg(eslog) // log raw dump1090:30006 output to SQLite log
         // Only increment if using an SDR for 1090 traffic
-        if !globalSettings.Ping_Enabled &amp;&amp; !globalSettings.Pong_Enabled </span><span class="cov0" title="0">{
+        if !globalSettings.Ping_Enabled &amp;&amp; !globalSettings.Pong_Enabled </span><span class="cov7" title="48">{
                 globalStatus.ES_messages_total++
         }</span>
-        <span class="cov0" title="0">var newTi *dump1090Data
+        <span class="cov7" title="48">var newTi *dump1090Data
         err := json.Unmarshal([]byte(buf), &amp;newTi)
         if err != nil </span><span class="cov0" title="0">{
                 log.Printf("can't read ES traffic information from %s: %s\n", buf, err.Error())
                 return
         }</span>
 
-        <span class="cov0" title="0">if newTi.Icao_addr == 0x07FFFFFF </span><span class="cov0" title="0">{ // used to signal heartbeat
+        <span class="cov7" title="48">if newTi.Icao_addr == 0x07FFFFFF </span><span class="cov0" title="0">{ // used to signal heartbeat
                 if globalSettings.DEBUG </span><span class="cov0" title="0">{
                         log.Printf("No traffic last 60 seconds. Heartbeat message from dump1090: %s\n", buf)
                 }</span>
                 <span class="cov0" title="0">return</span> // don't process heartbeat messages
         }
 
-        <span class="cov0" title="0">if (newTi.Icao_addr &amp; 0x01000000) != 0 </span><span class="cov0" title="0">{ // bit 25 used by dump1090 to signal non-ICAO address
+        <span class="cov7" title="48">if (newTi.Icao_addr &amp; 0x01000000) != 0 </span><span class="cov0" title="0">{ // bit 25 used by dump1090 to signal non-ICAO address
                 newTi.Icao_addr = newTi.Icao_addr &amp; 0x00FFFFFF
                 if globalSettings.DEBUG </span><span class="cov0" title="0">{
                         log.Printf("Non-ICAO address %X sent by dump1090. This is typical for TIS-B.\n", newTi.Icao_addr)
                 }</span>
         }
-        <span class="cov0" title="0">icao := uint32(newTi.Icao_addr)
+        <span class="cov7" title="48">icao := uint32(newTi.Icao_addr)
         var ti TrafficInfo
 
         trafficMutex.Lock()
 
         // Retrieve previous information on this ICAO code.
-        if val, ok := traffic[icao]; ok </span><span class="cov0" title="0">{ // if we've already seen it, copy it in to do updates
+        if val, ok := traffic[icao]; ok </span><span class="cov7" title="32">{ // if we've already seen it, copy it in to do updates
                 ti = val
                 //log.Printf("Existing target %X imported for ES update\n", icao)
-        }</span> else<span class="cov0" title="0"> {
+        }</span> else<span class="cov5" title="16"> {
                 //log.Printf("New target %X created for ES update\n",newTi.Icao_addr)
                 ti.Last_seen = stratuxClock.Time // need to initialize to current stratuxClock so it doesn't get cut before we have a chance to populate a position message
                 ti.Last_alt = stratuxClock.Time  // ditto.
@@ -14074,21 +14082,21 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
                 ti.Last_source = TRAFFIC_SOURCE_1090ES
 
                 thisReg, validReg := icao2reg(icao)
-                if validReg </span><span class="cov0" title="0">{
+                if validReg </span><span class="cov5" title="16">{
                         ti.Reg = thisReg
                         ti.Tail = thisReg
                 }</span>
         }
 
-        <span class="cov0" title="0">if newTi.SignalLevel &gt; 0 </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if newTi.SignalLevel &gt; 0 </span><span class="cov7" title="48">{
                 power := 10 * math.Log10(newTi.SignalLevel)
                 ti.SignalLevelHist = append(ti.SignalLevelHist, power)
                 if len(ti.SignalLevelHist) &gt; 8 </span><span class="cov0" title="0">{
                         ti.SignalLevelHist = ti.SignalLevelHist[len(ti.SignalLevelHist)-8:]
                 }</span>
-                <span class="cov0" title="0">ti.SignalLevel = -999
-                for _, level := range ti.SignalLevelHist </span><span class="cov0" title="0">{
-                        if level &gt; ti.SignalLevel </span><span class="cov0" title="0">{
+                <span class="cov7" title="48">ti.SignalLevel = -999
+                for _, level := range ti.SignalLevelHist </span><span class="cov9" title="96">{
+                        if level &gt; ti.SignalLevel </span><span class="cov8" title="80">{
                                 ti.SignalLevel = level
                         }</span>
                 }
@@ -14132,46 +14140,46 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
         // Altitude will be sent by dump1090 for ES ADS-B/TIS-B (DF=17 and DF=18)
         // and Mode S messages (DF=0, DF = 4, and DF = 20).
 
-        <span class="cov0" title="0">ti.AltIsGNSS = newTi.AltIsGNSS
+        <span class="cov7" title="48">ti.AltIsGNSS = newTi.AltIsGNSS
 
-        if newTi.Alt != nil </span><span class="cov0" title="0">{
+        if newTi.Alt != nil </span><span class="cov7" title="48">{
                 ti.Alt = int32(*newTi.Alt)
                 ti.Last_alt = stratuxClock.Time
         }</span>
 
-        <span class="cov0" title="0">if newTi.GnssDiffFromBaroAlt != nil </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if newTi.GnssDiffFromBaroAlt != nil </span><span class="cov0" title="0">{
                 ti.GnssDiffFromBaroAlt = int32(*newTi.GnssDiffFromBaroAlt) // we can estimate pressure altitude from GNSS height with this parameter!
                 ti.Last_GnssDiff = stratuxClock.Time
                 ti.Last_GnssDiffAlt = ti.Alt
         }</span>
 
         // Position updates are provided only by ES messages (DF=17 and DF=18; multiple TCs)
-        <span class="cov0" title="0">if newTi.Position_valid </span><span class="cov0" title="0">{ // i.e. DF17 or DF18 message decoded successfully by dump1090
+        <span class="cov7" title="48">if newTi.Position_valid </span><span class="cov7" title="48">{ // i.e. DF17 or DF18 message decoded successfully by dump1090
                 valid_position := true
                 var lat, lng float32
 
-                if newTi.Lat != nil </span><span class="cov0" title="0">{
+                if newTi.Lat != nil </span><span class="cov7" title="48">{
                         lat = float32(*newTi.Lat)
                 }</span> else<span class="cov0" title="0"> { // dump1090 send a valid message, but Stratux couldn't figure it out for some reason.
                         valid_position = false
                         //log.Printf("Missing latitude in DF=17/18 airborne position message\n")
                 }</span>
 
-                <span class="cov0" title="0">if newTi.Lng != nil </span><span class="cov0" title="0">{
+                <span class="cov7" title="48">if newTi.Lng != nil </span><span class="cov7" title="48">{
                         lng = float32(*newTi.Lng)
                 }</span> else<span class="cov0" title="0"> { //
                         valid_position = false
                         //log.Printf("Missing longitude in DF=17 airborne position message\n")
                 }</span>
 
-                <span class="cov0" title="0">if valid_position </span><span class="cov0" title="0">{
+                <span class="cov7" title="48">if valid_position </span><span class="cov7" title="48">{
                         ti.Lat = lat
                         ti.Lng = lng
                         if isGPSValid() </span><span class="cov0" title="0">{
                                 ti.Distance, ti.Bearing = common.Distance(float64(mySituation.GPSLatitude), float64(mySituation.GPSLongitude), float64(ti.Lat), float64(ti.Lng))
                                 ti.BearingDist_valid = true
                         }</span>
-                        <span class="cov0" title="0">ti.Position_valid = true
+                        <span class="cov7" title="48">ti.Position_valid = true
                         ti.ExtrapolatedPosition = false
                         ti.Last_seen = stratuxClock.Time</span> // only update "last seen" data on position updates
                 }
@@ -14182,32 +14190,32 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
                 }</span>
         }
 
-        <span class="cov0" title="0">if newTi.Speed_valid </span><span class="cov0" title="0">{ // i.e. DF17 or DF18, TC 19 message decoded successfully by dump1090
+        <span class="cov7" title="48">if newTi.Speed_valid </span><span class="cov7" title="48">{ // i.e. DF17 or DF18, TC 19 message decoded successfully by dump1090
                 valid_speed := true
                 var speed uint16
                 var track float32
 
-                if newTi.Track != nil </span><span class="cov0" title="0">{
+                if newTi.Track != nil </span><span class="cov7" title="48">{
                         track = float32(*newTi.Track)
                 }</span> else<span class="cov0" title="0"> { // dump1090 send a valid message, but Stratux couldn't figure it out for some reason.
                         valid_speed = false
                         //log.Printf("Missing track in DF=17/18 TC19 airborne velocity message\n")
                 }</span>
 
-                <span class="cov0" title="0">if newTi.Speed != nil </span><span class="cov0" title="0">{
+                <span class="cov7" title="48">if newTi.Speed != nil </span><span class="cov7" title="48">{
                         speed = uint16(*newTi.Speed)
                 }</span> else<span class="cov0" title="0"> { //
                         valid_speed = false
                         //log.Printf("Missing speed in DF=17/18 TC19 airborne velocity message\n")
                 }</span>
 
-                <span class="cov0" title="0">if newTi.Vvel != nil </span><span class="cov0" title="0">{
+                <span class="cov7" title="48">if newTi.Vvel != nil </span><span class="cov7" title="48">{
                         ti.Vvel = int16(*newTi.Vvel)
                 }</span> else <span class="cov0" title="0">{ // we'll still make the message without a valid vertical speed.
                         //log.Printf("Missing vertical speed in DF=17/18 TC19 airborne velocity message\n")
                 }</span>
 
-                <span class="cov0" title="0">if valid_speed </span><span class="cov0" title="0">{
+                <span class="cov7" title="48">if valid_speed </span><span class="cov7" title="48">{
                         ti.Track = track
                         ti.Speed = speed
                         ti.Speed_valid = true
@@ -14218,7 +14226,7 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
         }</span>
 
         // Determine NIC (navigation integrity category) from type code and subtype code
-        <span class="cov0" title="0">if ((newTi.DF == 17) || (newTi.DF == 18)) &amp;&amp; (newTi.TypeCode &gt;= 5 &amp;&amp; newTi.TypeCode &lt;= 22) &amp;&amp; (newTi.TypeCode != 19) </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if ((newTi.DF == 17) || (newTi.DF == 18)) &amp;&amp; (newTi.TypeCode &gt;= 5 &amp;&amp; newTi.TypeCode &lt;= 22) &amp;&amp; (newTi.TypeCode != 19) </span><span class="cov7" title="48">{
                 nic := 0 // default for unknown or missing NIC
                 switch newTi.TypeCode </span>{
                 case 0, 8, 18, 22:<span class="cov0" title="0">
@@ -14239,10 +14247,10 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
                         nic = 6</span>
                 case 12:<span class="cov0" title="0">
                         nic = 7</span>
-                case 11:<span class="cov0" title="0">
+                case 11:<span class="cov7" title="48">
                         if newTi.SubtypeCode == 1 </span><span class="cov0" title="0">{
                                 nic = 9
-                        }</span> else<span class="cov0" title="0"> {
+                        }</span> else<span class="cov7" title="48"> {
                                 nic = 8
                         }</span>
                 case 10, 21:<span class="cov0" title="0">
@@ -14250,27 +14258,27 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
                 case 9, 20:<span class="cov0" title="0">
                         nic = 11</span>
                 }
-                <span class="cov0" title="0">ti.NIC = nic
+                <span class="cov7" title="48">ti.NIC = nic
 
-                if (ti.NACp &lt; 7) &amp;&amp; (ti.NACp &lt; ti.NIC) </span><span class="cov0" title="0">{
+                if (ti.NACp &lt; 7) &amp;&amp; (ti.NACp &lt; ti.NIC) </span><span class="cov5" title="16">{
                         ti.NACp = ti.NIC // initialize to NIC, since NIC is sent with every position report, and not all emitters report NACp.
                 }</span>
         }
 
-        <span class="cov0" title="0">if newTi.NACp != nil </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if newTi.NACp != nil </span><span class="cov7" title="48">{
                 ti.NACp = *newTi.NACp
         }</span>
 
-        <span class="cov0" title="0">if newTi.Emitter_category != nil </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if newTi.Emitter_category != nil </span><span class="cov0" title="0">{
                 ti.Emitter_category = uint8(*newTi.Emitter_category) // validate dump1090 on live traffic
         }</span>
 
-        <span class="cov0" title="0">if newTi.Squawk != nil </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if newTi.Squawk != nil </span><span class="cov0" title="0">{
                 ti.Squawk = int(*newTi.Squawk) // only provided by Mode S messages, so we don't do this in parseUAT.
         }</span>
         // Set the target type. DF=18 messages are sent by ground station, so we look at CA
         // (repurposed to Control Field in DF18) to determine if it's ADS-R or TIS-B.
-        <span class="cov0" title="0">if newTi.DF == 17 </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if newTi.DF == 17 </span><span class="cov7" title="48">{
                 ti.TargetType = TARGET_TYPE_ADSB
                 ti.Addr_type = 0
         }</span> else<span class="cov0" title="0"> if newTi.DF == 18 </span><span class="cov0" title="0">{
@@ -14286,18 +14294,18 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
                 }</span>
         }
 
-        <span class="cov0" title="0">if newTi.OnGround != nil </span><span class="cov0" title="0">{ // DF=11 messages don't report "on ground" status so we need to check for valid values.
+        <span class="cov7" title="48">if newTi.OnGround != nil </span><span class="cov7" title="48">{ // DF=11 messages don't report "on ground" status so we need to check for valid values.
                 ti.OnGround = bool(*newTi.OnGround)
         }</span>
 
-        <span class="cov0" title="0">if (newTi.Tail != nil) &amp;&amp; ((newTi.DF == 17) || (newTi.DF == 18) || (newTi.DF == 20) || (newTi.DF == 21)) </span><span class="cov0" title="0">{ // DF=17 or DF=18, Type Code 1-4 , DF=20 Altitude Reply (often with Ident in Comm-B) DF=21 Identity Reply
+        <span class="cov7" title="48">if (newTi.Tail != nil) &amp;&amp; ((newTi.DF == 17) || (newTi.DF == 18) || (newTi.DF == 20) || (newTi.DF == 21)) </span><span class="cov7" title="48">{ // DF=17 or DF=18, Type Code 1-4 , DF=20 Altitude Reply (often with Ident in Comm-B) DF=21 Identity Reply
                 ti.Tail = *newTi.Tail
                 ti.Tail = strings.Trim(ti.Tail, " ") // remove extraneous spaces
         }</span>
 
         // This is a hack to show the source of the traffic on moving maps.
 
-        <span class="cov0" title="0">if globalSettings.DisplayTrafficSource </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if globalSettings.DisplayTrafficSource </span><span class="cov0" title="0">{
                 type_code := " "
                 switch ti.TargetType </span>{
                 case TARGET_TYPE_ADSB:<span class="cov0" title="0">
@@ -14320,10 +14328,10 @@ func parseDump1090Message(buf string) <span class="cov0" title="0">{
                 }</span>
         }
 
-        <span class="cov0" title="0">if newTi.DF == 17 || newTi.DF == 18 </span><span class="cov0" title="0">{
+        <span class="cov7" title="48">if newTi.DF == 17 || newTi.DF == 18 </span><span class="cov7" title="48">{
                 ti.Last_source = TRAFFIC_SOURCE_1090ES // only update traffic source on ADS-B messages. Prevents source on UAT ADS-B targets with Mode S transponders from "flickering" every time we get an altitude or DF11 update.
         }</span>
-        <span class="cov0" title="0">ti.Timestamp = newTi.Timestamp // only update "last seen" data on position updates
+        <span class="cov7" title="48">ti.Timestamp = newTi.Timestamp // only update "last seen" data on position updates
 
         /*
                 s_out, err := json.Marshal(ti)
@@ -14358,15 +14366,15 @@ func trafficInfoExtrapolator() <span class="cov0" title="0">{
 
 }
 
-func extrapolateTraffic(ti *TrafficInfo) <span class="cov5" title="5">{
-        if !ti.ExtrapolatedPosition </span><span class="cov5" title="5">{
+func extrapolateTraffic(ti *TrafficInfo) <span class="cov3" title="5">{
+        if !ti.ExtrapolatedPosition </span><span class="cov3" title="5">{
                 ti.Lat_fix = ti.Lat
                 ti.Lng_fix = ti.Lng
                 ti.Alt_fix = ti.Alt
                 ti.Last_extrapolation = ti.Last_seen // to make computation below simpler
         }</span>
 
-        <span class="cov5" title="5">seconds := stratuxClock.Since(ti.Last_extrapolation).Seconds()
+        <span class="cov3" title="5">seconds := stratuxClock.Since(ti.Last_extrapolation).Seconds()
         travelDist := float64(ti.Speed) * (seconds / 60 / 60) // speed is knots=nm per hour. /60/60 = nm per second
 
         // Estimate alt
@@ -14380,12 +14388,12 @@ func extrapolateTraffic(ti *TrafficInfo) <span class="cov5" title="5">{
         for ti.Track &lt; 0 </span><span class="cov0" title="0">{
                 ti.Track += 360
         }</span>
-        <span class="cov5" title="5">for ti.Track &gt; 360 </span><span class="cov0" title="0">{
+        <span class="cov3" title="5">for ti.Track &gt; 360 </span><span class="cov0" title="0">{
                 ti.Track -= 360
         }</span>
         // ti.Track = ti.Track % 360
 
-        <span class="cov5" title="5">ti.ExtrapolatedPosition = true
+        <span class="cov3" title="5">ti.ExtrapolatedPosition = true
         ti.Last_extrapolation = stratuxClock.Time</span>
 
         // TODO: should we call registerTrafficUpdate() to send this traffic to the web interface?
@@ -14527,7 +14535,7 @@ func updateDemoTraffic(icao uint32, tail string, relAlt float32, gs float64, off
                                         N number. False for all other conditions.
 */
 
-func icao2reg(icao_addr uint32) (string, bool) <span class="cov7" title="13">{
+func icao2reg(icao_addr uint32) (string, bool) <span class="cov6" title="29">{
         // Initialize local variables
         base34alphabet := string("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789")
         nationalOffset := uint32(0xA00001) // default is US
@@ -14535,18 +14543,18 @@ func icao2reg(icao_addr uint32) (string, bool) <span class="cov7" title="13">{
         nation := ""
 
         // Determine nationality
-        if (icao_addr &gt;= 0xA00001) &amp;&amp; (icao_addr &lt;= 0xAFFFFF) </span><span class="cov5" title="5">{
+        if (icao_addr &gt;= 0xA00001) &amp;&amp; (icao_addr &lt;= 0xAFFFFF) </span><span class="cov6" title="21">{
                 nation = "US"
-        }</span> else<span class="cov6" title="8"> if (icao_addr &gt;= 0xC00001) &amp;&amp; (icao_addr &lt;= 0xC3FFFF) </span><span class="cov4" title="4">{
+        }</span> else<span class="cov4" title="8"> if (icao_addr &gt;= 0xC00001) &amp;&amp; (icao_addr &lt;= 0xC3FFFF) </span><span class="cov3" title="4">{
                 nation = "CA"
-        }</span> else<span class="cov4" title="4"> if (icao_addr &gt;= 0x7C0000) &amp;&amp; (icao_addr &lt;= 0x7FFFFF) </span><span class="cov3" title="3">{
+        }</span> else<span class="cov3" title="4"> if (icao_addr &gt;= 0x7C0000) &amp;&amp; (icao_addr &lt;= 0x7FFFFF) </span><span class="cov2" title="3">{
                 nation = "AU"
         }</span> else<span class="cov1" title="1"> {
                 //TODO: future national decoding.
                 return "OTHER", false
         }</span>
 
-        <span class="cov7" title="12">if nation == "CA" </span><span class="cov4" title="4">{ // Canada decoding
+        <span class="cov6" title="28">if nation == "CA" </span><span class="cov3" title="4">{ // Canada decoding
                 // First, discard addresses that are not assigned to aircraft on the civil registry
                 if icao_addr &gt; 0xC0CDF8 </span><span class="cov2" title="2">{
                         //fmt.Printf("%X is a Canada aircraft, but not a CF-, CG-, or CI- registration.\n", icao_addr)
@@ -14574,7 +14582,7 @@ func icao2reg(icao_addr uint32) (string, bool) <span class="cov7" title="13">{
                 tail = fmt.Sprintf("C-%c%c%c%c", b_str[b], c+65, d+65, e+65)</span>
         }
 
-        <span class="cov7" title="10">if nation == "AU" </span><span class="cov3" title="3">{ // Australia decoding
+        <span class="cov6" title="26">if nation == "AU" </span><span class="cov2" title="3">{ // Australia decoding
 
                 nationalOffset := uint32(0x7C0000)
                 offset := (icao_addr - nationalOffset)
@@ -14594,17 +14602,17 @@ func icao2reg(icao_addr uint32) (string, bool) <span class="cov7" title="13">{
                         return "OTHER", false
                 }</span>
 
-                <span class="cov3" title="3">tail = "VH-" + a_char + b_char + c_char</span>
+                <span class="cov2" title="3">tail = "VH-" + a_char + b_char + c_char</span>
         }
 
-        <span class="cov7" title="10">if nation == "US" </span><span class="cov5" title="5">{ // FAA decoding
+        <span class="cov6" title="26">if nation == "US" </span><span class="cov6" title="21">{ // FAA decoding
                 // First, discard addresses that are not assigned to aircraft on the civil registry
                 if icao_addr &gt; 0xADF7C7 </span><span class="cov2" title="2">{
                         //fmt.Printf("%X is a US aircraft, but not on the civil registry.\n", icao_addr)
                         return "US-MIL", false
                 }</span>
 
-                <span class="cov3" title="3">serial := int32(icao_addr - nationalOffset)
+                <span class="cov6" title="19">serial := int32(icao_addr - nationalOffset)
                 // First digit
                 a := (serial / 101711) + 1
 
@@ -14624,16 +14632,16 @@ func icao2reg(icao_addr uint32) (string, bool) <span class="cov7" title="13">{
                 c_remainder := (b_remainder + 350) % 951
                 var d, e int32
 
-                if (b &gt;= 0) &amp;&amp; (c &gt;= 0) &amp;&amp; (c_remainder &gt; 600) </span><span class="cov2" title="2">{ // alphanumeric decoding method
+                if (b &gt;= 0) &amp;&amp; (c &gt;= 0) &amp;&amp; (c_remainder &gt; 600) </span><span class="cov5" title="10">{ // alphanumeric decoding method
                         d = 24 + (c_remainder-601)/35
                         e = (c_remainder - 601) % 35
 
-                }</span> else<span class="cov1" title="1"> { // two-letter decoding method
+                }</span> else<span class="cov4" title="9"> { // two-letter decoding method
                         if (b &lt; 0) || (c &lt; 0) </span><span class="cov1" title="1">{
                                 c_remainder -= 350 // otherwise "  " == 350, "A " == 351, "AA" == 352, etc.
                         }</span>
 
-                        <span class="cov1" title="1">d = (c_remainder - 1) / 25
+                        <span class="cov4" title="9">d = (c_remainder - 1) / 25
                         e = (c_remainder - 1) % 25
 
                         if e &lt; 0 </span><span class="cov1" title="1">{
@@ -14642,32 +14650,32 @@ func icao2reg(icao_addr uint32) (string, bool) <span class="cov7" title="13">{
                         }</span>
                 }
 
-                <span class="cov3" title="3">a_char := fmt.Sprintf("%d", a)
+                <span class="cov6" title="19">a_char := fmt.Sprintf("%d", a)
                 var b_char, c_char, d_char, e_char string
 
-                if b &gt;= 0 </span><span class="cov2" title="2">{
+                if b &gt;= 0 </span><span class="cov6" title="18">{
                         b_char = fmt.Sprintf("%d", b)
                 }</span>
 
-                <span class="cov3" title="3">if b &gt;= 0 &amp;&amp; c &gt;= 0 </span><span class="cov2" title="2">{
+                <span class="cov6" title="19">if b &gt;= 0 &amp;&amp; c &gt;= 0 </span><span class="cov6" title="18">{
                         c_char = fmt.Sprintf("%d", c)
                 }</span>
 
-                <span class="cov3" title="3">if d &gt; -1 </span><span class="cov2" title="2">{
+                <span class="cov6" title="19">if d &gt; -1 </span><span class="cov6" title="18">{
                         d_char = string(base34alphabet[d])
-                        if e &gt; 0 </span><span class="cov2" title="2">{
+                        if e &gt; 0 </span><span class="cov6" title="18">{
                                 e_char = string(base34alphabet[e-1])
                         }</span>
                 }
 
-                <span class="cov3" title="3">tail = "N" + a_char + b_char + c_char + d_char + e_char</span>
+                <span class="cov6" title="19">tail = "N" + a_char + b_char + c_char + d_char + e_char</span>
 
         }
 
-        <span class="cov6" title="8">return tail, true</span>
+        <span class="cov6" title="24">return tail, true</span>
 }
 
-func initTraffic(isTraceReplayMode bool) <span class="cov0" title="0">{
+func initTraffic(isTraceReplayMode bool) <span class="cov1" title="1">{
         traffic = make(map[uint32]TrafficInfo)
         seenTraffic = make(map[uint32]bool)
         trafficMutex = &amp;sync.Mutex{}
@@ -14716,13 +14724,13 @@ func NewUIBroadcaster() *uibroadcaster <span class="cov0" title="0">{
         return ret
 }</span>
 
-func (u *uibroadcaster) Send(msg []byte) <span class="cov10" title="2">{
+func (u *uibroadcaster) Send(msg []byte) <span class="cov10" title="50">{
         if u != nil &amp;&amp; u.messages != nil </span><span class="cov0" title="0">{
                 u.messages &lt;- msg
         }</span>
 }
 
-func (u *uibroadcaster) SendJSON(i interface{}) <span class="cov10" title="2">{
+func (u *uibroadcaster) SendJSON(i interface{}) <span class="cov10" title="50">{
         j, _ := json.Marshal(&amp;i)
         u.Send(j)
 }</span>
@@ -14773,35 +14781,35 @@ import (
         "regexp"
 )
 
-func convertKnotsToXPlaneSpeed(knots float32) float32 <span class="cov0" title="0">{
+func convertKnotsToXPlaneSpeed(knots float32) float32 <span class="cov9" title="10">{
         return knots / 1.94384 // meters per second
 }</span>
 
-func createXPlaneGpsMsg(latDeg float32, lonDeg float32, altMslFt float32, trackDeg float32, speedKt float32) []byte <span class="cov0" title="0">{
+func createXPlaneGpsMsg(latDeg float32, lonDeg float32, altMslFt float32, trackDeg float32, speedKt float32) []byte <span class="cov6" title="4">{
         // example: XGPS1,-122.298432,47.450756,420.9961,349.7547,57.9145
         return []byte(fmt.Sprintf("XGPSStratux,%.6f,%.6f,%.4f,%.4f,%.4f", lonDeg, latDeg, convertFeetToMeters(altMslFt), trackDeg, convertKnotsToXPlaneSpeed(speedKt)))
 }</span>
 
-func createXPlaneAttitudeMsg(headingDeg float32, pitchDeg float32, rollDeg float32) []byte <span class="cov0" title="0">{
+func createXPlaneAttitudeMsg(headingDeg float32, pitchDeg float32, rollDeg float32) []byte <span class="cov6" title="5">{
         // example: XATT1,345.1,-1.1,-12.5,0.1374,0.0954,-0.0444,-17.0,-1.2,-65.0,-0.01,1.63,0.02
         // TODO find out what the remaining parameters are for
         return []byte(fmt.Sprintf("XATTStratux,%.1f,%.1f,%.1f,0,0,0,0,0,0,0,0,0", headingDeg, pitchDeg, rollDeg)) // this one makes Garmin Pilot (Android) happy, and is similar to what XPlane does
         //return []byte(fmt.Sprintf("XATTStratux,%.1f,%.1f,%.1f")) // this one is what the Foreflight spec says
 }</span>
 
-func createXPlaneTrafficMsg(targetId uint32, latDeg float32, lonDeg float32, altFt int32, hSpeedKt uint32, vSpeedFpm int32, onGround bool, trackDeg uint32, callSign string) []byte <span class="cov0" title="0">{
+func createXPlaneTrafficMsg(targetId uint32, latDeg float32, lonDeg float32, altFt int32, hSpeedKt uint32, vSpeedFpm int32, onGround bool, trackDeg uint32, callSign string) []byte <span class="cov10" title="12">{
         // example: XTRA1,1,47.435484,-122.304048,351,1,0,62,0,N172SP
 
         // prepare airborne/ground information
         airborneValue := uint8(0)
-        if onGround </span><span class="cov0" title="0">{
+        if onGround </span><span class="cov1" title="1">{
                 airborneValue = 0
-        }</span> else<span class="cov0" title="0"> {
+        }</span> else<span class="cov9" title="11"> {
                 airborneValue = 1
         }</span>
 
         // prepare callsign (remove all non-alphanumeric characters)
-        <span class="cov0" title="0">regEx, _ := regexp.Compile("[^a-zA-Z0-9]+")
+        <span class="cov10" title="12">regEx, _ := regexp.Compile("[^a-zA-Z0-9]+")
         cleanCallSign := regEx.ReplaceAllString(callSign, "")
 
         return []byte(fmt.Sprintf("XTRAFFICStratux,%d,%.6f,%.6f,%d,%d,%d,%d,%d,%s", targetId, latDeg, lonDeg, altFt, vSpeedFpm, airborneValue, trackDeg, hSpeedKt, cleanCallSign))</span>

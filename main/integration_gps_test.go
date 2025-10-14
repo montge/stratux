@@ -393,10 +393,10 @@ func TestGPSFixQuality(t *testing.T) {
 // TestGPSAltitudeConversion tests meter to feet conversion
 func TestGPSAltitudeConversion(t *testing.T) {
 	tests := []struct {
-		name           string
-		altMeters      string
-		expectedFeet   float32
-		toleranceFeet  float32
+		name          string
+		altMeters     string
+		expectedFeet  float32
+		toleranceFeet float32
 	}{
 		{"Sea level", "0.0", 0.0, 1.0},
 		{"420.9 meters", "420.9", 1380.9, 1.0},

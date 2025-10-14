@@ -53,7 +53,7 @@ func resetOGNAPRSState() {
 	// Set up fake GPS position for distance checks in OGN parser
 	// OGN parser rejects targets >50km away, so we need a valid position
 	mySituation.muGPS.Lock()
-	mySituation.GPSLatitude = 51.7657   // Oxford, UK area
+	mySituation.GPSLatitude = 51.7657 // Oxford, UK area
 	mySituation.GPSLongitude = -1.1918
 	mySituation.GPSAltitudeMSL = 400
 	mySituation.GPSFixQuality = 1
@@ -263,22 +263,22 @@ func TestOGNTrafficParsing(t *testing.T) {
 // TestOGNAddressTypes tests OGN address type handling (ICAO vs FLARM)
 func TestOGNAddressTypes(t *testing.T) {
 	tests := []struct {
-		name         string
-		msg          string
-		addrType     uint8
-		description  string
+		name        string
+		msg         string
+		addrType    uint8
+		description string
 	}{
 		{
-			name:         "ICAO address",
-			msg:          `{"sys":"OGN","time":1728907200.0,"addr":"395F39","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":124,"track_deg":57,"speed_mps":15}`,
-			addrType:     0, // ICAO = 0 in GDL90
-			description:  "ICAO address should map to GDL90 address type 0",
+			name:        "ICAO address",
+			msg:         `{"sys":"OGN","time":1728907200.0,"addr":"395F39","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":124,"track_deg":57,"speed_mps":15}`,
+			addrType:    0, // ICAO = 0 in GDL90
+			description: "ICAO address should map to GDL90 address type 0",
 		},
 		{
-			name:         "FLARM address",
-			msg:          `{"sys":"FLR","time":1728907200.0,"addr":"DD4B12","addr_type":2,"acft_type":"8","lat_deg":51.7701,"lon_deg":-1.1956,"alt_msl_m":145,"track_deg":124,"speed_mps":25}`,
-			addrType:     1, // Non-ICAO = 1 in GDL90
-			description:  "FLARM address should map to GDL90 address type 1",
+			name:        "FLARM address",
+			msg:         `{"sys":"FLR","time":1728907200.0,"addr":"DD4B12","addr_type":2,"acft_type":"8","lat_deg":51.7701,"lon_deg":-1.1956,"alt_msl_m":145,"track_deg":124,"speed_mps":25}`,
+			addrType:    1, // Non-ICAO = 1 in GDL90
+			description: "FLARM address should map to GDL90 address type 1",
 		},
 	}
 
@@ -398,10 +398,10 @@ func TestOGNInvalidMessages(t *testing.T) {
 	resetOGNAPRSState()
 
 	invalidMessages := []string{
-		"", // Empty
-		"{", // Incomplete JSON
+		"",                   // Empty
+		"{",                  // Incomplete JSON
 		`{"invalid": "json"`, // Unclosed brace
-		`{"sys":"OGN"}`, // Missing required fields (but increments counter as non-status)
+		`{"sys":"OGN"}`,      // Missing required fields (but increments counter as non-status)
 	}
 
 	for i, msg := range invalidMessages {
@@ -552,7 +552,7 @@ func TestAPRSInvalidMessages(t *testing.T) {
 	resetOGNAPRSState()
 
 	invalidMessages := []string{
-		"", // Empty
+		"",                // Empty
 		"INVALID>MESSAGE", // Invalid format
 		"OXFORD>APRS,TCPIP*,qAC,GLIDERN1:/120005h5146.000N/00112.000W'", // Ground station (should be ignored)
 	}

@@ -174,13 +174,13 @@ func TestUATDownlinkLongReport(t *testing.T) {
 		length  int
 	}{
 		{
-			name:    "34_byte_long_report",
+			name: "34_byte_long_report",
 			// 34 bytes = 68 hex characters
 			message: "-00000000000000000000000000000000000000000000000000000000000000000000;rs=14;ss=102",
 			length:  34,
 		},
 		{
-			name:    "48_byte_long_report",
+			name: "48_byte_long_report",
 			// 48 bytes = 96 hex characters
 			message: "-000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000;rs=15;ss=98",
 			length:  48,
@@ -303,13 +303,13 @@ func TestUATMessageTypeDetection(t *testing.T) {
 	resetUATState()
 
 	testCases := []struct {
-		name        string
-		hexLength   int // Length in hex characters (2 chars per byte)
+		name         string
+		hexLength    int // Length in hex characters (2 chars per byte)
 		expectedType uint16
 	}{
-		{"uplink_432_bytes", 864, MSGTYPE_UPLINK},        // 432 bytes * 2 = 864 hex chars
-		{"long_report_48_bytes", 96, MSGTYPE_LONG_REPORT},  // 48 bytes * 2 = 96 hex chars
-		{"long_report_34_bytes", 68, MSGTYPE_LONG_REPORT},  // 34 bytes * 2 = 68 hex chars
+		{"uplink_432_bytes", 864, MSGTYPE_UPLINK},           // 432 bytes * 2 = 864 hex chars
+		{"long_report_48_bytes", 96, MSGTYPE_LONG_REPORT},   // 48 bytes * 2 = 96 hex chars
+		{"long_report_34_bytes", 68, MSGTYPE_LONG_REPORT},   // 34 bytes * 2 = 68 hex chars
 		{"basic_report_18_bytes", 36, MSGTYPE_BASIC_REPORT}, // 18 bytes * 2 = 36 hex chars
 	}
 
