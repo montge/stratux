@@ -7,4 +7,10 @@ fi
 if [ "${VER:0:1}" == "v" ]; then
 	VER=${VER:1}
 fi
+
+# Debian version must start with a digit, so prepend 0.0. if it doesn't
+if ! [[ "$VER" =~ ^[0-9] ]]; then
+	VER="0.0.$VER"
+fi
+
 echo $VER
