@@ -144,16 +144,16 @@ func TestComputeAlarmLevel(t *testing.T) {
 			expectedAlarm:    0,
 		},
 		{
-			name:             "Close horizontal but too high vertical - no alarm",
+			name:             "Close horizontal but too high vertical for level 3 - level 2",
 			dist:             500, // 0.27 NM
-			relativeVertical: 200, // 656 ft (> 500 ft threshold)
-			expectedAlarm:    0,
+			relativeVertical: 200, // 656 ft (> 500 ft threshold, but < 1000 ft)
+			expectedAlarm:    2,   // Still within level 2 threshold
 		},
 		{
-			name:             "Close horizontal but too low vertical - no alarm",
+			name:             "Close horizontal but too low vertical for level 3 - level 2",
 			dist:             500,  // 0.27 NM
-			relativeVertical: -200, // -656 ft (< -500 ft threshold)
-			expectedAlarm:    0,
+			relativeVertical: -200, // -656 ft (< -500 ft threshold, but > -1000 ft)
+			expectedAlarm:    2,    // Still within level 2 threshold
 		},
 		{
 			name:             "Negative vertical within range - level 3",
@@ -487,10 +487,10 @@ func TestComputeAlarmLevelBoundaries(t *testing.T) {
 	}{
 		// Level 3 boundaries (< 926m && < ±152m)
 		{"Level 3: max dist", 925, 151, 3},
-		{"Level 3: exceeds dist", 926, 151, 2}, // Just at boundary, should be level 2
-		{"Level 3: max vert", 925, 152, 0},     // Just at boundary vertical
+		{"Level 3: exceeds dist", 926, 151, 2},  // Just at boundary, should be level 2
+		{"Level 3: max vert", 925, 152, 2},      // Just at boundary vertical, still level 2
 		{"Level 3: min vert", 925, -151, 3},
-		{"Level 3: exceeds min vert", 925, -152, 0},
+		{"Level 3: exceeds min vert", 925, -152, 2}, // Still within level 2 threshold
 
 		// Level 2 boundaries (< 1852m && < ±304m)
 		{"Level 2: max dist", 1851, 303, 2},

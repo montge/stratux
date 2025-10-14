@@ -530,7 +530,10 @@ func getIdTail(idReceived string) (idStr string, tail string, address uint32) {
 	}
 
 	addressBytes, _ := hex.DecodeString(idStr)
-	addressBytes = append([]byte{0}, addressBytes...)
+	// Pad to exactly 4 bytes by prepending zeros
+	for len(addressBytes) < 4 {
+		addressBytes = append([]byte{0}, addressBytes...)
+	}
 	address = binary.BigEndian.Uint32(addressBytes)
 
 	return
