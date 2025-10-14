@@ -167,9 +167,9 @@ UATparse utility functions:
 ### Additional Tests Added (Session Continuation)
 
 #### 7. Main Package - FLARM NMEA Utilities
-**New Test File: main/flarm-nmea_test.go (513 lines)**
+**New Test File: main/flarm-nmea_test.go (672 lines)**
 
-Created comprehensive test suite for FLARM NMEA sentence generation and parsing:
+Created comprehensive test suite for FLARM NMEA sentence generation, parsing, and OGN ID handling:
 
 - **TestAppendNmeaChecksum** (6 test cases)
   - NMEA checksum calculation (XOR-based)
@@ -215,14 +215,31 @@ Created comprehensive test suite for FLARM NMEA sentence generation and parsing:
   - Verifies < vs <= behavior at thresholds
   - Tests both horizontal and vertical limits
 
+- **TestGetIdTail** (12 test cases)
+  - OGN ID and tail parsing
+  - ID without tail, ID with tail formats
+  - OGN/FLR prefix filtering in tails
+  - ID truncation for long addresses (> 6 chars)
+  - Short ID handling (< 6 chars)
+  - Hex decoding and address conversion
+  - Lowercase hex support
+  - Zero and maximum address values
+
+- **TestGetIdTailEdgeCases** (5 test cases)
+  - Empty strings, malformed inputs
+  - Multiple exclamations, underscores
+  - Very long IDs
+  - Verifies no panics on edge cases
+
 **Functions Tested:**
 - `appendNmeaChecksum()` (flarm-nmea.go:34)
 - `computeAlarmLevel()` (flarm-nmea.go:87)
 - `gdl90EmitterCatToNMEA()` (flarm-nmea.go:111)
 - `nmeaAircraftTypeToGdl90()` (flarm-nmea.go:138)
 - `atof32()` (flarm-nmea.go:486)
+- `getIdTail()` (flarm-nmea.go:515)
 
-**Note:** Tests are syntactically correct and ready but cannot execute due to C library dependencies in the main package. Expected to achieve 100% coverage for all 5 pure utility functions when executable.
+**Note:** Tests are syntactically correct and ready but cannot execute due to C library dependencies in the main package. Expected to achieve 100% coverage for all 6 pure utility functions when executable.
 
 ### Additional Tests Added (Session Continuation)
 
@@ -298,17 +315,17 @@ Created comprehensive test suite for priority queue implementation:
 - **Common package**: 715 lines (helpers_test.go)
 - **UATparse package**: 670 lines (uatparse_test.go) - extended from 471
 - **Main package**: 533 lines (messagequeue_test.go) - new
-- **Main package**: 513 lines (flarm-nmea_test.go) - new
+- **Main package**: 672 lines (flarm-nmea_test.go) - new (extended from 513)
 - **Main package**: 110 lines added to gen_gdl90_test.go
 - **Traffic tests**: 7 additional test functions in traffic_test.go
-- **Total new test code**: ~2,548 lines
+- **Total new test code**: ~2,707 lines
 
 ### Test Functions Added
 - Common package: 45+ test functions
 - UATparse package: 17 test functions (13 original + 4 NEXRAD)
-- Main package: 28+ test functions (MessageQueue + product name + FLARM)
+- Main package: 30+ test functions (MessageQueue + product name + FLARM + OGN ID)
 - Traffic package: 7 targeted edge case tests
-- **Total: 97+ test functions**
+- **Total: 99+ test functions**
 
 ### Coverage Achievements
 - **Common package**: 0% → 90.2% ✅
@@ -340,12 +357,13 @@ Created comprehensive test suite for priority queue implementation:
 3. Main package (1 function):
    - getProductNameFromId
 
-4. Main package - FLARM (5 functions, ready but not yet executable):
+4. Main package - FLARM (6 functions, ready but not yet executable):
    - appendNmeaChecksum
    - computeAlarmLevel
    - gdl90EmitterCatToNMEA
    - nmeaAircraftTypeToGdl90
    - atof32
+   - getIdTail
 
 ### High Coverage (90%+)
 - uatparse.New(): 93.9%
@@ -354,7 +372,7 @@ Created comprehensive test suite for priority queue implementation:
 
 ## Commits Made
 
-Total: 9 commits in extended session
+Total: 11 commits in extended session
 
 1. "Add comprehensive unit tests for gen_gdl90 and common packages"
 2. "Significantly improve test coverage to 90%+ in common package"
@@ -365,6 +383,8 @@ Total: 9 commits in extended session
 7. "Add tests for product name lookup and MessageQueue data structure"
 8. "Update coverage summary with extended session achievements"
 9. "Add comprehensive tests for FLARM NMEA utility functions"
+10. "Update coverage summary with FLARM NMEA test statistics"
+11. "Add comprehensive tests for getIdTail OGN ID parsing function"
 
 ## Bug Fixes During Testing
 
@@ -418,10 +438,10 @@ Total: 9 commits in extended session
 Successfully achieved major code coverage improvements:
 - **90.2% coverage** in common package (from 0%)
 - **29.7% coverage** in uatparse package (from 0%)
-- **100% coverage** for 21 utility functions (+ 5 ready for execution)
-- **2,548 lines** of new, comprehensive test code
-- **97+ test functions** with extensive edge case validation
-- **9 commits** with detailed documentation
+- **100% coverage** for 21 utility functions (+ 6 ready for execution)
+- **2,707 lines** of new, comprehensive test code
+- **99+ test functions** with extensive edge case validation
+- **11 commits** with detailed documentation
 - **2 bug fixes** discovered during testing
 
 The extended testing session demonstrated systematic improvement through:
