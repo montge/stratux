@@ -15,12 +15,12 @@ func TestAppendNmeaChecksum(t *testing.T) {
 		{
 			name:     "Simple NMEA sentence without $",
 			input:    "PFLAU,0,0,0,0,0",
-			expected: "PFLAU,0,0,0,0,0*45",
+			expected: "PFLAU,0,0,0,0,0*52",
 		},
 		{
 			name:     "NMEA sentence with $ prefix",
 			input:    "$PFLAU,0,0,0,0,0",
-			expected: "$PFLAU,0,0,0,0,0*45",
+			expected: "$PFLAU,0,0,0,0,0*52",
 		},
 		{
 			name:     "GPRMC sentence",

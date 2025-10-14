@@ -33,7 +33,7 @@ import (
 // Append checksum and to nmea string
 func appendNmeaChecksum(nmea string) string {
 	start := 0
-	if nmea[0] == '$' {
+	if len(nmea) > 0 && nmea[0] == '$' {
 		start = 1
 	}
 	checksum := byte(0x00)
