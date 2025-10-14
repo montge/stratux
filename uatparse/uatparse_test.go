@@ -467,3 +467,202 @@ func almostEqual(a, b, epsilon float64) bool {
 	}
 	return diff < epsilon
 }
+
+// TestBlockLocation tests the block_location function for NEXRAD blocks
+func TestBlockLocation(t *testing.T) {
+	tests := []struct {
+		name         string
+		block_num    int
+		ns_flag      bool
+		scale_factor int
+		expectLat    float64
+		expectLon    float64
+	}{
+		{
+			name:         "Block 0, Northern hemisphere, scale 0",
+			block_num:    0,
+			ns_flag:      false,
+			scale_factor: 0,
+			expectLat:    BLOCK_HEIGHT,
+			expectLon:    0.0,
+		},
+		{
+			name:         "Block 0, Southern hemisphere, scale 0",
+			block_num:    0,
+			ns_flag:      true,
+			scale_factor: 0,
+			expectLat:    0.0,
+			expectLon:    0.0,
+		},
+		{
+			name:         "Block 100, Northern hemisphere, scale 0",
+			block_num:    100,
+			ns_flag:      false,
+			scale_factor: 0,
+			expectLat:    BLOCK_HEIGHT, // Same row as block 0 (100 < 450)
+			expectLon:    100 * BLOCK_WIDTH,
+		},
+		{
+			name:         "Block 450, Northern hemisphere, scale 0 (new row)",
+			block_num:    450,
+			ns_flag:      false,
+			scale_factor: 0,
+			expectLat:    BLOCK_HEIGHT * 2, // Second row
+			expectLon:    0.0,
+		},
+		{
+			name:         "Block with scale_factor 1 (5x)",
+			block_num:    0,
+			ns_flag:      false,
+			scale_factor: 1,
+			expectLat:    BLOCK_HEIGHT,
+			expectLon:    0.0,
+		},
+		{
+			name:         "Block with scale_factor 2 (9x)",
+			block_num:    0,
+			ns_flag:      false,
+			scale_factor: 2,
+			expectLat:    BLOCK_HEIGHT,
+			expectLon:    0.0,
+		},
+		{
+			name:         "Block >= BLOCK_THRESHOLD (405000)",
+			block_num:    405000,
+			ns_flag:      false,
+			scale_factor: 0,
+			expectLat:    BLOCK_HEIGHT * (float64(405000) / float64(BLOCKS_PER_RING)) + BLOCK_HEIGHT,
+			expectLon:    0.0, // 405000 % 450 = 0
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lat, lon, latSize, lonSize := block_location(tt.block_num, tt.ns_flag, tt.scale_factor)
+
+			// Check latitude
+			if !almostEqual(lat, tt.expectLat, 0.001) {
+				t.Errorf("block_location() lat = %f, expected %f", lat, tt.expectLat)
+			}
+
+			// Check longitude
+			if !almostEqual(lon, tt.expectLon, 0.001) {
+				t.Errorf("block_location() lon = %f, expected %f", lon, tt.expectLon)
+			}
+
+			// Check sizes are reasonable
+			if latSize <= 0 || lonSize <= 0 {
+				t.Errorf("block_location() sizes should be positive: latSize=%f, lonSize=%f", latSize, lonSize)
+			}
+
+			// Verify scale factor affects size correctly
+			var expectedRealScale float64
+			switch tt.scale_factor {
+			case 1:
+				expectedRealScale = 5.0
+			case 2:
+				expectedRealScale = 9.0
+			default:
+				expectedRealScale = 1.0
+			}
+
+			expectedLatSize := BLOCK_HEIGHT * expectedRealScale
+			if !almostEqual(latSize, expectedLatSize, 0.001) {
+				t.Errorf("block_location() latSize = %f, expected %f", latSize, expectedLatSize)
+			}
+		})
+	}
+}
+
+// TestBlockLocationLongitudeWrapping tests longitude wrapping at 180 degrees
+func TestBlockLocationLongitudeWrapping(t *testing.T) {
+	// Block number that would result in lon > 180
+	// BLOCKS_PER_RING = 450, BLOCK_WIDTH = 48.0/60.0 = 0.8
+	// 450 * 0.8 = 360 degrees total
+	// Block 226+ should wrap: 226 * 0.8 = 180.8 -> -179.2
+
+	block_num := 230
+	lat, lon, _, _ := block_location(block_num, false, 0)
+
+	// Longitude should be wrapped to negative
+	if lon >= 180.0 {
+		t.Errorf("block_location(%d) lon = %f, should be < 180 (wrapped)", block_num, lon)
+	}
+
+	// Verify it's actually wrapped correctly
+	expectedRaw := float64(block_num%BLOCKS_PER_RING) * BLOCK_WIDTH
+	expectedWrapped := expectedRaw - 360.0
+	if !almostEqual(lon, expectedWrapped, 0.001) {
+		t.Errorf("block_location(%d) lon = %f, expected %f", block_num, lon, expectedWrapped)
+	}
+
+	_ = lat // unused in this test
+}
+
+// TestBlockLocationThresholdBehavior tests special handling for blocks >= 405000
+func TestBlockLocationThresholdBehavior(t *testing.T) {
+	// Blocks >= BLOCK_THRESHOLD have special handling (wide blocks)
+	tests := []struct {
+		name      string
+		block_num int
+	}{
+		{"Just below threshold", BLOCK_THRESHOLD - 1},
+		{"At threshold", BLOCK_THRESHOLD},
+		{"Just above threshold", BLOCK_THRESHOLD + 1},
+		{"Well above threshold", BLOCK_THRESHOLD + 1000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lat, lon, latSize, lonSize := block_location(tt.block_num, false, 0)
+
+			// Verify function doesn't crash and returns valid values
+			if lat < -90 || lat > 90 {
+				t.Errorf("block_location(%d) lat = %f, out of valid range [-90, 90]", tt.block_num, lat)
+			}
+			if lon < -180 || lon > 180 {
+				t.Errorf("block_location(%d) lon = %f, out of valid range [-180, 180]", tt.block_num, lon)
+			}
+			if latSize <= 0 || lonSize <= 0 {
+				t.Errorf("block_location(%d) invalid sizes: lat=%f, lon=%f", tt.block_num, latSize, lonSize)
+			}
+
+			// Verify wide block behavior for blocks >= threshold
+			if tt.block_num >= BLOCK_THRESHOLD {
+				expectedLonSize := WIDE_BLOCK_WIDTH * 1.0 // scale_factor 0 -> realScale 1.0
+				if !almostEqual(lonSize, expectedLonSize, 0.001) {
+					t.Errorf("block_location(%d) lonSize = %f, expected %f (wide block)", tt.block_num, lonSize, expectedLonSize)
+				}
+			}
+		})
+	}
+}
+
+// TestBlockLocationScaleFactors tests all three scale factor values
+func TestBlockLocationScaleFactors(t *testing.T) {
+	scaleTests := []struct {
+		scale_factor int
+		expectedReal float64
+	}{
+		{0, 1.0},
+		{1, 5.0},
+		{2, 9.0},
+		{3, 1.0}, // Invalid value defaults to 1.0
+	}
+
+	for _, tt := range scaleTests {
+		t.Run(string(rune('0'+tt.scale_factor)), func(t *testing.T) {
+			_, _, latSize, lonSize := block_location(0, false, tt.scale_factor)
+
+			expectedLatSize := BLOCK_HEIGHT * tt.expectedReal
+			if !almostEqual(latSize, expectedLatSize, 0.001) {
+				t.Errorf("scale_factor %d: latSize = %f, expected %f", tt.scale_factor, latSize, expectedLatSize)
+			}
+
+			expectedLonSize := BLOCK_WIDTH * tt.expectedReal
+			if !almostEqual(lonSize, expectedLonSize, 0.001) {
+				t.Errorf("scale_factor %d: lonSize = %f, expected %f", tt.scale_factor, lonSize, expectedLonSize)
+			}
+		})
+	}
+}
