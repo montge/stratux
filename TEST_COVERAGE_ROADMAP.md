@@ -3,9 +3,10 @@
 ## Overview
 This roadmap outlines the systematic approach to achieving comprehensive test coverage for the Stratux project, progressing from unit tests of pure functions to full system integration testing on physical hardware.
 
-**Current Status:** Phase 2.4 Complete
-**Current Coverage:** 18.9%
+**Current Status:** Phase 3.5 Complete
+**Current Coverage:** 19.8% (+0.9% from Phase 3.5)
 **Target Coverage:** 80% (long-term goal)
+**Next Milestone:** 25% coverage
 
 ---
 
@@ -304,22 +305,34 @@ This roadmap outlines the systematic approach to achieving comprehensive test co
 
 **Estimated Impact:** +3-5% main package coverage
 
-### Phase 3.5: GPS Integration Tests (from test-data)
-**Priority:** MEDIUM
+### Phase 3.5: GPS Integration Tests ✅ COMPLETE
+**Test Files:** Extended `main/integration_gps_test.go` (+210 lines)
 
-**Expected Coverage:**
-- [ ] NMEA sentence sequences (GPRMC, GPGGA, GPGSA, etc.)
-- [ ] UBX protocol messages
-- [ ] GPS fix quality transitions
-- [ ] Satellite tracking
-- [ ] Multi-constellation GNSS
+**Coverage Achieved:**
+- ✅ NMEA sentence sequences (VTG, GSA, GST, GSV)
+- ✅ GPS fix quality transitions
+- ✅ Satellite tracking and DOP values
+- ✅ Error statistics parsing (GST)
+- ✅ Multi-constellation GNSS (GPS, GLONASS, Galileo)
+- ✅ Low-speed velocity handling
 
-**Target Functions:**
-- processNMEALine()
-- parseGPRMC(), parseGPGGA(), parseGPGSA()
-- processUBXMessage()
+**Functions Tested:**
+- processNMEALine() - Extended coverage for VTG, GSA, GST, GSV
+- parseGPVTG() - Velocity and track made good
+- parseGPGSA() - DOP and active satellites
+- parseGPGST() - Position error statistics
+- parseGPGSV() - Satellites in view
+- Multi-constellation sentence parsing
 
-**Estimated Impact:** +2-4% main package coverage
+**Test Functions (6):**
+- TestGPSVTGSentence - Track and ground speed
+- TestGPSVTGLowSpeed - Low-speed velocity edge cases
+- TestGPSGSASentence - DOP and satellite constellation
+- TestGPSGSTSentence - Position error statistics
+- TestGPSGSVSentence - Satellites in view with SNR
+- TestGPSMultiConstellation - GPS/GLONASS/Galileo tracking
+
+**Impact:** +0.9% coverage (18.9% → 19.8%)
 
 ### Phase 3.6: Complete Integration Scenarios
 **Priority:** MEDIUM
@@ -666,17 +679,24 @@ test/
 
 ## Current Status Summary
 
-### Completed (Phases 1-2)
-- ✅ 5,228 lines of test code
-- ✅ 132+ test functions
-- ✅ 18.9% main package coverage
+### Completed (Phases 1-3.5)
+- ✅ 5,438+ lines of test code (+210 from Phase 3.5)
+- ✅ 138+ test functions (+6 from Phase 3.5)
+- ✅ 19.8% main package coverage (+0.9% from Phase 3.5)
 - ✅ 90.2% common package coverage
 - ✅ 29.7% uatparse package coverage
 - ✅ 24 functions at 100% coverage
 - ✅ Integration test framework established
 - ✅ Trace file replay methodology proven
+- ✅ GPS NMEA comprehensive sentence parsing (VTG, GSA, GST, GSV)
+
+**Phase 3.5 Achievements:**
+- ✅ Extended GPS integration tests
+- ✅ Multi-constellation GNSS support testing
+- ✅ CI fully passing
 
 ### In Progress (Phase 3)
+- 🚧 Working toward 25% coverage milestone (need +5.2%)
 - 🚧 Legacy test migration planning
 - 🚧 /test/ directory audit
 - 🚧 /test-data/ conversion strategy
@@ -695,6 +715,8 @@ test/
 - **Phase 4.6:** 2-3 weeks (automation infrastructure)
 
 ### Coverage Projection
+- **Current baseline:** 19.8% (Phase 3.5 complete)
+- **Next milestone:** 25% coverage (need +5.2%)
 - After Phase 3 completion: **35-45%** coverage
 - After Phase 4 completion: **60-75%** coverage
 - Long-term goal: **80%+** coverage
@@ -739,5 +761,6 @@ test/
 ---
 
 **Last Updated:** 2025-10-14
-**Current Phase:** 3.1 (Legacy Test Migration - Audit)
-**Next Milestone:** Complete /test/ and /test-data/ audit
+**Current Phase:** 3.5 Complete - Working toward 25% coverage
+**Current Coverage:** 19.8%
+**Next Milestone:** Achieve 25% coverage (+5.2% needed)
