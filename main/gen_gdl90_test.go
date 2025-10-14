@@ -230,6 +230,10 @@ func TestMakeLatLng(t *testing.T) {
 			if diff < 0 {
 				diff = -diff
 			}
+			// Special case: ±180° longitude are equivalent (same meridian)
+			if (tc.value == 180.0 || tc.value == -180.0) && (decoded == 180.0 || decoded == -180.0) {
+				diff = 0 // Accept ±180 equivalence
+			}
 			if diff > 0.01 { // Allow 0.01 degree error
 				t.Errorf("Roundtrip error: input=%f, encoded=0x%06X, decoded=%f, diff=%f",
 					tc.value, encoded, decoded, diff)
