@@ -512,3 +512,113 @@ func TestIsDetectedOwnshipValid(t *testing.T) {
 	t.Logf("Ownship valid (recent): %v", result1)
 	t.Logf("Ownship valid (old): %v", result2)
 }
+
+// TestGetProductNameFromId tests product ID to name mapping
+func TestGetProductNameFromId(t *testing.T) {
+	testCases := []struct {
+		name        string
+		product_id  int
+		expectedVal string
+	}{
+		{
+			name:        "METAR (ID 0)",
+			product_id:  0,
+			expectedVal: "METAR",
+		},
+		{
+			name:        "TAF (ID 1)",
+			product_id:  1,
+			expectedVal: "TAF",
+		},
+		{
+			name:        "NEXRAD Regional (ID 63)",
+			product_id:  63,
+			expectedVal: "NEXRAD Regional",
+		},
+		{
+			name:        "NEXRAD CONUS (ID 64)",
+			product_id:  64,
+			expectedVal: "NEXRAD CONUS",
+		},
+		{
+			name:        "Text (ID 413)",
+			product_id:  413,
+			expectedVal: "Text",
+		},
+		{
+			name:        "Custom/Test (ID 600)",
+			product_id:  600,
+			expectedVal: "Custom/Test",
+		},
+		{
+			name:        "Custom/Test range (ID 2000)",
+			product_id:  2000,
+			expectedVal: "Custom/Test",
+		},
+		{
+			name:        "Custom/Test range (ID 2005)",
+			product_id:  2005,
+			expectedVal: "Custom/Test",
+		},
+		{
+			name:        "Unknown ID (999)",
+			product_id:  999,
+			expectedVal: "Unknown (999)",
+		},
+		{
+			name:        "Unknown ID (1234)",
+			product_id:  1234,
+			expectedVal: "Unknown (1234)",
+		},
+		{
+			name:        "Lightning (ID 101)",
+			product_id:  101,
+			expectedVal: "Lightning",
+		},
+		{
+			name:        "G-AIRMET (ID 254)",
+			product_id:  254,
+			expectedVal: "G-AIRMET",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := getProductNameFromId(tc.product_id)
+			if result != tc.expectedVal {
+				t.Errorf("getProductNameFromId(%d) = %q, expected %q",
+					tc.product_id, result, tc.expectedVal)
+			}
+			t.Logf("Product ID %d -> %q", tc.product_id, result)
+		})
+	}
+}
+
+// TestGetProductNameFromIdEdgeCases tests edge cases for product name lookup
+func TestGetProductNameFromIdEdgeCases(t *testing.T) {
+	// Test all products in the custom/test range
+	for id := 2000; id <= 2005; id++ {
+		result := getProductNameFromId(id)
+		if result != "Custom/Test" {
+			t.Errorf("getProductNameFromId(%d) = %q, expected \"Custom/Test\"", id, result)
+		}
+	}
+
+	// Test boundary around custom range
+	if getProductNameFromId(1999) == "Custom/Test" {
+		t.Error("ID 1999 should not be Custom/Test")
+	}
+	if getProductNameFromId(2006) == "Custom/Test" {
+		t.Error("ID 2006 should not be Custom/Test")
+	}
+
+	// Test that unknown IDs format correctly
+	unknownTests := []int{-1, 10000, 9999}
+	for _, id := range unknownTests {
+		result := getProductNameFromId(id)
+		expectedPrefix := "Unknown ("
+		if len(result) < len(expectedPrefix) || result[:len(expectedPrefix)] != expectedPrefix {
+			t.Errorf("getProductNameFromId(%d) = %q, should start with %q", id, result, expectedPrefix)
+		}
+	}
+}
