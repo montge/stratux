@@ -1799,10 +1799,12 @@ func TestIsOwnshipTrafficInfo_OGNTrackerWithValidGPS(t *testing.T) {
 	origOwnship := globalSettings.OwnshipModeS
 	origOGNAddr := globalSettings.OGNAddr
 	origGPSType := globalStatus.GPS_detected_type
+	origGPSConnected := globalStatus.GPS_connected
 	defer func() {
 		globalSettings.OwnshipModeS = origOwnship
 		globalSettings.OGNAddr = origOGNAddr
 		globalStatus.GPS_detected_type = origGPSType
+		globalStatus.GPS_connected = origGPSConnected
 	}()
 
 	// Setup OGN tracker configuration
@@ -1814,9 +1816,23 @@ func TestIsOwnshipTrafficInfo_OGNTrackerWithValidGPS(t *testing.T) {
 		stratuxClock = NewMonotonic()
 		time.Sleep(10 * time.Millisecond)
 	}
+
+	// Initialize mutex if needed
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+
+	// Reset GPS state completely to avoid interference from other tests
+	mySituation.muGPS.Lock()
 	mySituation.GPSLatitude = 43.99
 	mySituation.GPSLongitude = -88.56
+	mySituation.GPSAltitudeMSL = 5000
 	mySituation.GPSFixQuality = 2
+	mySituation.GPSHorizontalAccuracy = 5
+	mySituation.GPSGroundSpeed = 0
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Must be recent for isGPSValid()
+	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
 
 	// Test traffic matching OGN address
