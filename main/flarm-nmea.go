@@ -529,6 +529,10 @@ func getIdTail(idReceived string) (idStr string, tail string, address uint32) {
 		tail = ""
 	}
 
+	// Pad hex string with leading 0 if odd length (hex.DecodeString needs even length)
+	if len(idStr)%2 != 0 {
+		idStr = "0" + idStr
+	}
 	addressBytes, _ := hex.DecodeString(idStr)
 	// Pad to exactly 4 bytes by prepending zeros
 	for len(addressBytes) < 4 {
