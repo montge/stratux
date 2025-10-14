@@ -316,16 +316,18 @@ Created comprehensive test suite for priority queue implementation:
 - **UATparse package**: 670 lines (uatparse_test.go) - extended from 471
 - **Main package**: 533 lines (messagequeue_test.go) - new
 - **Main package**: 672 lines (flarm-nmea_test.go) - new (extended from 513)
+- **Main package**: 414 lines (gps_test.go) - new
+- **Main package**: 429 lines (datalog_test.go) - new
 - **Main package**: 110 lines added to gen_gdl90_test.go
 - **Traffic tests**: 7 additional test functions in traffic_test.go
-- **Total new test code**: ~2,707 lines
+- **Total new test code**: ~3,550 lines
 
 ### Test Functions Added
 - Common package: 45+ test functions
 - UATparse package: 17 test functions (13 original + 4 NEXRAD)
-- Main package: 30+ test functions (MessageQueue + product name + FLARM + OGN ID)
+- Main package: 47+ test functions (MessageQueue + product name + FLARM + OGN ID + GPS + datalog)
 - Traffic package: 7 targeted edge case tests
-- **Total: 99+ test functions**
+- **Total: 116+ test functions**
 
 ### Coverage Achievements
 - **Common package**: 0% → 90.2% ✅
@@ -357,13 +359,30 @@ Created comprehensive test suite for priority queue implementation:
 3. Main package (1 function):
    - getProductNameFromId
 
-4. Main package - FLARM (6 functions, ready but not yet executable):
+4. Main package - FLARM/OGN (6 functions, ready but not yet executable):
    - appendNmeaChecksum
    - computeAlarmLevel
    - gdl90EmitterCatToNMEA
    - nmeaAircraftTypeToGdl90
    - atof32
    - getIdTail
+
+5. Main package - GPS (5 functions, ready but not yet executable):
+   - chksumUBX
+   - makeUBXCFG
+   - makeNMEACmd
+   - validateNMEAChecksum
+   - calculateNACp
+
+6. Main package - Datalog (8 functions, ready but not yet executable):
+   - boolMarshal
+   - intMarshal
+   - uintMarshal
+   - floatMarshal
+   - stringMarshal
+   - notsupportedMarshal
+   - structCanBeMarshalled
+   - structMarshal
 
 ### High Coverage (90%+)
 - uatparse.New(): 93.9%
@@ -372,7 +391,7 @@ Created comprehensive test suite for priority queue implementation:
 
 ## Commits Made
 
-Total: 11 commits in extended session
+Total: 16 commits in extended session
 
 1. "Add comprehensive unit tests for gen_gdl90 and common packages"
 2. "Significantly improve test coverage to 90%+ in common package"
@@ -385,6 +404,11 @@ Total: 11 commits in extended session
 9. "Add comprehensive tests for FLARM NMEA utility functions"
 10. "Update coverage summary with FLARM NMEA test statistics"
 11. "Add comprehensive tests for getIdTail OGN ID parsing function"
+12. "Update coverage summary with getIdTail test statistics"
+13. "Add Session 3 summary and testing exhaustion analysis"
+14. "Add comprehensive tests for GPS utility functions" (414 lines)
+15. "Add comprehensive tests for datalog marshal functions" (429 lines)
+16. (pending) "Update coverage summary with GPS and datalog tests"
 
 ## Bug Fixes During Testing
 
@@ -438,11 +462,16 @@ Total: 11 commits in extended session
 Successfully achieved major code coverage improvements:
 - **90.2% coverage** in common package (from 0%)
 - **29.7% coverage** in uatparse package (from 0%)
-- **100% coverage** for 21 utility functions (+ 6 ready for execution)
-- **2,707 lines** of new, comprehensive test code
-- **99+ test functions** with extensive edge case validation
-- **11 commits** with detailed documentation
+- **100% coverage** for 21 utility functions (+ 19 ready for execution)
+- **3,550 lines** of new, comprehensive test code
+- **116+ test functions** with extensive edge case validation
+- **16 commits** with detailed documentation
 - **2 bug fixes** discovered during testing
+
+**Functions with Tests Ready (blocked by C dependencies):**
+- 6 FLARM/OGN functions (NMEA, alarm levels, type conversion, ID parsing)
+- 5 GPS functions (UBX/NMEA checksums, message construction, validation, NACp)
+- 8 Datalog functions (SQL marshalling via reflection)
 
 The extended testing session demonstrated systematic improvement through:
 1. ✅ Prioritizing testable, pure functions
@@ -457,9 +486,9 @@ All tests pass and provide a solid foundation for maintaining code quality. The 
 
 ## Current Session Achievements
 
-### Session 3 Continuation Work
+### Session 3 Continuation Work (Part 1)
 
-This session focused on extending FLARM NMEA test coverage with OGN ID parsing functionality.
+This session initially focused on extending FLARM NMEA test coverage with OGN ID parsing functionality.
 
 #### Tests Added:
 1. **getIdTail() Function Tests** (flarm-nmea_test.go)
@@ -508,3 +537,96 @@ Future coverage improvements would require:
 - Mock frameworks for hardware/network I/O
 - Integration test environment with CGO support
 - Test fixtures for complex protocol decoding (complete GDL90/UAT messages)
+
+### Session 3 Continuation Work (Part 2)
+
+After the initial testing exhaustion analysis, continued deeper search and found
+additional pure utility functions in GPS and datalog modules.
+
+#### Tests Added:
+
+1. **GPS Utility Functions** (main/gps_test.go - 414 lines)
+   - **TestChksumUBX** (7 test cases)
+     - UBX protocol Fletcher-like checksum calculation
+     - Empty message, single/multiple bytes
+     - Known good checksums, edge cases (all zeros/ones, max bytes)
+
+   - **TestMakeUBXCFG** (3 test cases)
+     - UBX message construction with sync chars (0xB5 0x62)
+     - Empty/small/large payloads (>255 bytes)
+     - Little-endian length encoding
+     - Checksum integration validation
+
+   - **TestMakeNMEACmd** (3 test cases)
+     - NMEA command construction with XOR checksum
+     - $...* framing, \r\n suffix
+     - 2-digit hex checksum format
+
+   - **TestValidateNMEAChecksum** (9 test cases)
+     - Valid GPRMC, GPGGA sentences
+     - Invalid checksum detection
+     - Missing delimiters ($, *)
+     - Truncated/invalid checksums
+
+   - **TestCalculateNACp** (14 test cases)
+     - Navigation Accuracy Category (NACp) calculation
+     - All 7 NACp levels (0, 6-11)
+     - Thresholds: 3m, 10m, 30m, 92.6m, 185.2m, 555.6m
+
+   - **TestCalculateNACpBoundaries** (18 test cases)
+     - Precise boundary testing (±0.01m around each threshold)
+     - Verifies < vs <= behavior
+
+   **Functions Tested:**
+   - chksumUBX() - UBX checksum calculation
+   - makeUBXCFG() - UBX message construction
+   - makeNMEACmd() - NMEA command construction
+   - validateNMEAChecksum() - NMEA validation
+   - calculateNACp() - GPS accuracy category calculation
+
+2. **Datalog Marshal Functions** (main/datalog_test.go - 429 lines)
+   - **TestBoolMarshal** (2 test cases)
+     - Boolean to SQL INTEGER: true="1", false="0"
+
+   - **TestIntMarshal** (9 test cases)
+     - All signed integer types (int, int8, int16, int32, int64)
+     - Positive/negative/zero, max values (±2^31, 2^63-1)
+
+   - **TestUintMarshal** (7 test cases)
+     - All unsigned integer types (uint, uint8, uint16, uint32, uint64)
+     - Max values (255, 65535, 2^64-1)
+
+   - **TestFloatMarshal** (6 test cases)
+     - float32, float64 with 10 decimal precision
+     - Positive/negative, zero, scientific notation
+
+   - **TestStringMarshal** (5 test cases)
+     - String passthrough, special characters, newlines
+
+   - **TestNotsupportedMarshal** (2 test cases)
+     - Complex numbers, nil pointers -> empty string
+
+   - **TestStructCanBeMarshalled** (3 test cases)
+     - Reflection method detection for String()
+     - Struct with/without String() method
+
+   - **TestStructMarshal** (4 test cases)
+     - Calls String() method if available
+     - Empty return for non-marshallable structs
+
+   - **TestMarshalFunctionsIntegration** (5 test cases)
+     - End-to-end validation of marshal pipeline
+
+   **Functions Tested:**
+   - boolMarshal() - Boolean to SQL
+   - intMarshal() - Integer to SQL
+   - uintMarshal() - Unsigned integer to SQL
+   - floatMarshal() - Float to SQL
+   - stringMarshal() - String to SQL
+   - notsupportedMarshal() - Unsupported types
+   - structCanBeMarshalled() - Reflection check
+   - structMarshal() - Struct to SQL via String()
+
+#### Session 3 Part 2 Commits:
+1. "Add comprehensive tests for GPS utility functions" (414 lines)
+2. "Add comprehensive tests for datalog marshal functions" (429 lines)
