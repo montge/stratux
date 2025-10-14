@@ -487,8 +487,8 @@ func TestComputeAlarmLevelBoundaries(t *testing.T) {
 	}{
 		// Level 3 boundaries (< 926m && < ±152m)
 		{"Level 3: max dist", 925, 151, 3},
-		{"Level 3: exceeds dist", 926, 151, 2},  // Just at boundary, should be level 2
-		{"Level 3: max vert", 925, 152, 2},      // Just at boundary vertical, still level 2
+		{"Level 3: exceeds dist", 926, 151, 2}, // Just at boundary, should be level 2
+		{"Level 3: max vert", 925, 152, 2},     // Just at boundary vertical, still level 2
 		{"Level 3: min vert", 925, -151, 3},
 		{"Level 3: exceeds min vert", 925, -152, 2}, // Still within level 2 threshold
 

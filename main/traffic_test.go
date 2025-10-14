@@ -1853,7 +1853,7 @@ func TestIsOwnshipTrafficInfo_NoAltitudeVerification(t *testing.T) {
 	// Setup GPS but with NO altitude verification possible
 	mySituation.GPSLatitude = 43.99
 	mySituation.GPSLongitude = -88.56
-	mySituation.GPSHeightAboveEllipsoid = 0 // Invalid
+	mySituation.GPSHeightAboveEllipsoid = 0  // Invalid
 	mySituation.BaroPressureAltitude = 99999 // Invalid
 	mySituation.GPSHorizontalAccuracy = 5
 	mySituation.GPSGroundSpeed = 0
@@ -1867,7 +1867,7 @@ func TestIsOwnshipTrafficInfo_NoAltitudeVerification(t *testing.T) {
 		Position_valid: true,
 		Lat:            43.99,
 		Lng:            -88.56,
-		Alt:            0,      // Zero altitude means can't verify
+		Alt:            0, // Zero altitude means can't verify
 		AltIsGNSS:      false,
 		Age:            1.0,
 	}
@@ -1892,8 +1892,8 @@ func TestMakeTrafficReportMsg_GNSSAltitudeConversion(t *testing.T) {
 		Icao_addr: 0xABCDEF,
 		Lat:       43.99,
 		Lng:       -88.56,
-		Alt:       5300,   // GNSS altitude
-		AltIsGNSS: true,   // This is GNSS altitude, needs conversion
+		Alt:       5300, // GNSS altitude
+		AltIsGNSS: true, // This is GNSS altitude, needs conversion
 		Speed:     120,
 		Track:     90.0,
 	}
@@ -1915,8 +1915,8 @@ func TestMakeTrafficReportMsg_OutOfBoundsAltitude(t *testing.T) {
 		name string
 		alt  int32
 	}{
-		{"Below minimum", -2000},    // Below -1000 ft
-		{"Above maximum", 105000},   // Above 101350 ft
+		{"Below minimum", -2000},  // Below -1000 ft
+		{"Above maximum", 105000}, // Above 101350 ft
 	}
 
 	for _, tc := range testCases {
