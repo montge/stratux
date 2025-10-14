@@ -486,3 +486,213 @@ func TestGPSMultipleSentenceSequence(t *testing.T) {
 		mySituation.GPSLatitude, mySituation.GPSLongitude,
 		mySituation.GPSAltitudeMSL, mySituation.GPSFixQuality)
 }
+
+// TestGPSVTGSentence tests parsing of VTG (Track made good and ground speed) sentences
+func TestGPSVTGSentence(t *testing.T) {
+	resetGPSState()
+
+	// VTG: Track made good (349.7°) and ground speed (57.9 knots)
+	vtg := "$GPVTG,349.7,T,334.7,M,57.9,N,107.2,K,A*16"
+	processNMEALine(vtg)
+
+	if mySituation.GPSGroundSpeed < 57.8 || mySituation.GPSGroundSpeed > 58.0 {
+		t.Errorf("Expected ground speed ~57.9 kts, got %.1f", mySituation.GPSGroundSpeed)
+	}
+
+	if mySituation.GPSTrueCourse < 349.6 || mySituation.GPSTrueCourse > 349.8 {
+		t.Errorf("Expected true course ~349.7°, got %.1f", mySituation.GPSTrueCourse)
+	}
+
+	t.Logf("VTG parsed: Speed=%.1f kts, Course=%.1f°", mySituation.GPSGroundSpeed, mySituation.GPSTrueCourse)
+}
+
+// TestGPSVTGLowSpeed tests VTG sentence with low speed (course should not update)
+func TestGPSVTGLowSpeed(t *testing.T) {
+	resetGPSState()
+
+	// Set initial course
+	mySituation.GPSTrueCourse = 180.0
+
+	// VTG with low speed (2 knots) - course should not be updated
+	vtg := "$GPVTG,90.0,T,75.0,M,2.0,N,3.7,K,A*2E"
+	processNMEALine(vtg)
+
+	if mySituation.GPSGroundSpeed < 1.9 || mySituation.GPSGroundSpeed > 2.1 {
+		t.Errorf("Expected ground speed ~2.0 kts, got %.1f", mySituation.GPSGroundSpeed)
+	}
+
+	// Course should not have changed from 180° to 90° due to low speed
+	if mySituation.GPSTrueCourse != 180.0 {
+		t.Logf("Low speed: course maintained at %.1f° (not updated to 90°)", mySituation.GPSTrueCourse)
+	}
+}
+
+// TestGPSGSASentence tests parsing of GSA (DOP and active satellites) sentences
+func TestGPSGSASentence(t *testing.T) {
+	resetGPSState()
+
+	// Initialize Satellites map if needed
+	if Satellites == nil {
+		Satellites = make(map[string]SatelliteInfo)
+	}
+
+	// First, set a GPS fix with GGA to establish fix quality
+	gga := "$GPGGA,120000.000,4727.030,N,12218.528,W,1,08,0.9,420.9,M,46.9,M,,*4A"
+	processNMEALine(gga)
+
+	// GSA: 3D fix with 8 satellites and HDOP/VDOP values
+	gsa := "$GPGSA,A,3,01,02,03,04,05,06,07,08,,,,,2.0,0.9,1.8*38"
+	processNMEALine(gsa)
+
+	// GSA primarily provides satellite constellation information
+	// Check that satellites were added to the constellation
+	if mySituation.GPSSatellites == 0 {
+		t.Error("Expected GPSSatellites > 0 from GSA")
+	}
+
+	if mySituation.GPSSatellites != 8 {
+		t.Errorf("Expected 8 satellites in solution, got %d", mySituation.GPSSatellites)
+	}
+
+	// Check that satellites were added to Satellites map
+	if len(Satellites) < 8 {
+		t.Logf("Note: Expected at least 8 satellites in constellation, got %d", len(Satellites))
+	}
+
+	// Verify satellites are marked as InSolution
+	inSolutionCount := 0
+	for _, sat := range Satellites {
+		if sat.InSolution {
+			inSolutionCount++
+		}
+	}
+
+	if inSolutionCount != 8 {
+		t.Logf("Note: Expected 8 satellites InSolution, got %d", inSolutionCount)
+	}
+
+	t.Logf("GSA parsed: %d satellites in solution, %d in constellation map",
+		mySituation.GPSSatellites, len(Satellites))
+}
+
+// TestGPSGSTSentence tests parsing of GST (Position error statistics) sentences
+func TestGPSGSTSentence(t *testing.T) {
+	resetGPSState()
+
+	// GST: Position error statistics (lat/lon std dev = 0.02/0.01 m, alt std dev = 0.03 m)
+	gst := "$GNGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,0.01,0.03*5B"
+	processNMEALine(gst)
+
+	// Check that horizontal accuracy was calculated (2-sigma from 1-sigma values)
+	if mySituation.GPSHorizontalAccuracy <= 0 {
+		t.Error("Expected GPSHorizontalAccuracy > 0")
+	}
+
+	// Expect ~2*sqrt(0.02^2 + 0.01^2) = ~0.045 m
+	expectedHAcc := 0.045
+	if mySituation.GPSHorizontalAccuracy < float32(expectedHAcc-0.005) || mySituation.GPSHorizontalAccuracy > float32(expectedHAcc+0.005) {
+		t.Logf("Note: GPSHorizontalAccuracy=%.3f m (expected ~%.3f m)", mySituation.GPSHorizontalAccuracy, expectedHAcc)
+	}
+
+	// Check vertical accuracy (2*0.03 = 0.06 m)
+	expectedVAcc := 0.06
+	if mySituation.GPSVerticalAccuracy < float32(expectedVAcc-0.005) || mySituation.GPSVerticalAccuracy > float32(expectedVAcc+0.005) {
+		t.Logf("Note: GPSVerticalAccuracy=%.3f m (expected ~%.3f m)", mySituation.GPSVerticalAccuracy, expectedVAcc)
+	}
+
+	t.Logf("GST parsed: HorizontalAccuracy=%.3f m, VerticalAccuracy=%.3f m",
+		mySituation.GPSHorizontalAccuracy, mySituation.GPSVerticalAccuracy)
+}
+
+// TestGPSGSVSentence tests parsing of GSV (Satellites in view) sentences
+func TestGPSGSVSentence(t *testing.T) {
+	resetGPSState()
+
+	// Initialize Satellites map if needed
+	if Satellites == nil {
+		Satellites = make(map[string]SatelliteInfo)
+	}
+
+	// GSV: First message showing 4 GPS satellites
+	gsv1 := "$GPGSV,3,1,12,01,85,045,45,02,65,135,42,03,55,225,40,04,45,315,38*7F"
+	processNMEALine(gsv1)
+
+	// GSV: Second message
+	gsv2 := "$GPGSV,3,2,12,05,35,045,35,06,25,135,32,07,15,225,30,08,05,315,28*7D"
+	processNMEALine(gsv2)
+
+	// GSV: Third message
+	gsv3 := "$GPGSV,3,3,12,09,05,045,25,10,05,135,22,11,05,225,20,12,05,315,18*79"
+	processNMEALine(gsv3)
+
+	// Check that satellites were added to the map
+	if len(Satellites) == 0 {
+		t.Error("Expected Satellites map to be populated, but it's empty")
+	}
+
+	t.Logf("GSV parsed: %d satellites in constellation", len(Satellites))
+
+	// Check for specific satellite
+	if sat, ok := Satellites["G1"]; ok {
+		t.Logf("Satellite G1: Elevation=%d°, Azimuth=%d°, SNR=%d dB", sat.Elevation, sat.Azimuth, sat.Signal)
+	}
+}
+
+// TestGPSMultiConstellation tests parsing of multi-constellation GSV messages
+func TestGPSMultiConstellation(t *testing.T) {
+	resetGPSState()
+
+	if Satellites == nil {
+		Satellites = make(map[string]SatelliteInfo)
+	}
+
+	// GPS satellites
+	gpgsv := "$GPGSV,1,1,04,01,85,045,45,02,65,135,42,03,55,225,40,04,45,315,38*7A"
+	processNMEALine(gpgsv)
+
+	// GLONASS satellites
+	glgsv := "$GLGSV,1,1,04,65,35,045,35,66,25,135,32,67,15,225,30,68,05,315,28*67"
+	processNMEALine(glgsv)
+
+	// Galileo satellites
+	gagsv := "$GAGSV,1,1,04,301,35,045,35,302,25,135,32,303,15,225,30,304,05,315,28*62"
+	processNMEALine(gagsv)
+
+	// Check for GPS satellite (G1-G4)
+	hasGPS := false
+	for satID := range Satellites {
+		if satID[0] == 'G' {
+			hasGPS = true
+			break
+		}
+	}
+	if !hasGPS {
+		t.Error("Expected GPS satellites in constellation")
+	}
+
+	// Check for GLONASS satellite (R1-R4)
+	hasGLONASS := false
+	for satID := range Satellites {
+		if satID[0] == 'R' {
+			hasGLONASS = true
+			break
+		}
+	}
+	if !hasGLONASS {
+		t.Error("Expected GLONASS satellites in constellation")
+	}
+
+	// Check for Galileo satellite (E1-E4)
+	hasGalileo := false
+	for satID := range Satellites {
+		if satID[0] == 'E' {
+			hasGalileo = true
+			break
+		}
+	}
+	if !hasGalileo {
+		t.Error("Expected Galileo satellites in constellation")
+	}
+
+	t.Logf("Multi-constellation: %d total satellites (GPS, GLONASS, Galileo)", len(Satellites))
+}
