@@ -166,6 +166,66 @@ UATparse utility functions:
 
 ### Additional Tests Added (Session Continuation)
 
+#### 7. Main Package - FLARM NMEA Utilities
+**New Test File: main/flarm-nmea_test.go (513 lines)**
+
+Created comprehensive test suite for FLARM NMEA sentence generation and parsing:
+
+- **TestAppendNmeaChecksum** (6 test cases)
+  - NMEA checksum calculation (XOR-based)
+  - Tests with/without $ prefix
+  - Various sentence types (PFLAU, GPRMC, GPGGA)
+  - Edge cases: empty string, $ only
+
+- **TestAppendNmeaChecksumFormat**
+  - Validates checksum format (*XX, uppercase hex)
+  - Ensures consistent formatting across all inputs
+
+- **TestComputeAlarmLevel** (11 test cases)
+  - FLARM collision alarm level calculation
+  - Level 3 boundaries: < 0.5 NM (926m), < 500 ft (152m)
+  - Level 2 boundaries: < 1 NM (1852m), < 1000 ft (304m)
+  - Positive/negative vertical separation
+  - Zero distance edge case
+
+- **TestGdl90EmitterCatToNMEA** (16 test cases)
+  - GDL90 to NMEA aircraft type conversion
+  - All emitter categories (0-19)
+  - Aircraft types: glider, helicopter, jet, balloon, UAV, etc.
+  - Unknown type handling
+
+- **TestNmeaAircraftTypeToGdl90** (17 test cases)
+  - Reverse conversion: NMEA to GDL90
+  - All NMEA aircraft types (0-9, A-F)
+  - Case-insensitive hex handling
+  - Invalid type handling
+
+- **TestAtof32** (8 test cases)
+  - String to float32 conversion
+  - Integer and decimal parsing
+  - Scientific notation support
+  - Error handling for invalid inputs
+
+- **TestAtof32InvalidInputs** (5 test cases)
+  - Empty strings, malformed numbers
+  - Special values: NaN, Infinity
+
+- **TestComputeAlarmLevelBoundaries** (10 test cases)
+  - Precise boundary testing
+  - Verifies < vs <= behavior at thresholds
+  - Tests both horizontal and vertical limits
+
+**Functions Tested:**
+- `appendNmeaChecksum()` (flarm-nmea.go:34)
+- `computeAlarmLevel()` (flarm-nmea.go:87)
+- `gdl90EmitterCatToNMEA()` (flarm-nmea.go:111)
+- `nmeaAircraftTypeToGdl90()` (flarm-nmea.go:138)
+- `atof32()` (flarm-nmea.go:486)
+
+**Note:** Tests are syntactically correct and ready but cannot execute due to C library dependencies in the main package. Expected to achieve 100% coverage for all 5 pure utility functions when executable.
+
+### Additional Tests Added (Session Continuation)
+
 #### 4. UATparse Package - NEXRAD Functions
 **Coverage Improvement: 24.8% → 29.7% (+4.9%)**
 
@@ -238,16 +298,17 @@ Created comprehensive test suite for priority queue implementation:
 - **Common package**: 715 lines (helpers_test.go)
 - **UATparse package**: 670 lines (uatparse_test.go) - extended from 471
 - **Main package**: 533 lines (messagequeue_test.go) - new
+- **Main package**: 513 lines (flarm-nmea_test.go) - new
 - **Main package**: 110 lines added to gen_gdl90_test.go
 - **Traffic tests**: 7 additional test functions in traffic_test.go
-- **Total new test code**: ~2,035 lines
+- **Total new test code**: ~2,548 lines
 
 ### Test Functions Added
 - Common package: 45+ test functions
 - UATparse package: 17 test functions (13 original + 4 NEXRAD)
-- Main package: 18+ test functions (MessageQueue + product name)
+- Main package: 28+ test functions (MessageQueue + product name + FLARM)
 - Traffic package: 7 targeted edge case tests
-- **Total: 87+ test functions**
+- **Total: 97+ test functions**
 
 ### Coverage Achievements
 - **Common package**: 0% → 90.2% ✅
@@ -279,6 +340,13 @@ Created comprehensive test suite for priority queue implementation:
 3. Main package (1 function):
    - getProductNameFromId
 
+4. Main package - FLARM (5 functions, ready but not yet executable):
+   - appendNmeaChecksum
+   - computeAlarmLevel
+   - gdl90EmitterCatToNMEA
+   - nmeaAircraftTypeToGdl90
+   - atof32
+
 ### High Coverage (90%+)
 - uatparse.New(): 93.9%
 - uatparse.GetTextReports(): 90.0%
@@ -286,7 +354,7 @@ Created comprehensive test suite for priority queue implementation:
 
 ## Commits Made
 
-Total: 7 commits in extended session
+Total: 9 commits in extended session
 
 1. "Add comprehensive unit tests for gen_gdl90 and common packages"
 2. "Significantly improve test coverage to 90%+ in common package"
@@ -295,6 +363,8 @@ Total: 7 commits in extended session
 5. "Add comprehensive coverage improvement summary"
 6. "Add comprehensive tests for NEXRAD block_location function"
 7. "Add tests for product name lookup and MessageQueue data structure"
+8. "Update coverage summary with extended session achievements"
+9. "Add comprehensive tests for FLARM NMEA utility functions"
 
 ## Bug Fixes During Testing
 
@@ -348,10 +418,10 @@ Total: 7 commits in extended session
 Successfully achieved major code coverage improvements:
 - **90.2% coverage** in common package (from 0%)
 - **29.7% coverage** in uatparse package (from 0%)
-- **100% coverage** for 21 utility functions across packages
-- **2,035 lines** of new, comprehensive test code
-- **87+ test functions** with extensive edge case validation
-- **7 commits** with detailed documentation
+- **100% coverage** for 21 utility functions (+ 5 ready for execution)
+- **2,548 lines** of new, comprehensive test code
+- **97+ test functions** with extensive edge case validation
+- **9 commits** with detailed documentation
 - **2 bug fixes** discovered during testing
 
 The extended testing session demonstrated systematic improvement through:
