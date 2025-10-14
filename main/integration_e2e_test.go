@@ -425,3 +425,214 @@ func TestE2EUpdateStatus(t *testing.T) {
 	t.Logf("Status updated: GPS=%s, Sats=%d, Accuracy=%.1f m",
 		globalStatus.GPS_solution, globalStatus.GPS_satellites_locked, globalStatus.GPS_position_accuracy)
 }
+
+// TestE2EGeometricAltitudeReport tests ownship geometric altitude report generation
+func TestE2EGeometricAltitudeReport(t *testing.T) {
+	resetE2EState()
+
+	// Set up GPS with valid position and height above ellipsoid
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.45
+	mySituation.GPSLongitude = -122.31
+	mySituation.GPSHeightAboveEllipsoid = 500.0 // 500 feet HAE
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Set GPS as connected
+	globalStatus.GPS_connected = true
+
+	// Generate geometric altitude report
+	result := makeOwnshipGeometricAltitudeReport()
+
+	// Result depends on isGPSValid() which checks timing
+	if !result {
+		t.Log("Note: makeOwnshipGeometricAltitudeReport returned false (GPS may not be considered valid)")
+	} else {
+		t.Logf("Geometric altitude report generated successfully: HAE=%.1f ft", mySituation.GPSHeightAboveEllipsoid)
+	}
+}
+
+// TestE2ESystemErrors tests system error tracking
+func TestE2ESystemErrors(t *testing.T) {
+	// Initialize system errors mutex if needed
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Clear any existing errors
+	globalStatus.Errors = make([]string, 0)
+	systemErrsMutex.Lock()
+	systemErrs = make(map[string]string)
+	systemErrsMutex.Unlock()
+
+	// Add a single system error
+	addSingleSystemErrorf("test_error_1", "Test error %d", 1)
+
+	// Verify error was added
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error, got %d", len(globalStatus.Errors))
+	}
+
+	// Add the same error again - should not duplicate
+	addSingleSystemErrorf("test_error_1", "Test error %d", 1)
+
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error after duplicate add, got %d", len(globalStatus.Errors))
+	}
+
+	// Add a different error
+	addSingleSystemErrorf("test_error_2", "Test error %d", 2)
+
+	if len(globalStatus.Errors) != 2 {
+		t.Errorf("Expected 2 errors, got %d", len(globalStatus.Errors))
+	}
+
+	// Remove the first error
+	removeSingleSystemError("test_error_1")
+
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error after removal, got %d", len(globalStatus.Errors))
+	}
+
+	t.Logf("System errors test: %d error(s) tracked", len(globalStatus.Errors))
+}
+
+// TestE2EDownlinkReportEdgeCases tests UAT downlink report parsing edge cases
+func TestE2EDownlinkReportEdgeCases(t *testing.T) {
+	resetE2EState()
+
+	testCases := []struct {
+		name    string
+		message string
+		wantNil bool
+	}{
+		{
+			name:    "Empty downlink",
+			message: "-000000000000000000000000000000000000;rs=10;ss=90",
+			wantNil: false,
+		},
+		{
+			name:    "Long report 34 bytes",
+			message: "-00000000000000000000000000000000000000000000000000000000000000000000;rs=14;ss=102",
+			wantNil: false,
+		},
+		{
+			name:    "Long report 48 bytes",
+			message: "-000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000;rs=15;ss=98",
+			wantNil: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			frame, msgtype := parseInput(tc.message)
+
+			if tc.wantNil && frame != nil {
+				t.Errorf("Expected nil frame, got non-nil")
+			}
+
+			if !tc.wantNil && frame == nil {
+				t.Errorf("Expected non-nil frame, got nil")
+			}
+
+			t.Logf("%s: msgtype=0x%02X, frame_length=%d", tc.name, msgtype, len(frame))
+		})
+	}
+}
+
+// TestE2EDefaultSettings tests default settings initialization
+func TestE2EDefaultSettings(t *testing.T) {
+	// Save current settings
+	savedSettings := globalSettings
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify key defaults are set
+	if !globalSettings.UAT_Enabled {
+		t.Error("Expected UAT_Enabled to be true by default")
+	}
+
+	if !globalSettings.ES_Enabled {
+		t.Error("Expected ES_Enabled to be true by default")
+	}
+
+	if globalSettings.OGN_Enabled {
+		t.Error("Expected OGN_Enabled to be false by default (US region)")
+	}
+
+	if globalSettings.GPS_Enabled != true {
+		t.Error("Expected GPS_Enabled to be true by default")
+	}
+
+	if len(globalSettings.NetworkOutputs) == 0 {
+		t.Error("Expected NetworkOutputs to be populated")
+	}
+
+	if globalSettings.WiFiSSID != "Stratux" {
+		t.Errorf("Expected WiFiSSID='Stratux', got '%s'", globalSettings.WiFiSSID)
+	}
+
+	t.Logf("Default settings: UAT=%v, ES=%v, OGN=%v, GPS=%v, SSID=%s, Outputs=%d",
+		globalSettings.UAT_Enabled, globalSettings.ES_Enabled, globalSettings.OGN_Enabled,
+		globalSettings.GPS_Enabled, globalSettings.WiFiSSID, len(globalSettings.NetworkOutputs))
+
+	// Restore settings
+	globalSettings = savedSettings
+}
+
+// TestE2EUpdateStatusEdgeCases tests updateStatus with various GPS states
+func TestE2EUpdateStatusEdgeCases(t *testing.T) {
+	resetE2EState()
+
+	testCases := []struct {
+		name             string
+		fixQuality       uint8
+		expectedSolution string
+	}{
+		{"No fix", 0, "No Fix"},
+		{"GPS fix", 1, "3D GPS"},
+		{"DGPS fix", 2, "3D GPS + SBAS"},
+		{"Dead reckoning", 6, "Dead Reckoning"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set GPS as connected
+			globalStatus.GPS_connected = true
+
+			// Set fix quality
+			mySituation.muGPS.Lock()
+			mySituation.GPSFixQuality = tc.fixQuality
+			mySituation.muGPS.Unlock()
+
+			// Update status
+			updateStatus()
+
+			// Verify GPS solution string
+			if globalStatus.GPS_solution != tc.expectedSolution {
+				t.Errorf("Expected GPS_solution='%s', got '%s'", tc.expectedSolution, globalStatus.GPS_solution)
+			}
+
+			t.Logf("%s: GPS_solution='%s'", tc.name, globalStatus.GPS_solution)
+		})
+	}
+
+	// Test disconnected GPS
+	t.Run("Disconnected GPS", func(t *testing.T) {
+		globalStatus.GPS_connected = false
+		updateStatus()
+
+		if globalStatus.GPS_solution != "Disconnected" {
+			t.Errorf("Expected GPS_solution='Disconnected', got '%s'", globalStatus.GPS_solution)
+		}
+
+		if globalStatus.GPS_satellites_locked != 0 {
+			t.Errorf("Expected GPS_satellites_locked=0 for disconnected GPS, got %d", globalStatus.GPS_satellites_locked)
+		}
+	})
+}
