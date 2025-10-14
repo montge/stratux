@@ -29,13 +29,15 @@ func main() {
 	baseTime := time.Date(2025, 10, 13, 12, 0, 0, 0, time.UTC)
 
 	// Sample aircraft: UAL123 flying at 35000 ft
+	// Using Stratux's modified dump1090 JSON format (not standard dump1090 format)
+	// Key differences: "Tail" not "flight", "Alt" not "alt_baro", "Speed" not "gs"
 	messages := []struct {
 		offsetMs int64
 		data     string
 	}{
-		{0, `{"hex":"A12345","flight":"UAL123  ","alt_baro":35000,"gs":450,"track":270,"lat":47.4502,"lon":-122.3088,"nic":8,"rc":186,"seen_pos":0.1,"version":2,"nac_p":10,"nac_v":2,"sil":3,"sil_type":"perhour","gva":2,"sda":2,"mlat":[],"tisb":[],"messages":150,"seen":0.1,"rssi":-25.5}`},
-		{1000, `{"hex":"A12345","flight":"UAL123  ","alt_baro":35000,"gs":450,"track":270,"lat":47.4503,"lon":-122.3188,"nic":8,"rc":186,"seen_pos":0.1,"version":2,"nac_p":10,"nac_v":2,"sil":3,"sil_type":"perhour","gva":2,"sda":2,"mlat":[],"tisb":[],"messages":152,"seen":0.1,"rssi":-25.3}`},
-		{2000, `{"hex":"A12345","flight":"UAL123  ","alt_baro":35000,"gs":450,"track":270,"lat":47.4504,"lon":-122.3288,"nic":8,"rc":186,"seen_pos":0.1,"version":2,"nac_p":10,"nac_v":2,"sil":3,"sil_type":"perhour","gva":2,"sda":2,"mlat":[],"tisb":[],"messages":154,"seen":0.1,"rssi":-25.7}`},
+		{0, `{"Icao_addr":10560325,"DF":17,"CA":0,"TypeCode":11,"SubtypeCode":0,"SignalLevel":0.5,"Tail":"UAL123","Alt":35000,"AltIsGNSS":false,"Speed_valid":true,"Speed":450,"Track":270,"Lat":47.4502,"Lng":-122.3088,"Position_valid":true,"Vvel":0,"OnGround":false,"NACp":10}`},
+		{1000, `{"Icao_addr":10560325,"DF":17,"CA":0,"TypeCode":11,"SubtypeCode":0,"SignalLevel":0.6,"Tail":"UAL123","Alt":35000,"AltIsGNSS":false,"Speed_valid":true,"Speed":450,"Track":270,"Lat":47.4503,"Lng":-122.3188,"Position_valid":true,"Vvel":0,"OnGround":false,"NACp":10}`},
+		{2000, `{"Icao_addr":10560325,"DF":17,"CA":0,"TypeCode":11,"SubtypeCode":0,"SignalLevel":0.4,"Tail":"UAL123","Alt":35000,"AltIsGNSS":false,"Speed_valid":true,"Speed":450,"Track":270,"Lat":47.4504,"Lng":-122.3288,"Position_valid":true,"Vvel":0,"OnGround":false,"NACp":10}`},
 	}
 
 	// Sample aircraft 2: N172SP - general aviation
@@ -43,9 +45,9 @@ func main() {
 		offsetMs int64
 		data     string
 	}{
-		{500, `{"hex":"AC82EC","flight":"N172SP  ","alt_baro":5500,"gs":120,"track":90,"lat":47.4600,"lon":-122.2900,"nic":7,"rc":370,"seen_pos":0.2,"version":2,"nac_p":9,"nac_v":1,"sil":3,"sil_type":"perhour","messages":80,"seen":0.2,"rssi":-18.2}`},
-		{1500, `{"hex":"AC82EC","flight":"N172SP  ","alt_baro":5520,"gs":121,"track":91,"lat":47.4605,"lon":-122.2800,"nic":7,"rc":370,"seen_pos":0.2,"version":2,"nac_p":9,"nac_v":1,"sil":3,"sil_type":"perhour","messages":82,"seen":0.2,"rssi":-18.5}`},
-		{2500, `{"hex":"AC82EC","flight":"N172SP  ","alt_baro":5540,"gs":122,"track":92,"lat":47.4610,"lon":-122.2700,"nic":7,"rc":370,"seen_pos":0.2,"version":2,"nac_p":9,"nac_v":1,"sil":3,"sil_type":"perhour","messages":84,"seen":0.2,"rssi":-18.1}`},
+		{500, `{"Icao_addr":11305708,"DF":17,"CA":0,"TypeCode":11,"SubtypeCode":0,"SignalLevel":0.8,"Tail":"N172SP","Alt":5500,"AltIsGNSS":false,"Speed_valid":true,"Speed":120,"Track":90,"Lat":47.4600,"Lng":-122.2900,"Position_valid":true,"Vvel":0,"OnGround":false,"NACp":9}`},
+		{1500, `{"Icao_addr":11305708,"DF":17,"CA":0,"TypeCode":11,"SubtypeCode":0,"SignalLevel":0.9,"Tail":"N172SP","Alt":5520,"AltIsGNSS":false,"Speed_valid":true,"Speed":121,"Track":91,"Lat":47.4605,"Lng":-122.2800,"Position_valid":true,"Vvel":0,"OnGround":false,"NACp":9}`},
+		{2500, `{"Icao_addr":11305708,"DF":17,"CA":0,"TypeCode":11,"SubtypeCode":0,"SignalLevel":0.7,"Tail":"N172SP","Alt":5540,"AltIsGNSS":false,"Speed_valid":true,"Speed":122,"Track":92,"Lat":47.4610,"Lng":-122.2700,"Position_valid":true,"Vvel":0,"OnGround":false,"NACp":9}`},
 	}...)
 
 	// Sort by offsetMs

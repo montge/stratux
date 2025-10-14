@@ -95,6 +95,31 @@ jobs:
           coverage.html
         retention-days: 30
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: web/package-lock.json
+
+    - name: Install web UI dependencies
+      run: |
+        cd web
+        npm ci
+
+    - name: Run web UI tests
+      run: |
+        cd web
+        npm run test:ci
+
+    - name: Upload web UI coverage
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: web-ui-coverage
+        path: web/coverage/
+        retention-days: 30
+
     - name: Run static analysis
       run: |
         go vet ./main/...
