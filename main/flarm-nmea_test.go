@@ -510,3 +510,161 @@ func TestComputeAlarmLevelBoundaries(t *testing.T) {
 		})
 	}
 }
+
+// TestGetIdTail tests OGN ID and tail parsing
+func TestGetIdTail(t *testing.T) {
+	testCases := []struct {
+		name            string
+		input           string
+		expectedId      string
+		expectedTail    string
+		expectedAddress uint32
+	}{
+		{
+			name:            "Simple ID without tail",
+			input:           "AABBCC",
+			expectedId:      "AABBCC",
+			expectedTail:    "",
+			expectedAddress: 0x00AABBCC,
+		},
+		{
+			name:            "ID with tail",
+			input:           "AABBCC!N12345",
+			expectedId:      "AABBCC",
+			expectedTail:    "N12345",
+			expectedAddress: 0x00AABBCC,
+		},
+		{
+			name:            "ID with OGN prefix in tail (should strip)",
+			input:           "AABBCC!OGN_TAIL",
+			expectedId:      "AABBCC",
+			expectedTail:    "",
+			expectedAddress: 0x00AABBCC,
+		},
+		{
+			name:            "ID with FLR prefix in tail (should strip)",
+			input:           "AABBCC!FLR_TAIL",
+			expectedId:      "AABBCC",
+			expectedTail:    "",
+			expectedAddress: 0x00AABBCC,
+		},
+		{
+			name:            "Long ID (> 6 chars, should truncate to last 6)",
+			input:           "01AABBCC",
+			expectedId:      "AABBCC",
+			expectedTail:    "",
+			expectedAddress: 0x00AABBCC,
+		},
+		{
+			name:            "Long ID with tail",
+			input:           "01AABBCC!TAIL",
+			expectedId:      "AABBCC",
+			expectedTail:    "TAIL",
+			expectedAddress: 0x00AABBCC,
+		},
+		{
+			name:            "Short ID",
+			input:           "ABC",
+			expectedId:      "ABC",
+			expectedTail:    "",
+			expectedAddress: 0x00000ABC,
+		},
+		{
+			name:            "Short ID with tail",
+			input:           "ABC!TAIL",
+			expectedId:      "ABC",
+			expectedTail:    "TAIL",
+			expectedAddress: 0x00000ABC,
+		},
+		{
+			name:            "ID with short prefix tail (should keep)",
+			input:           "AABBCC!ABC",
+			expectedId:      "AABBCC",
+			expectedTail:    "ABC",
+			expectedAddress: 0x00AABBCC,
+		},
+		{
+			name:            "Lowercase hex ID",
+			input:           "aabbcc",
+			expectedId:      "aabbcc",
+			expectedTail:    "",
+			expectedAddress: 0x00AABBCC, // hex.DecodeString handles lowercase
+		},
+		{
+			name:            "Zero address",
+			input:           "000000",
+			expectedId:      "000000",
+			expectedTail:    "",
+			expectedAddress: 0x00000000,
+		},
+		{
+			name:            "Maximum 6-char hex address",
+			input:           "FFFFFF",
+			expectedId:      "FFFFFF",
+			expectedTail:    "",
+			expectedAddress: 0x00FFFFFF,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			idStr, tail, address := getIdTail(tc.input)
+
+			if idStr != tc.expectedId {
+				t.Errorf("getIdTail(%q) idStr = %q, expected %q",
+					tc.input, idStr, tc.expectedId)
+			}
+
+			if tail != tc.expectedTail {
+				t.Errorf("getIdTail(%q) tail = %q, expected %q",
+					tc.input, tail, tc.expectedTail)
+			}
+
+			if address != tc.expectedAddress {
+				t.Errorf("getIdTail(%q) address = 0x%08X, expected 0x%08X",
+					tc.input, address, tc.expectedAddress)
+			}
+
+			t.Logf("Input: %q -> ID: %q, Tail: %q, Address: 0x%08X",
+				tc.input, idStr, tail, address)
+		})
+	}
+}
+
+// TestGetIdTailEdgeCases tests edge cases for OGN ID parsing
+func TestGetIdTailEdgeCases(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "Empty string",
+			input: "",
+		},
+		{
+			name:  "Just exclamation",
+			input: "!",
+		},
+		{
+			name:  "Multiple exclamations",
+			input: "AABBCC!TAIL!EXTRA",
+		},
+		{
+			name:  "ID with underscore but no prefix",
+			input: "AABBCC!TAI_L",
+		},
+		{
+			name:  "Very long ID (8 chars, should use last 6)",
+			input: "0123AABB",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Just verify these don't panic
+			idStr, tail, address := getIdTail(tc.input)
+			t.Logf("getIdTail(%q) -> ID: %q, Tail: %q, Address: 0x%08X",
+				tc.input, idStr, tail, address)
+		})
+	}
+}
