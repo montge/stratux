@@ -13,12 +13,12 @@ func TestGetTailNumber(t *testing.T) {
 	}()
 
 	testCases := []struct {
-		name                  string
-		ognid                 string
-		sys                   string
-		displayTrafficSource  bool
-		expectedPrefix        string
-		description           string
+		name                 string
+		ognid                string
+		sys                  string
+		displayTrafficSource bool
+		expectedPrefix       string
+		description          string
 	}{
 		{
 			name:                 "DisplayTrafficSource_disabled",

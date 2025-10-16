@@ -47,7 +47,7 @@ func TestComputeTrafficPriority_BaroAltitude(t *testing.T) {
 
 	// Set up test scenario: ownship at 5000ft baro, target at 6000ft
 	mySituation.BaroPressureAltitude = 5000
-	mySituation.GPSAltitudeMSL = 4800                                     // different from baro
+	mySituation.GPSAltitudeMSL = 4800                                             // different from baro
 	mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-1 * time.Second) // valid baro (recent)
 	mySituation.BaroTemperature = 25.0
 
@@ -171,16 +171,16 @@ func TestExtrapolateTraffic_InitialExtrapolation(t *testing.T) {
 	}
 
 	ti := TrafficInfo{
-		Icao_addr:             0xABCDEF,
-		Lat:                   40.0,
-		Lng:                   -105.0,
-		Alt:                   5000,
-		Track:                 90.0, // heading east
-		Speed:                 150,  // 150 knots
-		Vvel:                  500,  // 500 fpm climb
-		TurnRate:              0.0,
-		ExtrapolatedPosition:  false,
-		Last_seen:             stratuxClock.Time,
+		Icao_addr:            0xABCDEF,
+		Lat:                  40.0,
+		Lng:                  -105.0,
+		Alt:                  5000,
+		Track:                90.0, // heading east
+		Speed:                150,  // 150 knots
+		Vvel:                 500,  // 500 fpm climb
+		TurnRate:             0.0,
+		ExtrapolatedPosition: false,
+		Last_seen:            stratuxClock.Time,
 	}
 
 	// Simulate 2 seconds passing
@@ -226,19 +226,19 @@ func TestExtrapolateTraffic_ContinuedExtrapolation(t *testing.T) {
 	}
 
 	ti := TrafficInfo{
-		Icao_addr:             0xABCDEF,
-		Lat:                   40.0,
-		Lng:                   -105.0,
-		Alt:                   5000,
-		Lat_fix:               40.0,
-		Lng_fix:               -105.0,
-		Alt_fix:               5000,
-		Track:                 180.0, // heading south
-		Speed:                 200,   // 200 knots
-		Vvel:                  -1000, // 1000 fpm descent
-		TurnRate:              0.0,
-		ExtrapolatedPosition:  true, // already extrapolating
-		Last_extrapolation:    stratuxClock.Time.Add(-3 * time.Second),
+		Icao_addr:            0xABCDEF,
+		Lat:                  40.0,
+		Lng:                  -105.0,
+		Alt:                  5000,
+		Lat_fix:              40.0,
+		Lng_fix:              -105.0,
+		Alt_fix:              5000,
+		Track:                180.0, // heading south
+		Speed:                200,   // 200 knots
+		Vvel:                 -1000, // 1000 fpm descent
+		TurnRate:             0.0,
+		ExtrapolatedPosition: true, // already extrapolating
+		Last_extrapolation:   stratuxClock.Time.Add(-3 * time.Second),
 	}
 
 	extrapolateTraffic(&ti)
@@ -378,8 +378,8 @@ func TestExtrapolateTraffic_HighSpeed(t *testing.T) {
 		Lat:                  40.0,
 		Lng:                  -105.0,
 		Alt:                  35000,
-		Track:                0.0, // heading north
-		Speed:                500, // 500 knots (fast jet)
+		Track:                0.0,  // heading north
+		Speed:                500,  // 500 knots (fast jet)
 		Vvel:                 2000, // 2000 fpm climb
 		TurnRate:             0.0,
 		ExtrapolatedPosition: false,
