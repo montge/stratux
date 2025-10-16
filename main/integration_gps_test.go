@@ -18,15 +18,31 @@ func resetGPSState() {
 	// Initialize stratuxClock if not already initialized
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
-		time.Sleep(50 * time.Millisecond) // Let the clock start
+		// Wait for clock to actually start and have a non-zero time
+		maxWait := 100 // 100 iterations
+		for i := 0; i < maxWait && stratuxClock.Time.IsZero(); i++ {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if stratuxClock.Time.IsZero() {
+			// Force clock update by calling Since with a past time
+			stratuxClock.Since(time.Time{})
+		}
 	}
 
 	// Initialize mutexes if not already initialized
 	if mySituation.muGPS == nil {
 		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
 		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
 		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
 	}
 

@@ -60,7 +60,7 @@ func (m *monotonic) SetRealTimeReference(t time.Time) {
 }
 
 func NewMonotonic() *monotonic {
-	t := &monotonic{Milliseconds: 0, Time: time.Time{}, ticker: time.NewTicker(10 * time.Millisecond)}
+	t := &monotonic{Milliseconds: 0, Time: time.Now(), ticker: time.NewTicker(10 * time.Millisecond)}
 	go t.Watcher()
 	return t
 }
