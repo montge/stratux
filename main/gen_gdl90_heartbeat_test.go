@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 // TestMakeHeartbeatBasic tests the makeHeartbeat function for basic message structure
@@ -116,4 +117,180 @@ func TestMakeFFIDMessageLongNames(t *testing.T) {
 	}
 
 	t.Logf("makeFFIDMessage() with long strings generated %d-byte message", len(msg))
+}
+
+// TestMakeHeartbeatWithGPS tests makeHeartbeat with valid GPS
+func TestMakeHeartbeatWithGPS(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original values
+	origSituation := mySituation
+	defer func() { mySituation = origSituation }()
+
+	// Set up valid GPS situation
+	mySituation.GPSLastFixSinceMidnightUTC = 3600.0
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-1 * time.Second)
+
+	msg := makeHeartbeat()
+
+	// Check that message was generated
+	if len(msg) < 10 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Check frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	t.Logf("makeHeartbeat() with GPS generated %d-byte message", len(msg))
+}
+
+// TestMakeHeartbeatWithErrors tests makeHeartbeat with system errors present
+func TestMakeHeartbeatWithErrors(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() { globalStatus = origStatus }()
+
+	// Add some errors
+	globalStatus.Errors = []string{"Test error 1", "Test error 2"}
+
+	msg := makeHeartbeat()
+
+	// Check that message was generated
+	if len(msg) < 10 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Check frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	t.Logf("makeHeartbeat() with errors generated %d-byte message", len(msg))
+}
+
+// TestMakeStratuxHeartbeatWithGPSAndAHRS tests all combinations of GPS and AHRS validity
+func TestMakeStratuxHeartbeatWithGPSAndAHRS(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	testCases := []struct {
+		name        string
+		setupFunc   func()
+		description string
+	}{
+		{
+			name: "GPS_Invalid_AHRS_Invalid",
+			setupFunc: func() {
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-60 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-60 * time.Second)
+			},
+			description: "Both GPS and AHRS invalid",
+		},
+		{
+			name: "GPS_Valid_AHRS_Invalid",
+			setupFunc: func() {
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-1 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-60 * time.Second)
+			},
+			description: "GPS valid, AHRS invalid",
+		},
+		{
+			name: "GPS_Invalid_AHRS_Valid",
+			setupFunc: func() {
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-60 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-1 * time.Second)
+			},
+			description: "GPS invalid, AHRS valid",
+		},
+		{
+			name: "GPS_Valid_AHRS_Valid",
+			setupFunc: func() {
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-1 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-1 * time.Second)
+			},
+			description: "Both GPS and AHRS valid",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Save original situation
+			origSituation := mySituation
+			defer func() { mySituation = origSituation }()
+
+			// Set up test scenario
+			tc.setupFunc()
+
+			msg := makeStratuxHeartbeat()
+
+			// Check that message was generated
+			if len(msg) < 5 {
+				t.Errorf("%s: Message too short: got %d bytes", tc.description, len(msg))
+			}
+
+			// Check frame markers
+			if msg[0] != 0x7E {
+				t.Errorf("%s: Expected start frame marker 0x7E, got 0x%02X", tc.description, msg[0])
+			}
+			if msg[len(msg)-1] != 0x7E {
+				t.Errorf("%s: Expected end frame marker 0x7E, got 0x%02X", tc.description, msg[len(msg)-1])
+			}
+
+			t.Logf("%s: generated %d-byte message", tc.description, len(msg))
+		})
+	}
+}
+
+// TestMakeFFIDMessageShortNames tests makeFFIDMessage with short version strings
+func TestMakeFFIDMessageShortNames(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Set short version strings (no truncation needed)
+	stratuxVersion = "v1.6"
+	stratuxBuild = "test"
+
+	msg := makeFFIDMessage()
+
+	// Basic validations
+	if len(msg) < 40 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Check frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	t.Logf("makeFFIDMessage() with short strings generated %d-byte message", len(msg))
 }
