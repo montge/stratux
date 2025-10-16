@@ -223,63 +223,63 @@ func TestMakeGPGGAString(t *testing.T) {
 	resetFlarmOutputState()
 
 	testCases := []struct {
-		name       string
-		lat        float32
-		lon        float32
-		alt        float32
-		fixQual    uint8
-		numSats    uint16
+		name        string
+		lat         float32
+		lon         float32
+		alt         float32
+		fixQual     uint8
+		numSats     uint16
 		hdop        float32
 		geoidSep    float32
 		gpsTime     time.Time
 		expectEmpty bool
 	}{
 		{
-			name:       "Valid 3D fix",
-			lat:        47.6062,
-			lon:        -122.3321,
-			alt:        500.0,
-			fixQual:    2, // DGPS
-			numSats:    12,
-			hdop:       1.2,
-			geoidSep:   -20.0,
-			gpsTime:    time.Date(2024, 10, 16, 12, 30, 45, 0, time.UTC),
+			name:        "Valid 3D fix",
+			lat:         47.6062,
+			lon:         -122.3321,
+			alt:         500.0,
+			fixQual:     2, // DGPS
+			numSats:     12,
+			hdop:        1.2,
+			geoidSep:    -20.0,
+			gpsTime:     time.Date(2024, 10, 16, 12, 30, 45, 0, time.UTC),
 			expectEmpty: false,
 		},
 		{
-			name:       "Valid GPS fix with high altitude",
-			lat:        35.6762,
-			lon:        139.6503,
-			alt:        35000.0, // 35000 ft
-			fixQual:    1,
-			numSats:    8,
-			hdop:       2.5,
-			geoidSep:   30.0,
-			gpsTime:    time.Date(2024, 10, 16, 9, 15, 0, 0, time.UTC),
+			name:        "Valid GPS fix with high altitude",
+			lat:         35.6762,
+			lon:         139.6503,
+			alt:         35000.0, // 35000 ft
+			fixQual:     1,
+			numSats:     8,
+			hdop:        2.5,
+			geoidSep:    30.0,
+			gpsTime:     time.Date(2024, 10, 16, 9, 15, 0, 0, time.UTC),
 			expectEmpty: false,
 		},
 		{
-			name:       "Low satellite count",
-			lat:        48.8566,
-			lon:        2.3522,
-			alt:        100.0,
-			fixQual:    1,
-			numSats:    4, // Minimum for 3D fix
-			hdop:       5.0,
-			geoidSep:   48.0,
-			gpsTime:    time.Date(2024, 10, 16, 14, 0, 0, 0, time.UTC),
+			name:        "Low satellite count",
+			lat:         48.8566,
+			lon:         2.3522,
+			alt:         100.0,
+			fixQual:     1,
+			numSats:     4, // Minimum for 3D fix
+			hdop:        5.0,
+			geoidSep:    48.0,
+			gpsTime:     time.Date(2024, 10, 16, 14, 0, 0, 0, time.UTC),
 			expectEmpty: false,
 		},
 		{
-			name:       "No GPS fix",
-			lat:        0,
-			lon:        0,
-			alt:        0,
-			fixQual:    0,
-			numSats:    0,
-			hdop:       99.9,
-			geoidSep:   0,
-			gpsTime:    time.Time{},
+			name:        "No GPS fix",
+			lat:         0,
+			lon:         0,
+			alt:         0,
+			fixQual:     0,
+			numSats:     0,
+			hdop:        99.9,
+			geoidSep:    0,
+			gpsTime:     time.Time{},
 			expectEmpty: false, // GPGGA returns sentence even without fix (fix quality = 0)
 		},
 	}
@@ -332,28 +332,28 @@ func TestMakePGRMZString(t *testing.T) {
 		expectEmpty bool
 	}{
 		{
-			name:       "Sea level",
-			altitude:   0.0,
+			name:        "Sea level",
+			altitude:    0.0,
 			expectEmpty: false,
 		},
 		{
-			name:       "Low altitude (500 ft)",
-			altitude:   500.0,
+			name:        "Low altitude (500 ft)",
+			altitude:    500.0,
 			expectEmpty: false,
 		},
 		{
-			name:       "Medium altitude (5000 ft)",
-			altitude:   5000.0,
+			name:        "Medium altitude (5000 ft)",
+			altitude:    5000.0,
 			expectEmpty: false,
 		},
 		{
-			name:       "High altitude (35000 ft)",
-			altitude:   35000.0,
+			name:        "High altitude (35000 ft)",
+			altitude:    35000.0,
 			expectEmpty: false,
 		},
 		{
-			name:       "Negative altitude (below sea level)",
-			altitude:   -100.0,
+			name:        "Negative altitude (below sea level)",
+			altitude:    -100.0,
 			expectEmpty: false,
 		},
 	}
@@ -499,18 +499,18 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 	resetFlarmOutputState()
 
 	testCases := []struct {
-		name           string
-		ownLat         float32
-		ownLon         float32
-		ownAlt         float32
-		ownTrack       float32
-		gpsValid       bool
-		targetLat      float32
-		targetLon      float32
-		targetAlt      int32
-		targetICAO     uint32
-		targetTail     string
-		expectedAlarm  int // Expected alarm level
+		name          string
+		ownLat        float32
+		ownLon        float32
+		ownAlt        float32
+		ownTrack      float32
+		gpsValid      bool
+		targetLat     float32
+		targetLon     float32
+		targetAlt     int32
+		targetICAO    uint32
+		targetTail    string
+		expectedAlarm int // Expected alarm level
 	}{
 		{
 			name:          "No alarm - distant traffic",
@@ -519,7 +519,7 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 			ownAlt:        5000,
 			ownTrack:      90,
 			gpsValid:      true,
-			targetLat:     48.0,  // ~30 NM away
+			targetLat:     48.0, // ~30 NM away
 			targetLon:     -122.3,
 			targetAlt:     5000,
 			targetICAO:    0xABC123,
@@ -629,22 +629,22 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 	resetFlarmOutputState()
 
 	testCases := []struct {
-		name           string
-		ownLat         float32
-		ownLon         float32
-		ownAlt         float32
-		targetLat      float32
-		targetLon      float32
-		targetAlt      int32
-		targetICAO     uint32
-		targetTail     string
-		targetTrack    float32
-		targetSpeed    uint16
-		targetVvel     int16
-		targetEmitter  uint8
-		positionValid  bool
-		speedValid     bool
-		expectedValid  bool
+		name          string
+		ownLat        float32
+		ownLon        float32
+		ownAlt        float32
+		targetLat     float32
+		targetLon     float32
+		targetAlt     int32
+		targetICAO    uint32
+		targetTail    string
+		targetTrack   float32
+		targetSpeed   uint16
+		targetVvel    int16
+		targetEmitter uint8
+		positionValid bool
+		speedValid    bool
+		expectedValid bool
 	}{
 		{
 			name:          "Valid traffic with position",
@@ -658,8 +658,8 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 			targetTail:    "N12345",
 			targetTrack:   180,
 			targetSpeed:   120, // knots
-			targetVvel:    500,  // fpm
-			targetEmitter: 1,    // Light aircraft
+			targetVvel:    500, // fpm
+			targetEmitter: 1,   // Light aircraft
 			positionValid: true,
 			speedValid:    true,
 			expectedValid: true,
@@ -677,7 +677,7 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 			targetTrack:   90,
 			targetSpeed:   0,
 			targetVvel:    -200,
-			targetEmitter: 9,    // Glider
+			targetEmitter: 9, // Glider
 			positionValid: false,
 			speedValid:    false,
 			expectedValid: true,
@@ -693,7 +693,7 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 			targetICAO:    0x123456,
 			targetTail:    "UAL123",
 			targetTrack:   45,
-			targetSpeed:   450, // knots
+			targetSpeed:   450,  // knots
 			targetVvel:    2000, // fpm
 			targetEmitter: 3,    // Large aircraft
 			positionValid: true,
@@ -785,9 +785,9 @@ func TestFlarmEmitterCategoryConversion(t *testing.T) {
 	resetFlarmOutputState()
 
 	testCases := []struct {
-		gdl90Cat  uint8
-		nmeaType  string
-		desc      string
+		gdl90Cat uint8
+		nmeaType string
+		desc     string
 	}{
 		{1, "8", "Light aircraft"},
 		{3, "9", "Large aircraft"},
@@ -811,4 +811,3 @@ func TestFlarmEmitterCategoryConversion(t *testing.T) {
 		})
 	}
 }
-

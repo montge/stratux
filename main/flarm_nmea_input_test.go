@@ -39,7 +39,7 @@ func resetFlarmInputState() {
 	mySituation.GPSFixQuality = 2 // DGPS fix
 	mySituation.GPSLatitude = 47.5
 	mySituation.GPSLongitude = -122.3
-	mySituation.GPSTrueCourse = 90 // Heading east
+	mySituation.GPSTrueCourse = 90                      // Heading east
 	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Set recent fix time
 	mySituation.muGPS.Unlock()
 
@@ -435,9 +435,9 @@ func TestParseFlarmPFLAAEmitterCategory(t *testing.T) {
 	resetFlarmInputState()
 
 	testCases := []struct {
-		nmeaType     string
-		expectedCat  uint8
-		desc         string
+		nmeaType    string
+		expectedCat uint8
+		desc        string
 	}{
 		{"1", 9, "Glider"},
 		{"8", 1, "Piston (light)"},
@@ -490,13 +490,13 @@ func TestParseFlarmPFLAUExisting1090ESTraffic(t *testing.T) {
 	// Create existing 1090ES traffic
 	trafficMutex.Lock()
 	traffic[icao] = TrafficInfo{
-		Icao_addr:    icao,
-		Tail:         "N12345",
-		Lat:          47.51,
-		Lng:          -122.31,
-		Alt:          5500,
-		Last_source:  TRAFFIC_SOURCE_1090ES,
-		Age:          2, // Recently seen (< 5 seconds)
+		Icao_addr:   icao,
+		Tail:        "N12345",
+		Lat:         47.51,
+		Lng:         -122.31,
+		Alt:         5500,
+		Last_source: TRAFFIC_SOURCE_1090ES,
+		Age:         2, // Recently seen (< 5 seconds)
 	}
 	trafficMutex.Unlock()
 

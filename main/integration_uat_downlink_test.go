@@ -132,14 +132,14 @@ func TestUATDownlinkCallsignDecoding(t *testing.T) {
 
 	// Message type 1 with callsign "N123AB"
 	msg := buildUATDownlinkMessage(
-		1,          // msg_type
-		0xABC123,   // ICAO
-		"N123AB",   // callsign
-		0,          // squawk (not used)
-		true,       // CSID=1 (callsign mode)
-		2,          // UAT version 2
-		3,          // emitter category (light aircraft)
-		9,          // NACp
+		1,        // msg_type
+		0xABC123, // ICAO
+		"N123AB", // callsign
+		0,        // squawk (not used)
+		true,     // CSID=1 (callsign mode)
+		2,        // UAT version 2
+		3,        // emitter category (light aircraft)
+		9,        // NACp
 	)
 
 	parseDownlinkReport(msg, -30) // -30 dBm signal level
@@ -177,14 +177,14 @@ func TestUATDownlinkSquawkDecoding(t *testing.T) {
 
 	// Message type 1 with squawk code 1200
 	msg := buildUATDownlinkMessage(
-		1,          // msg_type
-		0xDEF456,   // ICAO
-		"",         // callsign (not used)
-		1200,       // squawk code
-		false,      // CSID=0 (squawk mode)
-		2,          // UAT version 2 (required for squawk decoding)
-		2,          // emitter category
-		10,         // NACp
+		1,        // msg_type
+		0xDEF456, // ICAO
+		"",       // callsign (not used)
+		1200,     // squawk code
+		false,    // CSID=0 (squawk mode)
+		2,        // UAT version 2 (required for squawk decoding)
+		2,        // emitter category
+		10,       // NACp
 	)
 
 	parseDownlinkReport(msg, -25)
@@ -207,14 +207,14 @@ func TestUATDownlinkMessageType3(t *testing.T) {
 	resetUATDownlinkState()
 
 	msg := buildUATDownlinkMessage(
-		3,          // msg_type 3
-		0x123ABC,   // ICAO
-		"UAL456",   // callsign
-		0,          // squawk
-		true,       // CSID=1
-		2,          // UAT version
-		8,          // emitter category (large aircraft)
-		11,         // NACp
+		3,        // msg_type 3
+		0x123ABC, // ICAO
+		"UAL456", // callsign
+		0,        // squawk
+		true,     // CSID=1
+		2,        // UAT version
+		8,        // emitter category (large aircraft)
+		11,       // NACp
 	)
 
 	parseDownlinkReport(msg, -20)
@@ -238,14 +238,14 @@ func TestUATDownlinkPriorityStatus(t *testing.T) {
 
 	// Create message with priority status (emergency)
 	msg := buildUATDownlinkMessage(
-		1,          // msg_type
-		0x999999,   // ICAO
-		"EMERG1",   // callsign
-		0,          // squawk
-		true,       // CSID=1
-		2,          // UAT version
-		1,          // emitter category
-		8,          // NACp
+		1,        // msg_type
+		0x999999, // ICAO
+		"EMERG1", // callsign
+		0,        // squawk
+		true,     // CSID=1
+		2,        // UAT version
+		1,        // emitter category
+		8,        // NACp
 	)
 
 	parseDownlinkReport(msg, -15)
@@ -272,14 +272,14 @@ func TestUATDownlinkRegistrationLookup(t *testing.T) {
 	// Now inject a UAT message for the same ICAO
 	// ICAO 11259375 decimal = 0xABCDEF hex
 	uatMsg := buildUATDownlinkMessage(
-		1,          // msg_type
-		0xABCDEF,   // Same ICAO
-		"N12345",   // Same tail
-		0,          // squawk
-		true,       // CSID=1
-		2,          // UAT version
-		1,          // emitter category
-		10,         // NACp
+		1,        // msg_type
+		0xABCDEF, // Same ICAO
+		"N12345", // Same tail
+		0,        // squawk
+		true,     // CSID=1
+		2,        // UAT version
+		1,        // emitter category
+		10,       // NACp
 	)
 
 	parseDownlinkReport(uatMsg, -25)
@@ -325,14 +325,14 @@ func TestUATDownlinkEmitterCategories(t *testing.T) {
 	for i, tc := range categories {
 		icao := uint32(0x100000 + i)
 		msg := buildUATDownlinkMessage(
-			1,        // msg_type
-			icao,     // ICAO
-			"TEST",   // callsign
-			0,        // squawk
-			true,     // CSID=1
-			2,        // UAT version
-			tc.cat,   // emitter category
-			9,        // NACp
+			1,      // msg_type
+			icao,   // ICAO
+			"TEST", // callsign
+			0,      // squawk
+			true,   // CSID=1
+			2,      // UAT version
+			tc.cat, // emitter category
+			9,      // NACp
 		)
 
 		parseDownlinkReport(msg, -30)
@@ -366,14 +366,14 @@ func TestUATDownlinkNACpValues(t *testing.T) {
 	for nacp := byte(0); nacp <= 11; nacp++ {
 		icao := uint32(0x200000 + uint32(nacp))
 		msg := buildUATDownlinkMessage(
-			1,        // msg_type
-			icao,     // ICAO
-			"TEST",   // callsign
-			0,        // squawk
-			true,     // CSID=1
-			2,        // UAT version
-			1,        // emitter category
-			nacp,     // NACp value
+			1,      // msg_type
+			icao,   // ICAO
+			"TEST", // callsign
+			0,      // squawk
+			true,   // CSID=1
+			2,      // UAT version
+			1,      // emitter category
+			nacp,   // NACp value
 		)
 
 		parseDownlinkReport(msg, -30)
@@ -407,15 +407,15 @@ func TestUATDownlinkAddressTypes(t *testing.T) {
 	// Create a message with address type != 0 (non-ICAO)
 	// Addr type is in lower 3 bits of byte 0
 	frame := make([]byte, 34)
-	frame[0] = (1 << 3) | 2  // msg_type=1, addr_type=2 (non-ICAO)
+	frame[0] = (1 << 3) | 2 // msg_type=1, addr_type=2 (non-ICAO)
 	frame[1] = 0xAB
 	frame[2] = 0xCD
 	frame[3] = 0xEF
-	
+
 	// Add some data
-	frame[23] = 2 << 2  // UAT version 2
-	frame[25] = 9 << 4  // NACp 9
-	frame[26] = 1 << 1  // CSID=1
+	frame[23] = 2 << 2 // UAT version 2
+	frame[25] = 9 << 4 // NACp 9
+	frame[26] = 1 << 1 // CSID=1
 
 	hexStr := "+"
 	for _, b := range frame {
@@ -445,14 +445,14 @@ func TestUATDownlinkUATVersion0(t *testing.T) {
 
 	// UAT version 0 doesn't support squawk decoding
 	msg := buildUATDownlinkMessage(
-		1,          // msg_type
-		0x555555,   // ICAO
-		"",         // callsign
-		7700,       // squawk (emergency) - should be ignored in version 0
-		false,      // CSID=0
-		0,          // UAT version 0 (old format)
-		5,          // emitter category
-		7,          // NACp
+		1,        // msg_type
+		0x555555, // ICAO
+		"",       // callsign
+		7700,     // squawk (emergency) - should be ignored in version 0
+		false,    // CSID=0
+		0,        // UAT version 0 (old format)
+		5,        // emitter category
+		7,        // NACp
 	)
 
 	parseDownlinkReport(msg, -20)
@@ -470,4 +470,3 @@ func TestUATDownlinkUATVersion0(t *testing.T) {
 		t.Error("Traffic target with version 0 not found")
 	}
 }
-

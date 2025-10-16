@@ -139,8 +139,8 @@ func TestE2EOwnshipDetection(t *testing.T) {
 	mySituation.GPSLongitude = -122.3000
 	mySituation.GPSAltitudeMSL = 5500
 	mySituation.GPSHeightAboveEllipsoid = 5545 // ~45ft geoid separation
-	mySituation.GPSGroundSpeed = 120 // knots
-	mySituation.GPSTrueCourse = 270 // heading west
+	mySituation.GPSGroundSpeed = 120           // knots
+	mySituation.GPSTrueCourse = 270            // heading west
 	mySituation.muGPS.Unlock()
 
 	// Inject a 1090ES message that matches our position (potential ownship)
