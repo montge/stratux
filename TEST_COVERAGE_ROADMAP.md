@@ -4,9 +4,9 @@
 This roadmap outlines the systematic approach to achieving comprehensive test coverage for the Stratux project, progressing from unit tests of pure functions to full system integration testing on physical hardware.
 
 **Current Status:** Phase 3.6 In Progress
-**Current Coverage:** 24.5% (+1.8% from FLARM input tests)
+**Current Coverage:** 24.6% (+0.1% from monotonic tests)
 **Target Coverage:** 80% (long-term goal)
-**Next Milestone:** 25% coverage (+0.5% needed)
+**Next Milestone:** 30% coverage (+5.4% needed)
 
 ---
 
@@ -386,7 +386,15 @@ This roadmap outlines the systematic approach to achieving comprehensive test co
 - GPS state validation (fix quality, connected status, recent timestamp)
 - Barometric altitude validation with timestamp
 
-**Remaining Work for 25% Milestone:** +0.5% coverage needed
+**Additional Completed Work (Monotonic Tests):**
+- ✅ Created `monotonic_utils_test.go` with 4 utility function tests (137 lines)
+- ✅ Tests for HumanizeTime() - relative time formatting
+- ✅ Tests for Unix() - seconds since zero-time calculation
+- ✅ Tests for HasRealTimeReference() - real time tracking
+- ✅ Tests for SetRealTimeReference() - single-set validation
+- ✅ Coverage Impact: +0.1% (24.5% → 24.6%)
+
+**Remaining Work for 30% Milestone:** +5.4% coverage needed
 
 ---
 
@@ -716,9 +724,9 @@ test/
 ## Current Status Summary
 
 ### Completed (Phases 1-3.6 In Progress)
-- ✅ 8,210+ lines of test code (+2,046 from Phase 3.6)
-- ✅ 178+ test functions (+28 from Phase 3.6)
-- ✅ 24.5% main package coverage (+4.5% from Phase 3.6)
+- ✅ 8,347+ lines of test code (+2,183 from Phase 3.6)
+- ✅ 182+ test functions (+32 from Phase 3.6)
+- ✅ 24.6% main package coverage (+4.6% from Phase 3.6)
 - ✅ 90.2% common package coverage
 - ✅ 29.7% uatparse package coverage
 - ✅ 24 functions at 100% coverage
@@ -735,17 +743,20 @@ test/
 - ✅ UAT downlink message parsing tests (403 lines)
 - ✅ FLARM NMEA output tests (672 lines)
 - ✅ FLARM NMEA input parsing tests (520 lines)
+- ✅ Monotonic utility function tests (137 lines)
 - ✅ Tests for GPRMC, GPGGA, PGRMZ, PFLAU, PFLAA sentence generation
 - ✅ Tests for PFLAU/PFLAA parsing with coordinate conversion
 - ✅ Tests for FLARM traffic alerts with all alarm levels
 - ✅ Tests for emitter category conversion and relative vertical calculation
+- ✅ Tests for HumanizeTime, Unix, HasRealTimeReference functions
 - ✅ Fixed monotonic clock initialization bug (timestamps)
 - ✅ Fixed GPS integration test mutex initialization bug
 - ✅ Fixed FLARM output test state management (GPS/baro validation)
-- 🚧 Working toward 25% coverage milestone (need +0.5% from 24.5%)
+- 🚧 Working toward 30% coverage milestone (need +5.4% from 24.6%)
 
 ### In Progress (Phase 3)
-- 🚧 Working toward 25% coverage milestone (need +0.5% from current 24.5%)
+- 🚧 Working toward 30% coverage milestone (need +5.4% from current 24.6%)
+- 🚧 Adding tests for high-coverage functions (90%+ to 100%)
 - 🚧 Legacy test migration planning
 - 🚧 /test/ directory audit
 - 🚧 /test-data/ conversion strategy
@@ -764,8 +775,8 @@ test/
 - **Phase 4.6:** 2-3 weeks (automation infrastructure)
 
 ### Coverage Projection
-- **Current baseline:** 24.5% (Phase 3.6 in progress)
-- **Next milestone:** 25% coverage (need +0.5%)
+- **Current baseline:** 24.6% (Phase 3.6 in progress)
+- **Next milestone:** 30% coverage (need +5.4%)
 - After Phase 3 completion: **35-45%** coverage
 - After Phase 4 completion: **60-75%** coverage
 - Long-term goal: **80%+** coverage
@@ -810,6 +821,6 @@ test/
 ---
 
 **Last Updated:** 2025-10-16
-**Current Phase:** 3.6 In Progress - Working toward 25% coverage
-**Current Coverage:** 24.5%
-**Next Milestone:** Achieve 25% coverage (+0.5% needed)
+**Current Phase:** 3.6 In Progress - Working toward 30% coverage
+**Current Coverage:** 24.6%
+**Next Milestone:** Achieve 30% coverage (+5.4% needed)
