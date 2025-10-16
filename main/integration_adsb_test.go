@@ -16,7 +16,15 @@ func resetTrafficState() {
 	// Initialize stratuxClock if not already initialized
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
-		time.Sleep(50 * time.Millisecond) // Let the clock start
+		// Wait for clock to actually start and have a non-zero time
+		maxWait := 100 // 100 iterations
+		for i := 0; i < maxWait && stratuxClock.Time.IsZero(); i++ {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if stratuxClock.Time.IsZero() {
+			// Force clock update by calling Since with a past time
+			stratuxClock.Since(time.Time{})
+		}
 	}
 
 	if trafficMutex == nil {
