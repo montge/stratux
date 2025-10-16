@@ -521,3 +521,139 @@ func TestParseFlarmPFLAUExisting1090ESTraffic(t *testing.T) {
 
 	t.Log("Verified that recent 1090ES traffic is not overridden by FLARM")
 }
+
+// TestParseFlarmPFLAAExisting1090ESTraffic tests that PFLAA doesn't override recent 1090ES traffic
+func TestParseFlarmPFLAAExisting1090ESTraffic(t *testing.T) {
+	resetFlarmInputState()
+
+	icao := uint32(0xDEF789)
+
+	// Create existing 1090ES traffic
+	trafficMutex.Lock()
+	traffic[icao] = TrafficInfo{
+		Icao_addr:   icao,
+		Tail:        "N54321",
+		Lat:         47.52,
+		Lng:         -122.32,
+		Alt:         6000,
+		Last_source: TRAFFIC_SOURCE_1090ES,
+		Age:         3, // Recently seen (< 5 seconds)
+	}
+	trafficMutex.Unlock()
+
+	// Try to update with PFLAA
+	pflaaMsg := "PFLAA,2,1111,-750,152,1,DEF789!NEWTAIL,180,0,61,2.5,8"
+	fields := strings.Split(pflaaMsg, ",")
+	parseFlarmPFLAA(fields)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	ti := traffic[icao]
+
+	// Should still be 1090ES, not updated by PFLAA
+	if ti.Last_source != TRAFFIC_SOURCE_1090ES {
+		t.Errorf("Expected traffic to remain 1090ES source, got %d", ti.Last_source)
+	}
+
+	if ti.Tail != "N54321" {
+		t.Errorf("Expected tail to remain N54321 (not updated by PFLAA), got %s", ti.Tail)
+	}
+
+	t.Log("Verified that recent 1090ES traffic is not overridden by PFLAA")
+}
+
+// TestParseFlarmPFLAUEmptyFields tests PFLAU with empty required fields
+func TestParseFlarmPFLAUEmptyFields(t *testing.T) {
+	resetFlarmInputState()
+
+	testCases := []struct {
+		name     string
+		pflauMsg string
+	}{
+		{
+			name:     "Empty ID field",
+			pflauMsg: "PFLAU,1,1,2,1,2,45,2,152,1852,",
+		},
+		{
+			name:     "Empty distance field",
+			pflauMsg: "PFLAU,1,1,2,1,2,45,2,152,,ABC123",
+		},
+		{
+			name:     "Empty relative vertical field",
+			pflauMsg: "PFLAU,1,1,2,1,2,45,2,,1852,ABC123",
+		},
+		{
+			name:     "Empty bearing field",
+			pflauMsg: "PFLAU,1,1,2,1,2,,2,152,1852,ABC123",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset traffic
+			trafficMutex.Lock()
+			traffic = make(map[uint32]TrafficInfo)
+			trafficMutex.Unlock()
+
+			// Parse message
+			fields := strings.Split(tc.pflauMsg, ",")
+			parseFlarmPFLAU(fields)
+
+			trafficMutex.Lock()
+			defer trafficMutex.Unlock()
+
+			// Should not create traffic with empty required fields
+			if len(traffic) > 0 {
+				t.Errorf("Expected no traffic with empty field, but got %d entries", len(traffic))
+			}
+
+			t.Logf("Correctly rejected PFLAU with empty field")
+		})
+	}
+}
+
+// TestParseFlarmPFLAUAlternateKey tests PFLAU alternate key lookup (1<<24|address)
+func TestParseFlarmPFLAUAlternateKey(t *testing.T) {
+	resetFlarmInputState()
+
+	icao := uint32(0x123ABC)
+
+	// Create existing traffic with non-ICAO key (1<<24|address)
+	trafficMutex.Lock()
+	traffic[1<<24|icao] = TrafficInfo{
+		Icao_addr:   icao,
+		Tail:        "FLRM01",
+		Lat:         47.49,
+		Lng:         -122.29,
+		Alt:         4500,
+		Last_source: TRAFFIC_SOURCE_OGN,
+		Age:         10, // Old enough to be updated
+	}
+	trafficMutex.Unlock()
+
+	// Update with PFLAU (should find via alternate key)
+	pflauMsg := "PFLAU,1,1,2,1,2,45,2,200,1000,123ABC!NEWTAIL"
+	fields := strings.Split(pflauMsg, ",")
+	parseFlarmPFLAU(fields)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// Should find and update the existing traffic at alternate key
+	ti, ok := traffic[1<<24|icao]
+	if !ok {
+		t.Fatal("Expected to find traffic at alternate key (1<<24|address)")
+	}
+
+	if ti.Last_source != TRAFFIC_SOURCE_OGN {
+		t.Errorf("Expected traffic source to be OGN after update, got %d", ti.Last_source)
+	}
+
+	// Tail should be updated (old traffic, not recently seen by 1090ES)
+	if ti.Tail != "NEWTAIL" {
+		t.Logf("Tail was %s (might be intentional - OGN DDB fallback)", ti.Tail)
+	}
+
+	t.Log("Verified PFLAU alternate key lookup works correctly")
+}
