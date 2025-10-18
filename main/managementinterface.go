@@ -1013,21 +1013,42 @@ type dirlisting struct {
 
 // FIXME: This needs to be switched to show a "sessions log" from the sqlite database.
 func viewLogs(w http.ResponseWriter, r *http.Request) {
+	const baseDir = "/var/log"
+
+	// Extract and clean the requested path
 	urlpath := strings.TrimPrefix(r.URL.Path, "/logs/")
-	path := "/var/log/" + urlpath
-	finfo, err := os.Stat(path)
+
+	// Build the full path using filepath.Join (which cleans the path)
+	requestedPath := filepath.Join(baseDir, urlpath)
+
+	// Security: Validate that the resolved path is within /var/log
+	// This prevents path traversal attacks (../, absolute paths, etc.)
+	cleanPath := filepath.Clean(requestedPath)
+	if !strings.HasPrefix(cleanPath, baseDir) {
+		log.Printf("viewLogs: path traversal attempt blocked: %s", r.URL.Path)
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	finfo, err := os.Stat(cleanPath)
 	if err != nil {
-		w.Write([]byte(fmt.Sprintf("Failed to open %s: %s", path, err.Error())))
+		// Security: Use http.Error which automatically HTML-escapes the message
+		// Only include the base filename in error message, not the full path
+		http.Error(w, fmt.Sprintf("Failed to open %s: %s",
+			filepath.Base(cleanPath), err.Error()),
+			http.StatusNotFound)
 		return
 	}
 
 	if !finfo.IsDir() {
-		http.ServeFile(w, r, path)
+		http.ServeFile(w, r, cleanPath)
 		return
 	}
 
-	names, err := ioutil.ReadDir(path)
+	names, err := ioutil.ReadDir(cleanPath)
 	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read directory: %s", err.Error()),
+			http.StatusInternalServerError)
 		return
 	}
 
@@ -1050,6 +1071,7 @@ func viewLogs(w http.ResponseWriter, r *http.Request) {
 
 	tpl, err := template.New("tpl").Parse(dirlisting_tpl)
 	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	data := dirlisting{Name: r.URL.Path, ServerUA: "Stratux " + stratuxVersion + "/" + stratuxBuild,
