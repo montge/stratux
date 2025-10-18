@@ -52,7 +52,7 @@ func TestUATDownlinkMessageType2WithAUXSV(t *testing.T) {
 	// This should be baro altitude since primary alt is GNSS
 	// Let's encode 4800ft
 	// raw_alt = (alt + 1000) / 25 + 1
-	raw_alt_auxsv := uint16((4800 + 1000) / 25 + 1)
+	raw_alt_auxsv := uint16((4800+1000)/25 + 1)
 	frame[29] = byte((raw_alt_auxsv >> 4) & 0xFF)
 	frame[30] = byte((raw_alt_auxsv & 0x0F) << 4)
 
@@ -112,15 +112,15 @@ func TestUATDownlinkInvalidPosition(t *testing.T) {
 	// Set altitude
 	raw_alt := uint16(80) // Some valid altitude
 	frame[10] = byte((raw_alt >> 4) & 0xFF)
-	frame[11] = byte((raw_alt & 0x0F) << 4) | 0x07 // NIC = 7
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x07 // NIC = 7
 
 	// Airground state
 	frame[12] = 0x00
 
 	// Mode Status (msg_type 1 requires this)
 	frame[23] = (0 << 5) | (2 << 2) | 0x02 // priority=0, uat_version=2, sil=2
-	frame[25] = 9 << 4 // NACp = 9
-	frame[26] = 1 << 1 // CSID = 1
+	frame[25] = 9 << 4                     // NACp = 9
+	frame[26] = 1 << 1                     // CSID = 1
 
 	hexStr := "+"
 	for _, b := range frame {
@@ -180,7 +180,7 @@ func TestUATDownlinkLatLngWrapping(t *testing.T) {
 		// Set altitude and other fields
 		raw_alt := uint16(80)
 		frame[10] = byte((raw_alt >> 4) & 0xFF)
-		frame[11] = byte((raw_alt & 0x0F) << 4) | 0x07
+		frame[11] = byte((raw_alt&0x0F)<<4) | 0x07
 		frame[12] = 0x00
 		frame[23] = (0 << 5) | (2 << 2) | 0x02
 		frame[25] = 9 << 4
@@ -237,7 +237,7 @@ func TestUATDownlinkLatLngWrapping(t *testing.T) {
 
 		raw_alt := uint16(80)
 		frame[10] = byte((raw_alt >> 4) & 0xFF)
-		frame[11] = byte((raw_alt & 0x0F) << 4) | 0x07
+		frame[11] = byte((raw_alt&0x0F)<<4) | 0x07
 		frame[12] = 0x00
 		frame[23] = (0 << 5) | (2 << 2) | 0x02
 		frame[25] = 9 << 4
@@ -320,40 +320,40 @@ func TestUATDownlinkDisplayTrafficSource(t *testing.T) {
 	globalSettings.DisplayTrafficSource = true
 
 	testCases := []struct {
-		name         string
-		addrType     byte
-		icao         uint32
-		tail         string
+		name           string
+		addrType       byte
+		icao           uint32
+		tail           string
 		expectedPrefix string
-		emitterCat   byte
-		nic          byte
+		emitterCat     byte
+		nic            byte
 	}{
 		{
-			name:         "ADSB_empty_tail",
-			addrType:     0, // TARGET_TYPE_ADSB
-			icao:         0x100001,
-			tail:         "",
+			name:           "ADSB_empty_tail",
+			addrType:       0, // TARGET_TYPE_ADSB
+			icao:           0x100001,
+			tail:           "",
 			expectedPrefix: "ua", // "u" + "a"
-			emitterCat:   1,
-			nic:          8,
+			emitterCat:     1,
+			nic:            8,
 		},
 		{
-			name:         "TISB_short_tail",
-			addrType:     3, // TARGET_TYPE_TISB
-			icao:         0x100002,
-			tail:         "ABC",
+			name:           "TISB_short_tail",
+			addrType:       3, // TARGET_TYPE_TISB
+			icao:           0x100002,
+			tail:           "ABC",
 			expectedPrefix: "utABC", // "u" + "t" + tail
-			emitterCat:   2,
-			nic:          8,
+			emitterCat:     2,
+			nic:            8,
 		},
 		{
-			name:         "ADSR_7char_tail",
-			addrType:     6, // TARGET_TYPE_ADSR (via addr_type=6 or addr_type=2 with NIC>=7 and emitter>0)
-			icao:         0x100003,
-			tail:         "ABCDEFG", // 7 chars
+			name:           "ADSR_7char_tail",
+			addrType:       6, // TARGET_TYPE_ADSR (via addr_type=6 or addr_type=2 with NIC>=7 and emitter>0)
+			icao:           0x100003,
+			tail:           "ABCDEFG",  // 7 chars
 			expectedPrefix: "urBCDEFG", // "u" + "r" + tail[1:]
-			emitterCat:   3,
-			nic:          9,
+			emitterCat:     3,
+			nic:            9,
 		},
 	}
 
@@ -383,7 +383,7 @@ func TestUATDownlinkDisplayTrafficSource(t *testing.T) {
 			// Altitude
 			raw_alt := uint16(80)
 			frame[10] = byte((raw_alt >> 4) & 0xFF)
-			frame[11] = byte((raw_alt & 0x0F) << 4) | tc.nic
+			frame[11] = byte((raw_alt&0x0F)<<4) | tc.nic
 
 			// Airground state
 			frame[12] = 0x00
@@ -479,7 +479,7 @@ func TestUATDownlinkAirgroundState3(t *testing.T) {
 	// Altitude
 	raw_alt := uint16(80)
 	frame[10] = byte((raw_alt >> 4) & 0xFF)
-	frame[11] = byte((raw_alt & 0x0F) << 4) | 0x07
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x07
 
 	// Airground state = 3 (reserved/unknown)
 	frame[12] = 0xC0 // Upper 2 bits = 11 (binary) = 3
