@@ -29,7 +29,7 @@ stratuxrun: main/*.go common/*.go libdump978.so
 	@sed -i 's/^go 1\.23\.0$$/go 1.23/' go.mod 2>/dev/null || sed -i '' 's/^go 1\.23\.0$$/go 1.23/' go.mod 2>/dev/null || true
 
 fancontrol: fancontrol_main/*.go common/*.go
-	go build $(BUILDINFO) -o fancontrol -p 4 ./fancontrol_main/
+	go build -mod=mod $(BUILDINFO) -o fancontrol -p 4 ./fancontrol_main/
 
 xdump1090:
 	cd dump1090 && make BLADERF=no
