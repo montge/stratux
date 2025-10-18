@@ -6,7 +6,6 @@ toolchain go1.23.12
 
 require (
 	github.com/BertoldVdb/go-ais v0.1.0
-	github.com/bradfitz/gomemcache v0.0.0-20230124162541-5f7a7d875746
 	github.com/dustin/go-humanize v1.0.0
 	github.com/felixge/pidctrl v0.0.0-20160307080219-7b13bcae7243
 	github.com/gansidui/geohash v0.0.0-20141019080235-ebe5ba447f34
@@ -19,8 +18,8 @@ require (
 	github.com/stianeikeland/go-rpio/v4 v4.5.1-0.20210920090620-2ab4c0432c52
 	github.com/stratux/goflying v0.0.0-20250123172850-dd059ec48194
 	github.com/stratux/serial v0.0.0-20250124170838-6b3ab1cff00c
-	github.com/takama/daemon v1.0.0
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
+	github.com/uavionix/serial v0.0.0-19700101022104-87f23b1d3198
 	golang.org/x/exp v0.0.0-20230728194245-b0cb94b80691
 	golang.org/x/net v0.38.0
 	gonum.org/v1/plot v0.9.0
@@ -40,11 +39,11 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/glog v1.2.4 // indirect
-	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/kylelemons/go-gypsy v1.0.0 // indirect
 	github.com/lib/pq v1.10.0 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/phpdave11/gofpdf v1.4.2 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
@@ -56,7 +55,6 @@ require (
 	github.com/soypat/seqs v0.0.0-20240527012110-1201bab640ef // indirect
 	github.com/tinygo-org/cbgo v0.0.4 // indirect
 	github.com/tinygo-org/pio v0.0.0-20231216154340-cd888eb58899 // indirect
-	github.com/uavionix/serial v0.0.0-19700101022104-87f23b1d3198 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	golang.org/x/image v0.18.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect

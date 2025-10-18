@@ -30,7 +30,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"text/template"
+	"html/template"
 	"time"
 
 	"database/sql"
