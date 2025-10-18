@@ -1174,6 +1174,10 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		if err1 != nil {
 			return false
 		}
+		// Bounds checking: GPS fix quality should be 0-9 per NMEA spec
+		if q < 0 || q > 9 {
+			q = 0
+		}
 		tmpSituation.GPSFixQuality = uint8(q) // 1 = 3D GPS; 2 = DGPS (SBAS /WAAS)
 
 		// Timestamp.
@@ -1480,8 +1484,18 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 					//log.Printf("Satellite %s already seen. Retrieving from 'Satellites'.\n", svStr)
 				} else { // this satellite isn't in the Satellites data structure, so create it
 					thisSatellite.SatelliteID = svStr
-					thisSatellite.SatelliteNMEA = uint8(sv)
-					thisSatellite.Type = uint8(svType)
+					// Bounds checking: ensure satellite number fits in uint8 range
+					if sv < 0 || sv > 255 {
+						thisSatellite.SatelliteNMEA = 255 // Use max value if out of range
+					} else {
+						thisSatellite.SatelliteNMEA = uint8(sv)
+					}
+					// Bounds checking: ensure type fits in uint8 range
+					if svType < 0 || svType > 255 {
+						thisSatellite.Type = 0 // Use 0 (unknown) if out of range
+					} else {
+						thisSatellite.Type = uint8(svType)
+					}
 					//log.Printf("Creating new satellite %s from GSA message\n", svStr) // DEBUG
 				}
 				thisSatellite.InSolution = true
@@ -1658,8 +1672,18 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 				//log.Printf("Satellite %s already seen. Retrieving from 'Satellites'.\n", svStr) // DEBUG
 			} else { // this satellite isn't in the Satellites data structure, so create it new
 				thisSatellite.SatelliteID = svStr
-				thisSatellite.SatelliteNMEA = uint8(sv)
-				thisSatellite.Type = uint8(svType)
+				// Bounds checking: ensure satellite number fits in uint8 range
+				if sv < 0 || sv > 255 {
+					thisSatellite.SatelliteNMEA = 255 // Use max value if out of range
+				} else {
+					thisSatellite.SatelliteNMEA = uint8(sv)
+				}
+				// Bounds checking: ensure type fits in uint8 range
+				if svType < 0 || svType > 255 {
+					thisSatellite.Type = 0 // Use 0 (unknown) if out of range
+				} else {
+					thisSatellite.Type = uint8(svType)
+				}
 				//log.Printf("Creating new satellite %s\n", svStr) // DEBUG
 			}
 			thisSatellite.TimeLastTracked = stratuxClock.Time
@@ -1668,11 +1692,19 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 			if err != nil {                    // some firmwares leave this blank if there's no position fix. Represent as -999.
 				elev = -999
 			}
+			// Bounds checking: ensure elevation fits in int16 range (-32768 to 32767)
+			if elev < -32768 || elev > 32767 {
+				elev = -999 // Use invalid marker if out of range
+			}
 			thisSatellite.Elevation = int16(elev)
 
 			az, err = strconv.Atoi(x[6+4*i]) // azimuth
 			if err != nil {                  // UBX allows tracking up to 5(?) degrees below horizon. Some firmwares leave this blank if no position fix. Represent invalid as -999.
 				az = -999
+			}
+			// Bounds checking: ensure azimuth fits in int16 range (-32768 to 32767)
+			if az < -32768 || az > 32767 {
+				az = -999 // Use invalid marker if out of range
 			}
 			thisSatellite.Azimuth = int16(az)
 

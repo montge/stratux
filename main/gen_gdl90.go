@@ -529,10 +529,21 @@ func makeStratuxStatus() []byte {
 		b_str = mib_str[strings.Index(mib_str, "b")+1:]
 	}
 
-	// Convert to strings.
+	// Convert to integers and clamp to byte range (0-255).
 	m, _ := strconv.Atoi(m_str)
 	mi, _ := strconv.Atoi(mi_str)
 	b, _ := strconv.Atoi(b_str)
+
+	// Bounds checking: ensure values fit in uint8 range
+	if m < 0 || m > 255 {
+		m = 0
+	}
+	if mi < 0 || mi > 255 {
+		mi = 0
+	}
+	if b < 0 || b > 255 {
+		b = 0
+	}
 
 	msg[4] = byte(m)
 	msg[5] = byte(mi)
