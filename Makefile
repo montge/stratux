@@ -24,6 +24,9 @@ endif
 all: libdump978.so xdump1090 xrtlais stratuxrun $(PLATFORMDEPENDENT)
 
 stratuxrun: main/*.go common/*.go libdump978.so
+	@# Ensure go.mod dependencies are up to date and fix version format
+	@go mod tidy 2>/dev/null || true
+	@sed -i 's/^go 1\.23\.0$$/go 1.23/' go.mod 2>/dev/null || sed -i '' 's/^go 1\.23\.0$$/go 1.23/' go.mod 2>/dev/null || true
 	LIBRARY_PATH=$(CURDIR) CGO_CFLAGS_ALLOW="-L$(CURDIR)" go build $(BUILDINFO) -o stratuxrun ./main/
 
 fancontrol: fancontrol_main/*.go common/*.go
