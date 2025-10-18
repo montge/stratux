@@ -826,7 +826,7 @@ angular.module('appControllers')
 			require: 'ngModel',
 			link: function(scope, element, attr, ctrl) {
 				function ipListValidation(value) {
-					var r = "(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
+					var r = "(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
 					var valid = (new RegExp("^(" + r + "( " + r + ")*|)$", "g")).test(value);
 					ctrl.$setValidity('ipList', valid);
 					if (valid) {
@@ -844,7 +844,7 @@ angular.module('appControllers')
 			require: 'ngModel',
 			link: function(scope, element, attr, ctrl) {
 				function ipListValidation(value) {
-					var r = "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
+					var r = "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
 					var valid = (new RegExp(r, "g")).test(value);
 					ctrl.$setValidity('ipAddr', valid);
 					if (valid) {
@@ -862,7 +862,7 @@ angular.module('appControllers')
 			require: 'ngModel',
 			link: function(scope, element, attr, ctrl) {
 				function gLimitsValidation(value) {
-					var r = "[-+]?[0-9]*\.?[0-9]+";
+					var r = "[-+]?[0-9]*\\.?[0-9]+";
 					var valid = (new RegExp("^(" + r + "( " + r + ")*|)$", "g")).test(value);
 					ctrl.$setValidity('gLimits', valid);
 					if (valid) {
