@@ -1,6 +1,8 @@
 module github.com/stratux/stratux
 
-go 1.20
+go 1.23.0
+
+toolchain go1.23.12
 
 require (
 	github.com/BertoldVdb/go-ais v0.1.0
@@ -20,7 +22,7 @@ require (
 	github.com/takama/daemon v1.0.0
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
 	golang.org/x/exp v0.0.0-20230728194245-b0cb94b80691
-	golang.org/x/net v0.33.0
+	golang.org/x/net v0.38.0
 	gonum.org/v1/plot v0.9.0
 	tinygo.org/x/bluetooth v0.10.0
 )
@@ -37,7 +39,7 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
+	github.com/golang/glog v1.2.4 // indirect
 	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/kylelemons/go-gypsy v1.0.0 // indirect
@@ -57,7 +59,7 @@ require (
 	github.com/uavionix/serial v0.0.0-19700101022104-87f23b1d3198 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	golang.org/x/image v0.18.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 )
