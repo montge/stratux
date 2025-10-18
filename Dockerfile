@@ -10,9 +10,16 @@ RUN apt-get update \
   && apt-get -y install git \
   && apt-get -y install gcc \
   && apt-get -y install ncurses-dev \
-  && apt-get -y install golang-go \
   && apt-get -y install wget \
   && apt-get -y install libusb-1.0-0-dev
+
+# Install Go 1.23.12 (Debian Bookworm only has Go 1.20 which doesn't support toolchain directive)
+RUN cd /tmp \
+    && wget https://go.dev/dl/go1.23.12.linux-arm64.tar.gz \
+    && tar -C /usr/local -xzf go1.23.12.linux-arm64.tar.gz \
+    && rm go1.23.12.linux-arm64.tar.gz
+
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 RUN cd /tmp \
     && wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb \
