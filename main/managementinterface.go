@@ -16,6 +16,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
@@ -30,7 +31,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"html/template"
 	"time"
 
 	"database/sql"
