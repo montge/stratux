@@ -16,6 +16,14 @@ var esDone bool
 func uatReplay(f *os.File, replaySpeed uint64) {
 	rdr := bufio.NewReader(f)
 	curTick := int64(0)
+	// Safe conversion of replaySpeed to int64 for division
+	// Clamp to int64 range to prevent overflow
+	var replaySpeedInt int64
+	if replaySpeed > 9223372036854775807 { // math.MaxInt64
+		replaySpeedInt = 1 // Default to 1x speed if out of range
+	} else {
+		replaySpeedInt = int64(replaySpeed)
+	}
 	for {
 		buf, err := rdr.ReadString('\n')
 		if err != nil {
@@ -33,7 +41,7 @@ func uatReplay(f *os.File, replaySpeed uint64) {
 				fmt.Fprintf(os.Stderr, "invalid tick: '%s'\n", linesplit[0])
 				continue
 			}
-			thisWait := (i - curTick) / int64(replaySpeed)
+			thisWait := (i - curTick) / replaySpeedInt
 
 			if thisWait >= 120000000000 { // More than 2 minutes wait, skip ahead.
 				fmt.Fprintf(os.Stderr, "UAT skipahead - %d seconds.\n", thisWait/1000000000)
@@ -87,6 +95,14 @@ func esReplay(f *os.File, replaySpeed uint64) {
 
 	rdr := bufio.NewReader(f)
 	curTick := int64(0)
+	// Safe conversion of replaySpeed to int64 for division
+	// Clamp to int64 range to prevent overflow
+	var replaySpeedInt int64
+	if replaySpeed > 9223372036854775807 { // math.MaxInt64
+		replaySpeedInt = 1 // Default to 1x speed if out of range
+	} else {
+		replaySpeedInt = int64(replaySpeed)
+	}
 	for {
 		buf, err := rdr.ReadString('\n')
 		if err != nil {
@@ -105,7 +121,7 @@ func esReplay(f *os.File, replaySpeed uint64) {
 				fmt.Fprintf(os.Stderr, "invalid tick: '%s'\n", linesplit[0])
 				continue
 			}
-			thisWait := (i - curTick) / int64(replaySpeed)
+			thisWait := (i - curTick) / replaySpeedInt
 
 			if thisWait >= 120000000000 { // More than 2 minutes wait, skip ahead.
 				fmt.Fprintf(os.Stderr, "ES skipahead - %d seconds.\n", thisWait/1000000000)

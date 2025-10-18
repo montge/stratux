@@ -1175,10 +1175,14 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 			return false
 		}
 		// Bounds checking: GPS fix quality should be 0-9 per NMEA spec
-		if q < 0 || q > 9 {
-			q = 0
+		// Clamp and convert to uint8 in single expression for data flow analysis
+		if q < 0 {
+			tmpSituation.GPSFixQuality = 0
+		} else if q > 9 {
+			tmpSituation.GPSFixQuality = 9
+		} else {
+			tmpSituation.GPSFixQuality = uint8(q) // 1 = 3D GPS; 2 = DGPS (SBAS /WAAS)
 		}
-		tmpSituation.GPSFixQuality = uint8(q) // 1 = 3D GPS; 2 = DGPS (SBAS /WAAS)
 
 		// Timestamp.
 		if len(x[1]) < 7 {
@@ -1693,20 +1697,28 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 				elev = -999
 			}
 			// Bounds checking: ensure elevation fits in int16 range (-32768 to 32767)
-			if elev < -32768 || elev > 32767 {
-				elev = -999 // Use invalid marker if out of range
+			// Clamp and convert to int16 in single expression for data flow analysis
+			if elev < -32768 {
+				thisSatellite.Elevation = -999 // Use invalid marker if out of range
+			} else if elev > 32767 {
+				thisSatellite.Elevation = -999 // Use invalid marker if out of range
+			} else {
+				thisSatellite.Elevation = int16(elev)
 			}
-			thisSatellite.Elevation = int16(elev)
 
 			az, err = strconv.Atoi(x[6+4*i]) // azimuth
 			if err != nil {                  // UBX allows tracking up to 5(?) degrees below horizon. Some firmwares leave this blank if no position fix. Represent invalid as -999.
 				az = -999
 			}
 			// Bounds checking: ensure azimuth fits in int16 range (-32768 to 32767)
-			if az < -32768 || az > 32767 {
-				az = -999 // Use invalid marker if out of range
+			// Clamp and convert to int16 in single expression for data flow analysis
+			if az < -32768 {
+				thisSatellite.Azimuth = -999 // Use invalid marker if out of range
+			} else if az > 32767 {
+				thisSatellite.Azimuth = -999 // Use invalid marker if out of range
+			} else {
+				thisSatellite.Azimuth = int16(az)
 			}
-			thisSatellite.Azimuth = int16(az)
 
 			cno, err = strconv.Atoi(x[7+4*i]) // signal
 			if err != nil {                   // will be blank if satellite isn't being received. Represent as -99.
@@ -1716,10 +1728,15 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 			} else if cno > 0 {
 				thisSatellite.TimeLastSeen = stratuxClock.Time // Is this needed?
 			}
-			if cno > 127 { // make sure strong signals don't overflow. Normal range is 0-99 so it shouldn't, but take no chances.
-				cno = 127
+			// Bounds checking: ensure signal fits in int8 range (-128 to 127)
+			// Clamp and convert to int8 in single expression for data flow analysis
+			if cno < -128 {
+				thisSatellite.Signal = -99 // Use invalid marker if out of range
+			} else if cno > 127 {
+				thisSatellite.Signal = 127 // Make sure strong signals don't overflow. Normal range is 0-99.
+			} else {
+				thisSatellite.Signal = int8(cno)
 			}
-			thisSatellite.Signal = int8(cno)
 
 			// hack workaround for GSA 12-sv limitation... if this is a SBAS satellite, we have a SBAS solution, and signal is greater than some arbitrary threshold, set InSolution
 			// drawback is this will show all tracked SBAS satellites as being in solution.
