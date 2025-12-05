@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -333,4 +334,222 @@ func TestTraceTimestampOrdering(t *testing.T) {
 	}
 
 	t.Logf("Verified chronological ordering of timestamps")
+}
+
+// TestTraceLoggerRecord_NoFileHandle tests Record with no active file
+func TestTraceLoggerRecord_NoFileHandle(t *testing.T) {
+	// Save original state
+	origTraceLog := TraceLog
+
+	// Create a fresh TraceLogger with no file handle
+	TraceLog = TraceLogger{}
+
+	// Record should not panic when fileHandle is nil
+	TraceLog.Record(CONTEXT_DUMP1090, []byte("test data"))
+
+	// Give goroutine time to execute
+	time.Sleep(10 * time.Millisecond)
+
+	// Restore original
+	TraceLog = origTraceLog
+
+	t.Log("Record with no file handle completed without panic")
+}
+
+// TestTraceLoggerRecord_IsReplaying tests Record when replaying
+func TestTraceLoggerRecord_IsReplaying(t *testing.T) {
+	// Save original state
+	origTraceLog := TraceLog
+
+	// Create a TraceLogger that is replaying
+	TraceLog = TraceLogger{
+		isReplaying: true,
+	}
+
+	// Record should return early when replaying
+	TraceLog.Record(CONTEXT_NMEA, []byte("test NMEA data"))
+
+	// Give goroutine time to execute
+	time.Sleep(10 * time.Millisecond)
+
+	// Restore original
+	TraceLog = origTraceLog
+
+	t.Log("Record when replaying completed without action")
+}
+
+// TestTraceLoggerOnTimestamp_NoFileHandle tests OnTimestamp with no file
+func TestTraceLoggerOnTimestamp_NoFileHandle(t *testing.T) {
+	// Save original state
+	origTraceLog := TraceLog
+
+	// Create a fresh TraceLogger
+	TraceLog = TraceLogger{}
+
+	ts := time.Date(2024, 1, 15, 12, 30, 0, 0, time.UTC)
+
+	// OnTimestamp should return early when fileHandle is nil
+	TraceLog.OnTimestamp(ts)
+
+	if TraceLog.hasProperFilename {
+		t.Error("hasProperFilename should still be false")
+	}
+
+	// Restore original
+	TraceLog = origTraceLog
+
+	t.Log("OnTimestamp with no file handle completed")
+}
+
+// TestTraceLoggerOnTimestamp_AlreadyHasProperFilename tests OnTimestamp when already named
+func TestTraceLoggerOnTimestamp_AlreadyHasProperFilename(t *testing.T) {
+	// Save original state
+	origTraceLog := TraceLog
+
+	// Create a TraceLogger that already has proper filename
+	TraceLog = TraceLogger{
+		hasProperFilename: true,
+		fileName:          "/var/log/stratux/test_trace.txt.gz",
+	}
+
+	ts := time.Date(2024, 1, 15, 12, 30, 0, 0, time.UTC)
+	origFilename := TraceLog.fileName
+
+	TraceLog.OnTimestamp(ts)
+
+	// Filename should not have changed
+	if TraceLog.fileName != origFilename {
+		t.Errorf("Filename should not change when hasProperFilename=true")
+	}
+
+	// Restore original
+	TraceLog = origTraceLog
+
+	t.Log("OnTimestamp with proper filename already set completed")
+}
+
+// TestTraceLoggerIsActive tests IsActive method
+func TestTraceLoggerIsActive(t *testing.T) {
+	// Save original state
+	origTraceLog := TraceLog
+
+	// Create a fresh TraceLogger
+	TraceLog = TraceLogger{}
+
+	// Should be inactive with no file handle
+	if TraceLog.IsActive() {
+		t.Error("Expected IsActive=false with no file handle")
+	}
+
+	// Restore original
+	TraceLog = origTraceLog
+
+	t.Log("IsActive returns correct state")
+}
+
+// TestTraceLoggerIsReplaying tests IsReplaying method
+func TestTraceLoggerIsReplaying(t *testing.T) {
+	// Save original state
+	origTraceLog := TraceLog
+
+	// Create a fresh TraceLogger
+	TraceLog = TraceLogger{}
+
+	// Should not be replaying by default
+	if TraceLog.IsReplaying() {
+		t.Error("Expected IsReplaying=false by default")
+	}
+
+	// Set replaying
+	TraceLog.isReplaying = true
+
+	if !TraceLog.IsReplaying() {
+		t.Error("Expected IsReplaying=true after setting flag")
+	}
+
+	// Restore original
+	TraceLog = origTraceLog
+
+	t.Log("IsReplaying returns correct state")
+}
+
+// TestTraceLoggerFlush_NoFileHandle tests Flush with no file
+func TestTraceLoggerFlush_NoFileHandle(t *testing.T) {
+	// Save original state
+	origTraceLog := TraceLog
+
+	// Create a fresh TraceLogger
+	TraceLog = TraceLogger{}
+
+	// Flush should not panic when fileHandle is nil
+	TraceLog.Flush()
+
+	// Restore original
+	TraceLog = origTraceLog
+
+	t.Log("Flush with no file handle completed without panic")
+}
+
+// TestInjectTraceMessage_AllContexts tests message injection for all context types
+func TestInjectTraceMessage_AllContexts(t *testing.T) {
+	// Initialize stratuxClock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Initialize required globals
+	initTestState()
+
+	testCases := []struct {
+		context string
+		data    string
+	}{
+		{CONTEXT_AIS, "!AIVDM,1,1,,A,13u@ND0P00PkCj0L1uUoEf600000,0*69"},
+		{CONTEXT_NMEA, "$GPRMC,120000,A,4727.030,N,12218.528,W,057.9,349.7,131025,015.0,E*66"},
+		{CONTEXT_APRS, `FLR395F39>APRS,qAS,OXFORD:/120000h5145.945N/00111.511W'057/057/A=000407 !W02! id06395F39`},
+		{CONTEXT_OGN_RX, `{"sys":"OGN","addr":"123456","lat_deg":51.7657,"lon_deg":-1.1918}`},
+		{CONTEXT_DUMP1090, `{"hex":"A12345","flight":"N12345","lat":47.5,"lon":-122.3}`},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.context, func(t *testing.T) {
+			// Set time slightly in the future so we don't sleep
+			ts := stratuxClock.Time.Add(-1 * time.Millisecond)
+
+			// This should not panic
+			injectTraceMessage(tc.context, ts, []byte(tc.data))
+
+			t.Logf("Injected %s message", tc.context)
+		})
+	}
+}
+
+// initTestState initializes global state for trace injection tests
+func initTestState() {
+	// Initialize mutexes
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muGPSPerformance = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Initialize traffic
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+	if traffic == nil {
+		traffic = make(map[uint32]TrafficInfo)
+	}
+	if seenTraffic == nil {
+		seenTraffic = make(map[uint32]bool)
+	}
+
+	// Initialize message log
+	msgLogMutex = sync.Mutex{}
+	if msgLog == nil {
+		msgLog = make([]msg, 0)
+	}
 }
