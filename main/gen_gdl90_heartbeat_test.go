@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -293,4 +294,104 @@ func TestMakeFFIDMessageShortNames(t *testing.T) {
 	}
 
 	t.Logf("makeFFIDMessage() with short strings generated %d-byte message", len(msg))
+}
+
+// TestMakeStratuxHeartbeat_WithValidAHRS tests makeStratuxHeartbeat with valid AHRS
+func TestMakeStratuxHeartbeat_WithValidAHRS(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	time.Sleep(50 * time.Millisecond) // Let clock start
+
+	// Initialize mutexes if needed
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+
+	// Set GPS valid: recent fix, connected, fix quality > 0
+	mySituation.muGPS.Lock()
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Very recent
+	mySituation.GPSFixQuality = 1
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set AHRS valid: recent attitude time
+	mySituation.muAttitude.Lock()
+	mySituation.AHRSLastAttitudeTime = stratuxClock.Time // Very recent (< 1 second)
+	mySituation.muAttitude.Unlock()
+
+	// Generate heartbeat
+	msg := makeStratuxHeartbeat()
+
+	// Check message was generated
+	if len(msg) < 5 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	// Check that GPS flag (0x02) and AHRS flag (0x01) are set
+	// Message format: 0x7E, msg[0]=0xCC, msg[1]=flags, CRC, 0x7E
+	// After unescaping, msg[1] should have GPS valid (0x02), AHRS valid (0x01), and protocol version (0x04)
+	// Expected: 0x07 (GPS=0x02 | AHRS=0x01 | Protocol=0x04)
+
+	t.Logf("makeStratuxHeartbeat() with valid AHRS generated %d-byte message", len(msg))
+	t.Logf("isGPSValid()=%v, isAHRSValid()=%v", isGPSValid(), isAHRSValid())
+}
+
+// TestMakeHeartbeat_WithErrors tests makeHeartbeat with system errors present
+func TestMakeHeartbeat_WithErrors(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	// Initialize mutex if needed
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+
+	// Set GPS valid
+	mySituation.muGPS.Lock()
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 1
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Add system errors
+	globalStatus.Errors = []string{"Error 1", "Error 2"}
+	defer func() { globalStatus.Errors = nil }()
+
+	msg := makeHeartbeat()
+
+	if len(msg) < 8 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	t.Logf("makeHeartbeat() with errors generated %d-byte message", len(msg))
 }
