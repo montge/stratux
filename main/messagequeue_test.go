@@ -409,3 +409,230 @@ func TestMessageQueueDataAvailableChannel(t *testing.T) {
 		t.Error("DataAvailable channel was not notified after Put")
 	}
 }
+
+// TestMessageQueueAllEntriesExpired tests when all entries are expired
+func TestMessageQueueAllEntriesExpired(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	// Add entries with very short timeout
+	queue.Put(100, 1*time.Millisecond, "expired1")
+	queue.Put(200, 1*time.Millisecond, "expired2")
+	queue.Put(300, 1*time.Millisecond, "expired3")
+
+	// Wait for entries to expire
+	time.Sleep(50 * time.Millisecond)
+
+	// All entries should be expired
+	data, prio := queue.PopFirst()
+	if data != nil {
+		t.Errorf("Expected nil when all entries expired, got %v", data)
+	}
+	if prio != 0 {
+		t.Errorf("Expected priority 0 when all entries expired, got %d", prio)
+	}
+
+	// The queue should have been cleared internally
+	dump := queue.GetQueueDump(false)
+	if len(dump) != 0 {
+		t.Errorf("Queue should be empty after all entries expired, got %d entries", len(dump))
+	}
+}
+
+// TestMessageQueuePruneLowPriorityRemoval tests that low priority entries are removed during pruning
+func TestMessageQueuePruneLowPriorityRemoval(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(3)
+
+	// Add high priority entries
+	queue.Put(10, 10*time.Second, "high1")
+	queue.Put(20, 10*time.Second, "high2")
+
+	// Add low priority entries to trigger pruning (>10% over maxSize)
+	queue.Put(100, 10*time.Second, "low1")
+	queue.Put(200, 10*time.Second, "low2")
+	queue.Put(300, 10*time.Second, "low3")
+
+	// Force another prune with GetQueueDump
+	dump := queue.GetQueueDump(true)
+
+	// Should have pruned to maxSize (3)
+	if len(dump) > 3 {
+		t.Errorf("Queue size after prune = %d, expected <= 3", len(dump))
+	}
+
+	// High priority entries should still be present
+	data1, prio1 := queue.PeekFirst()
+	if prio1 != 10 {
+		t.Errorf("First entry priority = %d, expected 10 (high priority)", prio1)
+	}
+	if data1.(string) != "high1" {
+		t.Errorf("First entry data = %v, expected 'high1'", data1)
+	}
+}
+
+// TestMessageQueuePruneRemoveEntireCategory tests removing an entire priority category
+func TestMessageQueuePruneRemoveEntireCategory(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(2)
+
+	// Add a high priority entry
+	queue.Put(10, 10*time.Second, "high")
+
+	// Add several low priority entries to exceed maxSize
+	queue.Put(500, 10*time.Second, "low1")
+	queue.Put(500, 10*time.Second, "low2")
+	queue.Put(500, 10*time.Second, "low3")
+	queue.Put(500, 10*time.Second, "low4")
+
+	// Force prune
+	dump := queue.GetQueueDump(true)
+
+	// The entire low priority category should be removed
+	if len(dump) > 2 {
+		t.Errorf("Queue size after prune = %d, expected <= 2", len(dump))
+	}
+
+	// Verify high priority is kept
+	data, prio := queue.PeekFirst()
+	if data == nil {
+		t.Fatal("Queue is empty")
+	}
+	if prio != 10 {
+		t.Errorf("First entry priority = %d, expected 10", prio)
+	}
+}
+
+// TestMessageQueuePruneExpiredRemoval tests that expired entries are removed during pruning
+func TestMessageQueuePruneExpiredRemoval(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	// Add entries with short timeout
+	queue.Put(100, 1*time.Millisecond, "expired1")
+	queue.Put(200, 1*time.Millisecond, "expired2")
+
+	// Add entry with long timeout
+	queue.Put(300, 10*time.Second, "valid")
+
+	// Wait for short entries to expire
+	time.Sleep(50 * time.Millisecond)
+
+	// Force prune
+	dump := queue.GetQueueDump(true)
+
+	// Only the valid entry should remain
+	if len(dump) != 1 {
+		t.Errorf("Queue size after prune = %d, expected 1 (only valid entry)", len(dump))
+	}
+
+	data, prio := queue.PeekFirst()
+	if prio != 300 {
+		t.Errorf("Entry priority = %d, expected 300", prio)
+	}
+	if data.(string) != "valid" {
+		t.Errorf("Entry data = %v, expected 'valid'", data)
+	}
+}
+
+// TestMessageQueueInsertPositionAtEnd tests insertion at the end of queue
+func TestMessageQueueInsertPositionAtEnd(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	// Add entries in ascending order (each should go at end)
+	queue.Put(100, 10*time.Second, "a")
+	queue.Put(200, 10*time.Second, "b")
+	queue.Put(300, 10*time.Second, "c")
+
+	// Verify order
+	dump := queue.GetQueueDump(false)
+	if len(dump) != 3 {
+		t.Fatalf("Queue size = %d, expected 3", len(dump))
+	}
+
+	if dump[0].(string) != "a" || dump[1].(string) != "b" || dump[2].(string) != "c" {
+		t.Errorf("Entries not in expected order: %v", dump)
+	}
+}
+
+// TestMessageQueuePutToNilEntries tests Put when entries is nil
+func TestMessageQueuePutToNilEntries(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+	// Manually set entries to nil
+	queue.entries = nil
+
+	// Put should handle nil entries gracefully
+	queue.Put(100, 10*time.Second, "test")
+
+	data, prio := queue.PeekFirst()
+	if data == nil {
+		t.Fatal("Entry not added to nil entries slice")
+	}
+	if data.(string) != "test" {
+		t.Errorf("Data = %v, expected 'test'", data)
+	}
+	if prio != 100 {
+		t.Errorf("Priority = %d, expected 100", prio)
+	}
+}
+
+// TestMessageQueueMultiplePriorityCategories tests pruning with multiple categories
+func TestMessageQueueMultiplePriorityCategories(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(4)
+
+	// Add entries in multiple priority categories
+	queue.Put(10, 10*time.Second, "high1")
+	queue.Put(10, 10*time.Second, "high2")
+	queue.Put(50, 10*time.Second, "medium1")
+	queue.Put(50, 10*time.Second, "medium2")
+	queue.Put(100, 10*time.Second, "low1")
+	queue.Put(100, 10*time.Second, "low2")
+
+	// Force prune
+	dump := queue.GetQueueDump(true)
+
+	// Should have pruned to 4 entries
+	if len(dump) > 4 {
+		t.Errorf("Queue size = %d, expected <= 4", len(dump))
+	}
+
+	// Highest priority should still be present
+	data, prio := queue.PeekFirst()
+	if prio != 10 {
+		t.Errorf("First entry priority = %d, expected 10", prio)
+	}
+	if data.(string) != "high1" {
+		t.Errorf("First entry = %v, expected 'high1'", data)
+	}
+}

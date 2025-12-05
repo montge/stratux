@@ -811,3 +811,179 @@ func TestFlarmEmitterCategoryConversion(t *testing.T) {
 		})
 	}
 }
+
+// TestMakeGPRMCString_SouthernHemisphere tests GPRMC with southern latitude
+func TestMakeGPRMCString_SouthernHemisphere(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up GPS state for southern hemisphere
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = -33.8688    // Sydney, Australia
+	mySituation.GPSLongitude = 151.2093   // East
+	mySituation.GPSGroundSpeed = 120
+	mySituation.GPSTrueCourse = 180
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTime = time.Now().UTC()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	result := makeGPRMCString()
+
+	if !strings.Contains(result, ",S,") {
+		t.Error("Expected 'S' for southern latitude")
+	}
+	if !strings.Contains(result, ",E,") {
+		t.Error("Expected 'E' for eastern longitude")
+	}
+	if !strings.Contains(result, ",A,") {
+		t.Error("Expected 'A' for valid GPS status")
+	}
+
+	t.Logf("GPRMC Southern: %s", strings.TrimSpace(result))
+}
+
+// TestMakeGPRMCString_WesternLongitude tests GPRMC with western longitude
+func TestMakeGPRMCString_WesternLongitude(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up GPS state for western hemisphere
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 40.7128     // New York, northern
+	mySituation.GPSLongitude = -74.0060   // West
+	mySituation.GPSGroundSpeed = 100
+	mySituation.GPSTrueCourse = 90
+	mySituation.GPSFixQuality = 2         // DGPS fix
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTime = time.Now().UTC()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	result := makeGPRMCString()
+
+	if !strings.Contains(result, ",N,") {
+		t.Error("Expected 'N' for northern latitude")
+	}
+	if !strings.Contains(result, ",W,") {
+		t.Error("Expected 'W' for western longitude")
+	}
+	// Fix quality 2 should give mode "D"
+	if !strings.Contains(result, ",D*") {
+		t.Error("Expected mode 'D' for DGPS fix quality")
+	}
+
+	t.Logf("GPRMC Western: %s", strings.TrimSpace(result))
+}
+
+// TestMakeGPRMCString_InvalidGPS tests GPRMC with invalid GPS
+func TestMakeGPRMCString_InvalidGPS(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up invalid GPS state
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 0
+	mySituation.GPSLongitude = 0
+	mySituation.GPSGroundSpeed = 0
+	mySituation.GPSTrueCourse = 0
+	mySituation.GPSFixQuality = 0
+	mySituation.GPSLastFixLocalTime = time.Time{} // Invalid time
+	mySituation.GPSTime = time.Time{}
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = false
+
+	result := makeGPRMCString()
+
+	if !strings.Contains(result, ",V,") {
+		t.Error("Expected 'V' for invalid GPS status")
+	}
+	if !strings.Contains(result, ",N*") {
+		t.Error("Expected mode 'N' for no fix quality")
+	}
+
+	t.Logf("GPRMC Invalid: %s", strings.TrimSpace(result))
+}
+
+// TestMakeGPGGAString_SouthernHemisphere tests GPGGA with southern latitude
+func TestMakeGPGGAString_SouthernHemisphere(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up GPS state for southern hemisphere
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = -33.8688    // Sydney, Australia
+	mySituation.GPSLongitude = 151.2093   // East
+	mySituation.GPSAltitudeMSL = 500
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSSatellites = 10
+	mySituation.GPSGeoidSep = -30.0
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTime = time.Now().UTC()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	result := makeGPGGAString()
+
+	if !strings.Contains(result, ",S,") {
+		t.Error("Expected 'S' for southern latitude")
+	}
+	if !strings.Contains(result, ",E,") {
+		t.Error("Expected 'E' for eastern longitude")
+	}
+
+	t.Logf("GPGGA Southern: %s", strings.TrimSpace(result))
+}
+
+// TestMakeGPGGAString_WesternLongitude tests GPGGA with western longitude
+func TestMakeGPGGAString_WesternLongitude(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up GPS state for western hemisphere
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 40.7128     // New York, northern
+	mySituation.GPSLongitude = -74.0060   // West
+	mySituation.GPSAltitudeMSL = 100
+	mySituation.GPSFixQuality = 2         // DGPS
+	mySituation.GPSSatellites = 12
+	mySituation.GPSGeoidSep = -35.0
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTime = time.Now().UTC()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	result := makeGPGGAString()
+
+	if !strings.Contains(result, ",N,") {
+		t.Error("Expected 'N' for northern latitude")
+	}
+	if !strings.Contains(result, ",W,") {
+		t.Error("Expected 'W' for western longitude")
+	}
+
+	t.Logf("GPGGA Western: %s", strings.TrimSpace(result))
+}
+
+// TestMakeGPGGAString_InvalidGPS tests GPGGA with invalid GPS
+func TestMakeGPGGAString_InvalidGPS(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up invalid GPS state
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 0
+	mySituation.GPSLongitude = 0
+	mySituation.GPSAltitudeMSL = 0
+	mySituation.GPSFixQuality = 0
+	mySituation.GPSSatellites = 3  // Some satellites tracked but no fix
+	mySituation.GPSGeoidSep = 0
+	mySituation.GPSLastFixLocalTime = time.Time{}
+	mySituation.GPSTime = time.Time{}
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = false
+
+	result := makeGPGGAString()
+
+	// Should have fix quality 0
+	if !strings.Contains(result, ",0,") {
+		t.Error("Expected fix quality 0 for invalid GPS")
+	}
+
+	t.Logf("GPGGA Invalid: %s", strings.TrimSpace(result))
+}

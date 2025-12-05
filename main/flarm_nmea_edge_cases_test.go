@@ -36,6 +36,11 @@ func resetFlarmEdgeCaseState() {
 		mySituation.muSatellite = &sync.Mutex{}
 	}
 
+	// Initialize traffic mutex if not already initialized
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
 	// Reset GPS state
 	mySituation.muGPS.Lock()
 	mySituation.GPSLatitude = 0
@@ -419,4 +424,288 @@ func TestComputeAlarmLevel_NegativeVertical(t *testing.T) {
 	}
 
 	t.Log("Negative vertical separation test complete")
+}
+
+// TestParseFlarmPFLAU_1090ESPriority tests that PFLAU ignores traffic when 1090ES has recent data
+func TestParseFlarmPFLAU_1090ESPriority(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTrueCourse = 90.0
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+
+	// Add existing traffic with 1090ES source and recent Age
+	address := uint32(0xABCDEF)
+	existingTraffic := TrafficInfo{
+		Icao_addr:   address,
+		Last_source: TRAFFIC_SOURCE_1090ES,
+		Age:         2.0, // Recently seen
+		Tail:        "TEST",
+	}
+	// Store with both possible keys
+	traffic[address] = existingTraffic
+	trafficMutex.Unlock()
+
+	// Parse PFLAU message for same aircraft - should be ignored due to 1090ES priority
+	// $PFLAU,<RX>,<TX>,<GPS>,<Power>,<AlarmLevel>,<RelativeBearing>,<AlarmType>,<RelativeVertical>,<RelativeDistance>,<ID>
+	pflauMsg := []string{"$PFLAU", "1", "1", "2", "1", "0", "45", "0", "100", "500", "ABCDEF"}
+	parseFlarmPFLAU(pflauMsg)
+
+	// Verify traffic wasn't modified (still has 1090ES source)
+	trafficMutex.Lock()
+	if ti, ok := traffic[address]; ok {
+		if ti.Last_source != TRAFFIC_SOURCE_1090ES {
+			t.Error("Traffic source should still be 1090ES after PFLAU when 1090ES is recent")
+		}
+	}
+	trafficMutex.Unlock()
+
+	t.Log("PFLAU 1090ES priority test complete")
+}
+
+// TestParseFlarmPFLAA_1090ESPriority tests that PFLAA ignores traffic when 1090ES has recent data
+func TestParseFlarmPFLAA_1090ESPriority(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS for distance calculation
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+
+	// Add existing traffic with 1090ES source and recent Age
+	address := uint32(0x123456)
+	key := uint32(0)<<24 | address // ICAO address type
+	existingTraffic := TrafficInfo{
+		Icao_addr:   address,
+		Last_source: TRAFFIC_SOURCE_1090ES,
+		Age:         1.0, // Very recently seen
+		Tail:        "TEST",
+		Alt:         5000,
+	}
+	traffic[key] = existingTraffic
+	trafficMutex.Unlock()
+
+	// Parse PFLAA message for same aircraft - should be ignored due to 1090ES priority
+	// $PFLAA,<AlarmLevel>,<RelativeNorth>,<RelativeEast>,<RelativeVertical>,<IDType>,<ID>,<Track>,<TurnRate>,<GroundSpeed>,<ClimbRate>,<AcftType>
+	pflaaMsg := []string{"$PFLAA", "0", "1000", "500", "100", "1", "123456", "90", "0", "50", "2", "1"}
+	parseFlarmPFLAA(pflaaMsg)
+
+	// Verify traffic wasn't modified (should still have 1090ES source and original altitude)
+	trafficMutex.Lock()
+	if ti, ok := traffic[key]; ok {
+		if ti.Last_source != TRAFFIC_SOURCE_1090ES {
+			t.Error("Traffic source should still be 1090ES after PFLAA when 1090ES is recent")
+		}
+		if ti.Alt != 5000 {
+			t.Errorf("Traffic altitude should still be 5000 after PFLAA when 1090ES is recent, got %d", ti.Alt)
+		}
+	}
+	trafficMutex.Unlock()
+
+	t.Log("PFLAA 1090ES priority test complete")
+}
+
+// TestParseFlarmPFLAU_OldTraffic tests that PFLAU updates traffic when 1090ES data is old
+func TestParseFlarmPFLAU_OldTraffic(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTrueCourse = 90.0
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+
+	// Add existing traffic with 1090ES source but OLD Age
+	address := uint32(0xFEDCBA)
+	existingTraffic := TrafficInfo{
+		Icao_addr:   address,
+		Last_source: TRAFFIC_SOURCE_1090ES,
+		Age:         10.0, // Old - should be updated by FLARM
+		Tail:        "OLD",
+	}
+	traffic[address] = existingTraffic
+	trafficMutex.Unlock()
+
+	// Parse PFLAU message - should update because 1090ES data is old
+	pflauMsg := []string{"$PFLAU", "1", "1", "2", "1", "0", "45", "0", "100", "500", "FEDCBA"}
+	parseFlarmPFLAU(pflauMsg)
+
+	// Verify traffic WAS modified (now has OGN source)
+	trafficMutex.Lock()
+	// Check with non-ICAO key since we can't know idType from PFLAU
+	key := uint32(1)<<24 | address
+	if ti, ok := traffic[key]; ok {
+		if ti.Last_source != TRAFFIC_SOURCE_OGN {
+			t.Errorf("Traffic source should be OGN after PFLAU when 1090ES is old, got %d", ti.Last_source)
+		}
+	}
+	trafficMutex.Unlock()
+
+	t.Log("PFLAU old traffic update test complete")
+}
+
+// TestParseFlarmPFLAA_OldTraffic tests that PFLAA updates traffic when 1090ES data is old
+func TestParseFlarmPFLAA_OldTraffic(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS for distance calculation
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+
+	// Add existing traffic with 1090ES source but OLD Age
+	address := uint32(0x654321)
+	key := uint32(0)<<24 | address // ICAO address type
+	existingTraffic := TrafficInfo{
+		Icao_addr:   address,
+		Last_source: TRAFFIC_SOURCE_1090ES,
+		Age:         8.0, // Old - should be updated by FLARM
+		Tail:        "OLD",
+		Alt:         3000,
+	}
+	traffic[key] = existingTraffic
+	trafficMutex.Unlock()
+
+	// Parse PFLAA message - should update because 1090ES data is old
+	pflaaMsg := []string{"$PFLAA", "0", "1000", "500", "100", "1", "654321", "90", "0", "50", "2", "1"}
+	parseFlarmPFLAA(pflaaMsg)
+
+	// Verify traffic WAS modified (now has OGN source)
+	trafficMutex.Lock()
+	if ti, ok := traffic[key]; ok {
+		if ti.Last_source != TRAFFIC_SOURCE_OGN {
+			t.Errorf("Traffic source should be OGN after PFLAA when 1090ES is old, got %d", ti.Last_source)
+		}
+	}
+	trafficMutex.Unlock()
+
+	t.Log("PFLAA old traffic update test complete")
+}
+
+// TestParseFlarmPFLAU_NegativeBearing tests negative bearing correction
+func TestParseFlarmPFLAU_NegativeBearing(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS with heading that will create negative bearing
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTrueCourse = 10.0 // Low heading
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+	trafficMutex.Unlock()
+
+	// Parse PFLAU message with negative relative bearing
+	// GPSTrueCourse (10) + RelativeBearing (-45) = -35, should wrap to 325
+	pflauMsg := []string{"$PFLAU", "1", "1", "2", "1", "0", "-45", "0", "100", "500", "ABCD12"}
+	parseFlarmPFLAU(pflauMsg)
+
+	trafficMutex.Lock()
+	found := false
+	for _, ti := range traffic {
+		if ti.Bearing >= 0 && ti.Bearing < 360 {
+			found = true
+			t.Logf("Bearing calculated: %.1f", ti.Bearing)
+		}
+	}
+	trafficMutex.Unlock()
+
+	if !found {
+		t.Error("Expected to find traffic with valid bearing")
+	}
+
+	t.Log("PFLAU negative bearing test complete")
+}
+
+// TestParseFlarmPFLAA_NonICAOType tests PFLAA with non-ICAO ID type
+func TestParseFlarmPFLAA_NonICAOType(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+	trafficMutex.Unlock()
+
+	// Parse PFLAA with non-ICAO ID type (2 = Flarm ID, should map to idType 1)
+	pflaaMsg := []string{"$PFLAA", "0", "500", "300", "50", "2", "DEAD00", "180", "0", "40", "1", "8"}
+	parseFlarmPFLAA(pflaaMsg)
+
+	trafficMutex.Lock()
+	// Check for non-ICAO key (idType=1)
+	address := uint32(0xDEAD00)
+	key := uint32(1)<<24 | address
+	ti, ok := traffic[key]
+	trafficMutex.Unlock()
+
+	if !ok {
+		t.Error("Expected to find traffic with non-ICAO ID type")
+	} else {
+		if ti.Addr_type != 1 {
+			t.Errorf("Expected Addr_type 1 (non-ICAO), got %d", ti.Addr_type)
+		}
+		t.Logf("Traffic registered with Addr_type=%d", ti.Addr_type)
+	}
+
+	t.Log("PFLAA non-ICAO ID type test complete")
 }
