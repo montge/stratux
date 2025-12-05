@@ -636,3 +636,56 @@ func TestMessageQueueMultiplePriorityCategories(t *testing.T) {
 		t.Errorf("First entry = %v, expected 'high1'", data)
 	}
 }
+
+// TestMessageQueuePruneRemoveMultipleCategories tests pruning that must remove multiple categories
+// This test specifically triggers the "else" branch in prune() where an entire category
+// is removed because it doesn't have enough entries to satisfy toBeRemoved
+func TestMessageQueuePruneRemoveMultipleCategories(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Create a queue with large maxSize initially so Put doesn't auto-prune
+	// Then we'll manually reduce maxSize and call prune via GetQueueDump
+	queue := NewMessageQueue(100) // Large enough that Put won't auto-prune
+
+	// Add entries in multiple priority categories
+	// High priority (prio=10) - 2 entries (should remain)
+	queue.Put(10, 10*time.Second, "high1")
+	queue.Put(10, 10*time.Second, "high2")
+	// Medium priority (prio=50) - 1 entry (entire category will be removed)
+	queue.Put(50, 10*time.Second, "medium1")
+	// Low priority (prio=100) - 1 entry (entire category will be removed first)
+	queue.Put(100, 10*time.Second, "low1")
+
+	// Now reduce maxSize to 2 and call prune
+	// Total: 4 entries, need to remove 2
+	// Low has 1, 1 < 2, so enter else branch, set low to nil, toBeRemoved = 1
+	// Medium has 1, 1 >= 1, so enter if branch, remove 1, keep 0... wait that's not right
+
+	// Let me recalculate:
+	// - We need to remove 2
+	// - Low priority has 1 entry, 1 < 2, so we set it to nil and continue (ELSE BRANCH)
+	// - toBeRemoved becomes 2 - 1 = 1
+	// - Medium has 1 entry, 1 >= 1, so we remove from it (IF BRANCH)
+	// Result: Low removed entirely (else), Medium has 0 left, High intact
+
+	queue.maxSize = 2
+
+	// Force prune via GetQueueDump
+	dump := queue.GetQueueDump(true)
+
+	// Should have pruned to 2 entries (only high priority remains)
+	if len(dump) != 2 {
+		t.Errorf("Queue size = %d, expected 2", len(dump))
+	}
+
+	// Verify all remaining entries are high priority
+	for _, entry := range dump {
+		str := entry.(string)
+		if str != "high1" && str != "high2" {
+			t.Errorf("Unexpected entry remaining: %s (expected only high priority)", str)
+		}
+	}
+}
