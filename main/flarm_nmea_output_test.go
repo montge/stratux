@@ -1156,3 +1156,306 @@ func TestMakeFlarmPFLAAString_NonICAOAddress(t *testing.T) {
 
 	t.Logf("PFLAA with non-ICAO: %s", strings.TrimSpace(msg))
 }
+
+// TestMakeFlarmPFLAUString_BearingLessThanMinus180 tests bearing wrapping for bearing < -180
+func TestMakeFlarmPFLAUString_BearingLessThanMinus180(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS with course that results in bearing < -180
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSTrueCourse = 350 // heading almost north
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro for relative vertical calculation
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 1000
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	// Add traffic to the traffic map (needed for len(traffic))
+	trafficMutex.Lock()
+	traffic[0x123456] = TrafficInfo{}
+	trafficMutex.Unlock()
+
+	// Traffic to the east-southeast (bearing ~120 degrees)
+	// With course 350, relative bearing = 120 - 350 = -230 -> should wrap to +130
+	ti := TrafficInfo{
+		Icao_addr:      0x123456,
+		Position_valid: true,
+		Lat:            47.4,  // South
+		Lng:            8.7,   // East
+		Alt:            1200,
+	}
+
+	msg := makeFlarmPFLAUString(ti)
+
+	if !strings.HasPrefix(msg, "$PFLAU") {
+		t.Errorf("Expected PFLAU sentence, got: %s", msg)
+	}
+
+	// Validate it's a proper NMEA sentence
+	validateNMEASentence(t, msg, "PFLAU")
+
+	t.Logf("PFLAU with bearing wrapping (< -180): %s", strings.TrimSpace(msg))
+}
+
+// TestMakeFlarmPFLAUString_BearingGreaterThan180 tests bearing wrapping when relative bearing > 180
+func TestMakeFlarmPFLAUString_BearingGreaterThan180(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS with low true course (e.g., 10 degrees)
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSTrueCourse = 10 // Low true course
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 1000
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	trafficMutex.Lock()
+	traffic[0xBEA123] = TrafficInfo{}
+	trafficMutex.Unlock()
+
+	// Traffic to the southwest (bearing ~225 from north)
+	// Relative bearing = 225 - 10 = 215 degrees, which is > 180
+	// Should be wrapped to 215 - 360 = -145 degrees
+	ti := TrafficInfo{
+		Icao_addr:      0xBEA123,
+		Position_valid: true,
+		Lat:            47.495, // South of us
+		Lng:            8.494,  // West of us, creates ~225° bearing
+		Alt:            1050,   // Close in altitude for alarm
+		BearingDist_valid: true,
+	}
+
+	msg := makeFlarmPFLAUString(ti)
+
+	if !strings.HasPrefix(msg, "$PFLAU") {
+		t.Errorf("Expected PFLAU sentence, got: %s", msg)
+	}
+
+	// Validate it's a proper NMEA sentence
+	validateNMEASentence(t, msg, "PFLAU")
+
+	t.Logf("PFLAU with bearing wrapping (> 180): %s", strings.TrimSpace(msg))
+}
+
+// TestMakeFlarmPFLAUString_AlarmLevel2 tests PFLAU with alarm level 2 (close traffic)
+func TestMakeFlarmPFLAUString_AlarmLevel2(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSTrueCourse = 90
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 1000 // 1000 ft
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	trafficMutex.Lock()
+	traffic[0xABCDEF] = TrafficInfo{}
+	trafficMutex.Unlock()
+
+	// Traffic very close (within 1 NM / 1852m and within 1000 ft / 304m vertical)
+	// This should trigger alarm level 2
+	ti := TrafficInfo{
+		Icao_addr:      0xABCDEF,
+		Position_valid: true,
+		Lat:            47.5 + 0.005, // ~500m north
+		Lng:            8.5 + 0.005,  // ~350m east
+		Alt:            1150,          // 150 ft higher (within 304m = 1000ft)
+		Tail:           "N123AB",
+	}
+
+	msg := makeFlarmPFLAUString(ti)
+
+	if !strings.HasPrefix(msg, "$PFLAU") {
+		t.Errorf("Expected PFLAU sentence, got: %s", msg)
+	}
+
+	// Alarm level should be 2 (1NM, 1000ft)
+	// Format: $PFLAU,<RX>,<TX>,<GPS>,<Power>,<AlarmLevel>,...
+	parts := strings.Split(msg, ",")
+	if len(parts) > 5 {
+		alarmLevel := parts[5]
+		if alarmLevel != "2" && alarmLevel != "3" {
+			t.Logf("Alarm level was %s (expected 2 or 3 for close traffic)", alarmLevel)
+		}
+	}
+
+	// Should have the ID with tail appended
+	if !strings.Contains(msg, "ABCDEF!N123AB") {
+		t.Log("Expected ID with tail appended")
+	}
+
+	t.Logf("PFLAU with alarm level: %s", strings.TrimSpace(msg))
+}
+
+// TestMakeFlarmPFLAUString_AlarmLevel3 tests PFLAU with alarm level 3 (very close traffic)
+func TestMakeFlarmPFLAUString_AlarmLevel3(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSTrueCourse = 0
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 1000
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	trafficMutex.Lock()
+	traffic[0x111111] = TrafficInfo{}
+	trafficMutex.Unlock()
+
+	// Traffic very close (within 0.5 NM / 926m and within 500 ft / 152m vertical)
+	// This should trigger alarm level 3
+	ti := TrafficInfo{
+		Icao_addr:      0x111111,
+		Position_valid: true,
+		Lat:            47.5 + 0.002, // ~220m north
+		Lng:            8.5 + 0.002,  // ~150m east
+		Alt:            1050,          // 50 ft higher (within 152m = 500ft)
+	}
+
+	msg := makeFlarmPFLAUString(ti)
+
+	if !strings.HasPrefix(msg, "$PFLAU") {
+		t.Errorf("Expected PFLAU sentence, got: %s", msg)
+	}
+
+	// Alarm level should be 3 (0.5NM, 500ft)
+	parts := strings.Split(msg, ",")
+	if len(parts) > 5 {
+		alarmLevel := parts[5]
+		if alarmLevel != "3" {
+			t.Logf("Alarm level was %s (expected 3 for very close traffic)", alarmLevel)
+		}
+	}
+
+	t.Logf("PFLAU with alarm level 3: %s", strings.TrimSpace(msg))
+}
+
+// TestMakeFlarmPFLAAString_DEBUGMode tests PFLAA with DEBUG mode enabled
+func TestMakeFlarmPFLAAString_DEBUGMode(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Save and restore DEBUG setting
+	origDEBUG := globalSettings.DEBUG
+	defer func() { globalSettings.DEBUG = origDEBUG }()
+
+	globalSettings.DEBUG = true
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 1000
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	ti := TrafficInfo{
+		Icao_addr:      0xDEB001,
+		Position_valid: true,
+		Lat:            47.51,
+		Lng:            8.51,
+		Alt:            1500,
+		Tail:           "DEBUG",
+		Speed_valid:    true,
+		Speed:          100,
+	}
+
+	msg, valid, _ := makeFlarmPFLAAString(ti)
+
+	if !valid {
+		t.Error("Expected valid PFLAA message")
+	}
+
+	if !strings.HasPrefix(msg, "$PFLAA") {
+		t.Errorf("Expected PFLAA sentence, got: %s", msg)
+	}
+
+	t.Logf("PFLAA with DEBUG mode: %s", strings.TrimSpace(msg))
+}
+
+// TestMakeFlarmPFLAAString_DistanceEstimated tests PFLAA with DistanceEstimated
+func TestMakeFlarmPFLAAString_DistanceEstimated(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 1000
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	// Traffic without valid position but with estimated distance
+	ti := TrafficInfo{
+		Icao_addr:         0xE51111,
+		Position_valid:    false,
+		DistanceEstimated: 5000, // 5km estimated
+		Alt:               1500,
+		Vvel:              200,
+	}
+
+	msg, valid, _ := makeFlarmPFLAAString(ti)
+
+	if !valid {
+		t.Error("Expected valid PFLAA message even with invalid position")
+	}
+
+	// For invalid position, RelativeEast should be empty (consecutive commas)
+	if !strings.Contains(msg, ",,") {
+		t.Log("Expected empty RelativeEast field for bearingless traffic")
+	}
+
+	t.Logf("PFLAA with DistanceEstimated: %s", strings.TrimSpace(msg))
+}

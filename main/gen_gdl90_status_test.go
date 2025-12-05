@@ -525,3 +525,301 @@ func TestMakeStratuxStatus_VersionParsing(t *testing.T) {
 		})
 	}
 }
+
+// TestMakeStratuxStatus_GPSFixQuality3D tests GPS Fix Quality = 1 (3D GPS)
+func TestMakeStratuxStatus_GPSFixQuality3D(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mutexes
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original values
+	origVersion := stratuxVersion
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origTowers := ADSBTowers
+	origSituation := mySituation
+
+	defer func() {
+		stratuxVersion = origVersion
+		globalSettings = origSettings
+		globalStatus = origStatus
+		ADSBTowers = origTowers
+		mySituation = origSituation
+	}()
+
+	// Initialize towers map
+	ADSBTowers = make(map[string]ADSBTower)
+	stratuxVersion = "v1.6"
+	globalSettings = settings{}
+	globalStatus = status{}
+	globalStatus.GPS_connected = true
+
+	// Set up GPS with fix quality 1 (3D GPS, not DGPS)
+	mySituation.muGPS.Lock()
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	msg := makeStratuxStatus()
+
+	if len(msg) < 30 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Check frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	t.Logf("GPS Fix Quality 1: generated %d-byte message", len(msg))
+}
+
+// TestMakeStratuxStatus_GPSFixQuality2DGPS tests GPS Fix Quality = 2 (DGPS/WAAS)
+func TestMakeStratuxStatus_GPSFixQuality2DGPS(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mutexes
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original values
+	origVersion := stratuxVersion
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origTowers := ADSBTowers
+	origSituation := mySituation
+
+	defer func() {
+		stratuxVersion = origVersion
+		globalSettings = origSettings
+		globalStatus = origStatus
+		ADSBTowers = origTowers
+		mySituation = origSituation
+	}()
+
+	// Initialize towers map
+	ADSBTowers = make(map[string]ADSBTower)
+	stratuxVersion = "v1.6"
+	globalSettings = settings{}
+	globalStatus = status{}
+	globalStatus.GPS_connected = true
+
+	// Set up GPS with fix quality 2 (DGPS/SBAS/WAAS)
+	mySituation.muGPS.Lock()
+	mySituation.GPSFixQuality = 2
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	msg := makeStratuxStatus()
+
+	if len(msg) < 30 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Check frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	t.Logf("GPS Fix Quality 2 (DGPS): generated %d-byte message", len(msg))
+}
+
+// TestMakeStratuxStatus_GPSFixQualityDefault tests GPS Fix Quality = 0 (default case)
+func TestMakeStratuxStatus_GPSFixQualityDefault(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mutexes
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original values
+	origVersion := stratuxVersion
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origTowers := ADSBTowers
+	origSituation := mySituation
+
+	defer func() {
+		stratuxVersion = origVersion
+		globalSettings = origSettings
+		globalStatus = origStatus
+		ADSBTowers = origTowers
+		mySituation = origSituation
+	}()
+
+	// Initialize towers map
+	ADSBTowers = make(map[string]ADSBTower)
+	stratuxVersion = "v1.6"
+	globalSettings = settings{}
+	globalStatus = status{}
+	globalStatus.GPS_connected = true
+
+	// Set up GPS with fix quality 0 (default case - neither 1 nor 2)
+	mySituation.muGPS.Lock()
+	mySituation.GPSFixQuality = 0
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	msg := makeStratuxStatus()
+
+	if len(msg) < 30 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Check frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	t.Logf("GPS Fix Quality 0 (default): generated %d-byte message", len(msg))
+}
+
+// TestMakeStratuxStatus_EdgeVersions tests version numbers that hit edge cases
+func TestMakeStratuxStatus_EdgeVersions(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mutexes
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	// Save original values
+	origVersion := stratuxVersion
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origTowers := ADSBTowers
+
+	defer func() {
+		stratuxVersion = origVersion
+		globalSettings = origSettings
+		globalStatus = origStatus
+		ADSBTowers = origTowers
+	}()
+
+	// Initialize towers map
+	ADSBTowers = make(map[string]ADSBTower)
+	globalSettings = settings{}
+	globalStatus = status{}
+
+	// Test edge version formats that may produce unusual parsing results
+	testCases := []struct {
+		name    string
+		version string
+	}{
+		// No suffix version (tp = 0, empty minor/build)
+		{"Plain_version", "v1.6"},
+		// Very large major version
+		{"Large_major", "v999.0"},
+		// Very large minor version (> 255 to hit bounds check)
+		{"Large_minor", "v1.999"},
+		// Very large minor with RC
+		{"Large_minor_rc", "v1.999rc1"},
+		// Large build number
+		{"Large_build", "v1.6rc999"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stratuxVersion = tc.version
+
+			msg := makeStratuxStatus()
+
+			if len(msg) < 30 {
+				t.Errorf("%s: Message too short: got %d bytes", tc.name, len(msg))
+			}
+
+			// Check frame markers
+			if msg[0] != 0x7E {
+				t.Errorf("%s: Expected start frame marker 0x7E, got 0x%02X", tc.name, msg[0])
+			}
+			if msg[len(msg)-1] != 0x7E {
+				t.Errorf("%s: Expected end frame marker 0x7E, got 0x%02X", tc.name, msg[len(msg)-1])
+			}
+
+			t.Logf("%s: generated %d-byte message", tc.name, len(msg))
+		})
+	}
+}
