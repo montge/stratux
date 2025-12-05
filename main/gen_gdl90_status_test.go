@@ -449,3 +449,79 @@ func TestMakeStratuxStatusWithStatus(t *testing.T) {
 		})
 	}
 }
+
+// TestMakeStratuxStatus_VersionParsing tests various version string formats
+func TestMakeStratuxStatus_VersionParsing(t *testing.T) {
+	// Initialize CRC table
+	crcInit()
+
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mutexes
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name    string
+		version string
+		build   string
+	}{
+		{
+			name:    "Release Candidate Version",
+			version: "v1.6rc3",
+			build:   "test",
+		},
+		{
+			name:    "Release Version",
+			version: "v1.6r2",
+			build:   "test",
+		},
+		{
+			name:    "Beta Version",
+			version: "v1.6b1",
+			build:   "test",
+		},
+		{
+			name:    "Simple Version",
+			version: "v1.6",
+			build:   "test",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set version strings
+			stratuxVersion = tc.version
+			stratuxBuild = tc.build
+
+			msg := makeStratuxStatus()
+
+			if len(msg) < 30 {
+				t.Errorf("Message too short: got %d bytes", len(msg))
+			}
+
+			// Check frame markers
+			if msg[0] != 0x7E {
+				t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+			}
+			if msg[len(msg)-1] != 0x7E {
+				t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+			}
+
+			t.Logf("Version %s: generated %d-byte message", tc.version, len(msg))
+		})
+	}
+}
