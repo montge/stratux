@@ -712,3 +712,111 @@ func TestMbTileConnectionCacheEntry(t *testing.T) {
 		}
 	})
 }
+
+// =============================================================================
+// POST Handler Tests
+// =============================================================================
+
+// TestHandleRegionSet tests the /setRegion POST endpoint
+// Note: Full POST tests are skipped because they call changeRegionSettings()
+// which requires extensive global state initialization
+func TestHandleRegionSet(t *testing.T) {
+	// Test that GET request is handled correctly (doesn't modify anything)
+	t.Run("get_request", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/setRegion", nil)
+		w := httptest.NewRecorder()
+
+		handleRegionSet(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		// Verify CORS headers are set
+		if w.Header().Get("Access-Control-Allow-Method") == "" {
+			t.Error("Expected Access-Control-Allow-Method header")
+		}
+	})
+
+	// Test OPTIONS request for CORS preflight
+	t.Run("options_request", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/setRegion", nil)
+		w := httptest.NewRecorder()
+
+		handleRegionSet(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// TestHandleSettingsSetRequest tests the /setSettings POST endpoint
+// Note: Full POST tests require extensive global state. Testing GET/OPTIONS only.
+func TestHandleSettingsSetRequest(t *testing.T) {
+	t.Run("get_request", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/setSettings", nil)
+		w := httptest.NewRecorder()
+
+		handleSettingsSetRequest(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		// Verify CORS headers are set
+		if w.Header().Get("Access-Control-Allow-Method") == "" {
+			t.Error("Expected Access-Control-Allow-Method header")
+		}
+	})
+
+	t.Run("options_request", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/setSettings", nil)
+		w := httptest.NewRecorder()
+
+		handleSettingsSetRequest(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// Note: The following handlers call saveSettings() which requires
+// systemErrsMutex and other globals to be initialized:
+// - handleDevelModeToggle
+// - handleOrientAHRS
+// - handleCageAHRS
+// - handleCalibrateAHRS
+// - handleResetGMeter
+// Testing these would require initializing the full application state.
+
+// =============================================================================
+// Utility Function Tests
+// =============================================================================
+
+// TestSetNoCache tests the setNoCache helper
+func TestSetNoCache(t *testing.T) {
+	w := httptest.NewRecorder()
+	setNoCache(w)
+
+	cacheControl := w.Header().Get("Cache-Control")
+	if cacheControl == "" {
+		t.Error("Expected Cache-Control header to be set")
+	}
+}
+
+// TestSetJSONHeaders tests the setJSONHeaders helper
+func TestSetJSONHeaders(t *testing.T) {
+	w := httptest.NewRecorder()
+	setJSONHeaders(w)
+
+	contentType := w.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected Content-Type to contain application/json, got %s", contentType)
+	}
+}
