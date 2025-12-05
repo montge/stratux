@@ -1896,6 +1896,184 @@ func TestIsOwnshipTrafficInfo_NoAltitudeVerification(t *testing.T) {
 	}
 }
 
+// TestIsOwnshipTrafficInfo_ValidSpeed tests ownship with valid speed from traffic
+func TestIsOwnshipTrafficInfo_ValidSpeed(t *testing.T) {
+	resetTrafficState()
+
+	// Initialize mutexes if needed
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+
+	// Set up ownship ICAO
+	globalSettings.OwnshipModeS = "A12345"
+
+	// Set up GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 43.99
+	mySituation.GPSLongitude = -88.56
+	mySituation.GPSAltitudeMSL = 5000
+	mySituation.GPSGroundSpeed = 100 // Our ground speed
+	mySituation.GPSHorizontalAccuracy = 10
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 1
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro for altitude verification
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 5000
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	// Traffic matching ownship with valid speed
+	ti := TrafficInfo{
+		Icao_addr:      0xA12345,
+		Lat:            43.99,
+		Lng:            -88.56,
+		Alt:            5000, // Matches baro altitude
+		Position_valid: true,
+		Speed_valid:    true, // Traffic has valid speed
+		Speed:          120,  // Traffic moving faster than us
+		Age:            1.0,
+	}
+
+	isOwnship, shouldIgnore := isOwnshipTrafficInfo(ti)
+
+	// Should be treated as ownship
+	if !shouldIgnore {
+		t.Error("Expected shouldIgnore=true for matching ownship ICAO")
+	}
+
+	t.Logf("isOwnship=%v, shouldIgnore=%v (with valid speed)", isOwnship, shouldIgnore)
+}
+
+// TestIsOwnshipTrafficInfo_TooFarDistance tests ownship rejection when horizontal distance is too large
+func TestIsOwnshipTrafficInfo_TooFarDistance(t *testing.T) {
+	resetTrafficState()
+
+	// Initialize mutexes if needed
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+
+	// Set up ownship ICAO
+	globalSettings.OwnshipModeS = "DEADBE"
+
+	// Set up GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 43.0
+	mySituation.GPSLongitude = -88.0
+	mySituation.GPSAltitudeMSL = 5000
+	mySituation.GPSGroundSpeed = 50 // Low speed
+	mySituation.GPSHorizontalAccuracy = 10
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 1
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro for altitude verification
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 5000
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	// Traffic at matching ICAO but very far away (multiple km)
+	// ~111km north (1 degree latitude is ~111km)
+	ti := TrafficInfo{
+		Icao_addr:      0xDEADBE,
+		Lat:            44.0, // 1 degree north = ~111km away
+		Lng:            -88.0,
+		Alt:            5000, // Same altitude
+		Position_valid: true,
+		Age:            1.0,
+	}
+
+	isOwnship, shouldIgnore := isOwnshipTrafficInfo(ti)
+
+	// Should NOT be marked as ownship (too far), and should continue trying other codes
+	// Since there's only one code and distance check fails, shouldIgnore should be false
+	if isOwnship {
+		t.Error("Expected isOwnship=false for traffic too far away")
+	}
+	if shouldIgnore {
+		t.Error("Expected shouldIgnore=false when skipping due to distance")
+	}
+
+	t.Logf("isOwnship=%v, shouldIgnore=%v (too far away)", isOwnship, shouldIgnore)
+}
+
+// TestIsOwnshipTrafficInfo_DEBUGMode tests ownship detection with DEBUG logging enabled
+func TestIsOwnshipTrafficInfo_DEBUGMode(t *testing.T) {
+	resetTrafficState()
+
+	// Initialize mutexes if needed
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+
+	// Save original DEBUG setting
+	origDEBUG := globalSettings.DEBUG
+	defer func() {
+		globalSettings.DEBUG = origDEBUG
+	}()
+
+	// Enable DEBUG mode
+	globalSettings.DEBUG = true
+
+	// Set up ownship ICAO
+	globalSettings.OwnshipModeS = "123456"
+
+	// Set up GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 43.99
+	mySituation.GPSLongitude = -88.56
+	mySituation.GPSAltitudeMSL = 5000
+	mySituation.GPSGroundSpeed = 100
+	mySituation.GPSHorizontalAccuracy = 10
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 1
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Set up baro for altitude verification
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 5000
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.muBaro.Unlock()
+
+	// Traffic matching ownship, close by
+	ti := TrafficInfo{
+		Icao_addr:      0x123456,
+		Lat:            43.99,
+		Lng:            -88.56,
+		Alt:            5000,
+		Position_valid: true,
+		Age:            1.0,
+	}
+
+	isOwnship, shouldIgnore := isOwnshipTrafficInfo(ti)
+
+	// Should be treated as ownship with DEBUG logging
+	if !shouldIgnore {
+		t.Error("Expected shouldIgnore=true for matching ownship ICAO with DEBUG")
+	}
+
+	t.Logf("isOwnship=%v, shouldIgnore=%v (with DEBUG mode)", isOwnship, shouldIgnore)
+}
+
 // TestMakeTrafficReportMsg_GNSSAltitudeConversion tests GNSS to baro altitude conversion
 // Verifies: FR-604 (GDL90 Traffic Report - GNSS altitude conversion)
 func TestMakeTrafficReportMsg_GNSSAltitudeConversion(t *testing.T) {
