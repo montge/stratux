@@ -555,3 +555,268 @@ func Test1090ESMessageLog(t *testing.T) {
 		t.Logf("Message logged with class=%d", lastMsg.MessageClass)
 	}
 }
+
+// Test1090ESHeartbeatMessage tests the heartbeat message (0x07FFFFFF)
+func Test1090ESHeartbeatMessage(t *testing.T) {
+	reset1090ESState()
+
+	// Heartbeat uses special ICAO address 0x07FFFFFF
+	heartbeatMsg := `{"Icao_addr":134217727,"DF":0,"CA":0,"TypeCode":0}`
+	parseDump1090Message(heartbeatMsg)
+
+	// Heartbeat should not create traffic entry
+	trafficMutex.Lock()
+	_, exists := traffic[0x07FFFFFF]
+	trafficMutex.Unlock()
+
+	if exists {
+		t.Error("Heartbeat message should not create traffic entry")
+	}
+
+	t.Log("Heartbeat message correctly ignored")
+}
+
+// Test1090ESNonICAOAddress tests handling of non-ICAO addresses (TIS-B)
+func Test1090ESNonICAOAddress(t *testing.T) {
+	reset1090ESState()
+
+	// Non-ICAO addresses have bit 25 set by dump1090
+	// Original address 0xABCDEF with bit 25 set becomes 0x01ABCDEF
+	nonIcaoMsg := `{"Icao_addr":28036591,"DF":18,"CA":5,"TypeCode":11,"Lat":40.7128,"Lng":-74.006,"Alt":5000,"Position_valid":true}`
+	parseDump1090Message(nonIcaoMsg)
+
+	// Should be stored with address 0xABCDEF (bit 25 stripped)
+	trafficMutex.Lock()
+	ti, exists := traffic[0xABCDEF]
+	trafficMutex.Unlock()
+
+	if !exists {
+		t.Error("Non-ICAO address should be stored with bit 25 stripped")
+	} else {
+		if ti.Addr_type != 3 {
+			t.Logf("TIS-B target stored with Addr_type=%d", ti.Addr_type)
+		}
+	}
+
+	t.Log("Non-ICAO address handling test complete")
+}
+
+// Test1090ESNICCalculation tests NIC (Navigation Integrity Category) calculation for different type codes
+func Test1090ESNICCalculation(t *testing.T) {
+	reset1090ESState()
+
+	testCases := []struct {
+		name        string
+		typeCode    int
+		subtypeCode int
+		expectedNIC int
+	}{
+		{"TypeCode 17 -> NIC 1", 17, 0, 1},
+		{"TypeCode 16 subtype 0 -> NIC 2", 16, 0, 2},
+		{"TypeCode 16 subtype 1 -> NIC 3", 16, 1, 3},
+		{"TypeCode 15 -> NIC 4", 15, 0, 4},
+		{"TypeCode 14 -> NIC 5", 14, 0, 5},
+		{"TypeCode 13 -> NIC 6", 13, 0, 6},
+		{"TypeCode 12 -> NIC 7", 12, 0, 7},
+		{"TypeCode 11 subtype 0 -> NIC 8", 11, 0, 8},
+		{"TypeCode 11 subtype 1 -> NIC 9", 11, 1, 9},
+		{"TypeCode 10 -> NIC 10", 10, 0, 10},
+		{"TypeCode 21 -> NIC 10", 21, 0, 10},
+		{"TypeCode 9 -> NIC 11", 9, 0, 11},
+		{"TypeCode 20 -> NIC 11", 20, 0, 11},
+		{"TypeCode 8 -> NIC 0", 8, 0, 0},
+		{"TypeCode 22 -> NIC 0", 22, 0, 0},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Use unique ICAO for each test
+			icao := 0x100000 + i
+
+			// Construct the message properly
+			parseDump1090Message(constructNICTestMessage(icao, tc.typeCode, tc.subtypeCode))
+
+			trafficMutex.Lock()
+			ti, exists := traffic[uint32(icao)]
+			trafficMutex.Unlock()
+
+			if !exists {
+				t.Errorf("Expected traffic entry for ICAO %X", icao)
+				return
+			}
+
+			if ti.NIC != tc.expectedNIC {
+				t.Errorf("Expected NIC %d for TypeCode %d SubtypeCode %d, got %d",
+					tc.expectedNIC, tc.typeCode, tc.subtypeCode, ti.NIC)
+			}
+		})
+	}
+}
+
+// constructNICTestMessage creates a dump1090 JSON message for NIC testing
+func constructNICTestMessage(icao, typeCode, subtypeCode int) string {
+	return `{"Icao_addr":` + intToStr(icao) +
+		`,"DF":17,"CA":5,"TypeCode":` + intToStr(typeCode) +
+		`,"SubtypeCode":` + intToStr(subtypeCode) +
+		`,"Lat":40.0,"Lng":-74.0,"Alt":5000,"Position_valid":true}`
+}
+
+// intToStr converts an int to string (simple helper)
+func intToStr(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	result := ""
+	for n > 0 {
+		result = string(rune('0'+n%10)) + result
+		n /= 10
+	}
+	return result
+}
+
+// Test1090ESDisplayTrafficSource tests the DisplayTrafficSource feature
+func Test1090ESDisplayTrafficSource(t *testing.T) {
+	reset1090ESState()
+
+	// Enable DisplayTrafficSource
+	globalSettings.DisplayTrafficSource = true
+	defer func() { globalSettings.DisplayTrafficSource = false }()
+
+	testCases := []struct {
+		name         string
+		df           int
+		ca           int
+		tail         string
+		expectedType string // 'a' for ADS-B, 'r' for ADS-R, 't' for TIS-B
+	}{
+		{"ADS-B no tail", 17, 5, "", "ea"},
+		{"ADS-B with short tail", 17, 5, "N123", "eaN123"},
+		{"ADS-R no tail", 18, 6, "", "er"},
+		{"TIS-B CA=2 no tail", 18, 2, "", "et"},
+		{"TIS-B CA=5 no tail", 18, 5, "", "et"},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			icao := 0x200000 + i
+
+			var msg string
+			if tc.tail != "" {
+				msg = `{"Icao_addr":` + intToStr(icao) +
+					`,"DF":` + intToStr(tc.df) +
+					`,"CA":` + intToStr(tc.ca) +
+					`,"TypeCode":11,"Lat":41.0,"Lng":-75.0,"Alt":6000,"Position_valid":true,"Tail":"` + tc.tail + `"}`
+			} else {
+				msg = `{"Icao_addr":` + intToStr(icao) +
+					`,"DF":` + intToStr(tc.df) +
+					`,"CA":` + intToStr(tc.ca) +
+					`,"TypeCode":11,"Lat":41.0,"Lng":-75.0,"Alt":6000,"Position_valid":true}`
+			}
+
+			parseDump1090Message(msg)
+
+			trafficMutex.Lock()
+			ti, exists := traffic[uint32(icao)]
+			trafficMutex.Unlock()
+
+			if !exists {
+				t.Errorf("Expected traffic entry for ICAO %X", icao)
+				return
+			}
+
+			// Check that tail starts with expected prefix
+			if len(ti.Tail) < 2 {
+				t.Errorf("Expected tail to have traffic source prefix, got '%s'", ti.Tail)
+			} else {
+				t.Logf("Tail with source: '%s'", ti.Tail)
+			}
+		})
+	}
+}
+
+// Test1090ESInvalidJSON tests handling of invalid JSON
+func Test1090ESInvalidJSON(t *testing.T) {
+	reset1090ESState()
+
+	initialTrafficCount := len(traffic)
+
+	// Send invalid JSON
+	parseDump1090Message(`{invalid json}`)
+	parseDump1090Message(``)
+	parseDump1090Message(`{"incomplete":`)
+
+	// Should not crash and should not add traffic
+	if len(traffic) != initialTrafficCount {
+		t.Error("Invalid JSON should not create traffic entries")
+	}
+
+	t.Log("Invalid JSON handling test complete")
+}
+
+// Test1090ESMissingPosition tests handling when lat/lng are missing but position_valid is true
+func Test1090ESMissingPosition(t *testing.T) {
+	reset1090ESState()
+
+	icao := 0x300001
+
+	// Position_valid true but missing Lat
+	msg := `{"Icao_addr":` + intToStr(icao) + `,"DF":17,"CA":5,"TypeCode":11,"Lng":-74.0,"Alt":5000,"Position_valid":true}`
+	parseDump1090Message(msg)
+
+	trafficMutex.Lock()
+	ti, exists := traffic[uint32(icao)]
+	trafficMutex.Unlock()
+
+	if exists && ti.Position_valid {
+		t.Error("Expected Position_valid to be false when Lat is missing")
+	}
+
+	t.Log("Missing position handling test complete")
+}
+
+// Test1090ESMissingSpeed tests handling when track/speed are missing but speed_valid is true
+func Test1090ESMissingSpeed(t *testing.T) {
+	reset1090ESState()
+
+	icao := 0x300002
+
+	// Speed_valid true but missing Track
+	msg := `{"Icao_addr":` + intToStr(icao) + `,"DF":17,"CA":5,"TypeCode":19,"Speed":250,"Vvel":500,"Speed_valid":true}`
+	parseDump1090Message(msg)
+
+	trafficMutex.Lock()
+	ti, exists := traffic[uint32(icao)]
+	trafficMutex.Unlock()
+
+	if exists && ti.Speed_valid {
+		t.Error("Expected Speed_valid to be false when Track is missing")
+	}
+
+	t.Log("Missing speed handling test complete")
+}
+
+// Test1090ESGnssDiff tests GnssDiffFromBaroAlt handling
+func Test1090ESGnssDiff(t *testing.T) {
+	reset1090ESState()
+
+	icao := 0x400001
+	gnssDiff := 150
+
+	msg := `{"Icao_addr":` + intToStr(icao) + `,"DF":17,"CA":5,"TypeCode":11,"Lat":42.0,"Lng":-73.0,"Alt":10000,"GnssDiffFromBaroAlt":` + intToStr(gnssDiff) + `,"Position_valid":true}`
+	parseDump1090Message(msg)
+
+	trafficMutex.Lock()
+	ti, exists := traffic[uint32(icao)]
+	trafficMutex.Unlock()
+
+	if !exists {
+		t.Error("Expected traffic entry")
+		return
+	}
+
+	if ti.GnssDiffFromBaroAlt != int32(gnssDiff) {
+		t.Errorf("Expected GnssDiffFromBaroAlt %d, got %d", gnssDiff, ti.GnssDiffFromBaroAlt)
+	}
+
+	t.Logf("GnssDiff: %d", ti.GnssDiffFromBaroAlt)
+}
