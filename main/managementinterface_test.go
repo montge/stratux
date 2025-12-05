@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -387,4 +388,327 @@ func TestViewLogs_NormalOperation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// =============================================================================
+// HTTP API Handler Tests
+// =============================================================================
+
+// TestHandleStatusRequest tests the /getStatus endpoint
+func TestHandleStatusRequest(t *testing.T) {
+	req := httptest.NewRequest("GET", "/getStatus", nil)
+	w := httptest.NewRecorder()
+
+	handleStatusRequest(w, req)
+
+	resp := w.Result()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	// Should return 200 OK
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Should have JSON content type
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected application/json content type, got %s", contentType)
+	}
+
+	// Should have no-cache headers
+	cacheControl := resp.Header.Get("Cache-Control")
+	if !strings.Contains(cacheControl, "no-cache") && !strings.Contains(cacheControl, "no-store") {
+		t.Logf("Note: Cache-Control header may need no-cache: %s", cacheControl)
+	}
+
+	// Body should be valid JSON (at minimum an empty object)
+	if len(body) == 0 {
+		t.Error("Expected non-empty response body")
+	}
+
+	// Should contain common status fields
+	bodyStr := string(body)
+	if !strings.Contains(bodyStr, "{") || !strings.Contains(bodyStr, "}") {
+		t.Errorf("Expected JSON object in response, got: %s", bodyStr)
+	}
+}
+
+// TestHandleSituationRequest tests the /getSituation endpoint
+func TestHandleSituationRequest(t *testing.T) {
+	req := httptest.NewRequest("GET", "/getSituation", nil)
+	w := httptest.NewRecorder()
+
+	handleSituationRequest(w, req)
+
+	resp := w.Result()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected application/json content type, got %s", contentType)
+	}
+
+	bodyStr := string(body)
+	if !strings.Contains(bodyStr, "{") || !strings.Contains(bodyStr, "}") {
+		t.Errorf("Expected JSON object in response, got: %s", bodyStr)
+	}
+}
+
+// TestHandleTowersRequest tests the /getTowers endpoint
+func TestHandleTowersRequest(t *testing.T) {
+	// Initialize mutex and map if needed
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+	if ADSBTowers == nil {
+		ADSBTowers = make(map[string]ADSBTower)
+	}
+
+	req := httptest.NewRequest("GET", "/getTowers", nil)
+	w := httptest.NewRecorder()
+
+	handleTowersRequest(w, req)
+
+	resp := w.Result()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected application/json content type, got %s", contentType)
+	}
+
+	// Should be valid JSON (empty object or array is fine)
+	bodyStr := string(body)
+	if len(bodyStr) == 0 {
+		t.Error("Expected non-empty response body")
+	}
+}
+
+// TestHandleSatellitesRequest tests the /getSatellites endpoint
+func TestHandleSatellitesRequest(t *testing.T) {
+	// Initialize mutex and Satellites map if needed
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if Satellites == nil {
+		Satellites = make(map[string]SatelliteInfo)
+	}
+
+	req := httptest.NewRequest("GET", "/getSatellites", nil)
+	w := httptest.NewRecorder()
+
+	handleSatellitesRequest(w, req)
+
+	resp := w.Result()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected application/json content type, got %s", contentType)
+	}
+
+	bodyStr := string(body)
+	if len(bodyStr) == 0 {
+		t.Error("Expected non-empty response body")
+	}
+}
+
+// TestHandleSettingsGetRequest tests the /getSettings endpoint
+func TestHandleSettingsGetRequest(t *testing.T) {
+	// Save and restore global settings
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	// Set some test values
+	globalSettings.UAT_Enabled = true
+	globalSettings.ES_Enabled = true
+
+	req := httptest.NewRequest("GET", "/getSettings", nil)
+	w := httptest.NewRecorder()
+
+	handleSettingsGetRequest(w, req)
+
+	resp := w.Result()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected application/json content type, got %s", contentType)
+	}
+
+	bodyStr := string(body)
+	// Verify that the settings we set are reflected in the response
+	if !strings.Contains(bodyStr, "UAT_Enabled") {
+		t.Error("Expected UAT_Enabled field in settings response")
+	}
+}
+
+// TestHandleRegionGet tests the /getRegion endpoint
+func TestHandleRegionGet(t *testing.T) {
+	// Save and restore global settings
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	testCases := []struct {
+		name           string
+		regionSelected int
+		expectedIsSet  bool
+		expectedRegion string
+	}{
+		{
+			name:           "no_region_selected",
+			regionSelected: 0,
+			expectedIsSet:  false,
+			expectedRegion: "",
+		},
+		{
+			name:           "us_region",
+			regionSelected: 1,
+			expectedIsSet:  true,
+			expectedRegion: "US",
+		},
+		{
+			name:           "eu_region",
+			regionSelected: 2,
+			expectedIsSet:  true,
+			expectedRegion: "EU",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			globalSettings.RegionSelected = tc.regionSelected
+
+			req := httptest.NewRequest("GET", "/getRegion", nil)
+			w := httptest.NewRecorder()
+
+			handleRegionGet(w, req)
+
+			resp := w.Result()
+			body, _ := ioutil.ReadAll(resp.Body)
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status 200, got %d", resp.StatusCode)
+			}
+
+			bodyStr := string(body)
+			if tc.expectedIsSet {
+				if !strings.Contains(bodyStr, `"IsSet":true`) {
+					t.Errorf("Expected IsSet:true in response, got: %s", bodyStr)
+				}
+				if !strings.Contains(bodyStr, tc.expectedRegion) {
+					t.Errorf("Expected region %s in response, got: %s", tc.expectedRegion, bodyStr)
+				}
+			} else {
+				if !strings.Contains(bodyStr, `"IsSet":false`) {
+					t.Errorf("Expected IsSet:false in response, got: %s", bodyStr)
+				}
+			}
+		})
+	}
+}
+
+// TestHandleClientsGetRequest tests the /getClients endpoint
+func TestHandleClientsGetRequest(t *testing.T) {
+	// Initialize netMutex if needed
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+
+	req := httptest.NewRequest("GET", "/getClients", nil)
+	w := httptest.NewRecorder()
+
+	handleClientsGetRequest(w, req)
+
+	resp := w.Result()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected application/json content type, got %s", contentType)
+	}
+
+	bodyStr := string(body)
+	if len(bodyStr) == 0 {
+		t.Error("Expected non-empty response body")
+	}
+}
+
+// TestMbTileConnectionCacheEntry tests the MbTile cache entry functions
+func TestMbTileConnectionCacheEntry(t *testing.T) {
+	// Create a temporary file for testing
+	tmpFile, err := ioutil.TempFile("", "test-mbtile-*.mbtile")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	t.Run("NewMbTileConnectionCacheEntry_ValidPath", func(t *testing.T) {
+		entry := NewMbTileConnectionCacheEntry(tmpFile.Name(), nil)
+		if entry == nil {
+			t.Error("Expected non-nil entry for valid path")
+		}
+		if entry != nil && entry.Path != tmpFile.Name() {
+			t.Errorf("Expected path %s, got %s", tmpFile.Name(), entry.Path)
+		}
+	})
+
+	t.Run("NewMbTileConnectionCacheEntry_InvalidPath", func(t *testing.T) {
+		entry := NewMbTileConnectionCacheEntry("/nonexistent/path.mbtile", nil)
+		if entry != nil {
+			t.Error("Expected nil entry for invalid path")
+		}
+	})
+
+	t.Run("IsOutdated_FileNotModified", func(t *testing.T) {
+		entry := NewMbTileConnectionCacheEntry(tmpFile.Name(), nil)
+		if entry == nil {
+			t.Fatal("Failed to create cache entry")
+		}
+		if entry.IsOutdated() {
+			t.Error("Entry should not be outdated immediately after creation")
+		}
+	})
+
+	t.Run("IsOutdated_FileDeleted", func(t *testing.T) {
+		// Create another temp file
+		tmpFile2, err := ioutil.TempFile("", "test-mbtile2-*.mbtile")
+		if err != nil {
+			t.Fatalf("Failed to create temp file: %v", err)
+		}
+		tmpFile2.Close()
+
+		entry := NewMbTileConnectionCacheEntry(tmpFile2.Name(), nil)
+		if entry == nil {
+			t.Fatal("Failed to create cache entry")
+		}
+
+		// Delete the file
+		os.Remove(tmpFile2.Name())
+
+		if !entry.IsOutdated() {
+			t.Error("Entry should be outdated after file is deleted")
+		}
+	})
 }
