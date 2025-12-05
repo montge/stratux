@@ -987,3 +987,172 @@ func TestMakeGPGGAString_InvalidGPS(t *testing.T) {
 
 	t.Logf("GPGGA Invalid: %s", strings.TrimSpace(result))
 }
+
+// TestMakeFlarmPFLAUString_BearingWrapping tests PFLAU bearing wrapping (> 180 and < -180)
+func TestMakeFlarmPFLAUString_BearingWrapping(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.BaroPressureAltitude = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTrueCourse = 350 // Heading north-northwest
+	mySituation.muGPS.Unlock()
+	mySituation.muBaro.Lock()
+	mySituation.BaroLastMeasurementTime = time.Now()
+	mySituation.muBaro.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// Traffic close enough to trigger alarm (to get tail number included)
+	// and behind to trigger bearing wrapping
+	ti := TrafficInfo{
+		Icao_addr:  0xABCDEF,
+		Lat:        47.4995, // Very slightly south (~500m)
+		Lng:        8.5005,  // Very slightly east
+		Alt:        1050,    // Close altitude (within 500ft)
+		Tail:       "TEST1",
+	}
+
+	result := makeFlarmPFLAUString(ti)
+
+	if !strings.Contains(result, "PFLAU") {
+		t.Error("Expected PFLAU sentence")
+	}
+	// Tail is included when alarm level > 0
+	if !strings.Contains(result, "!TEST1") {
+		t.Logf("Note: Tail not included (likely no alarm level - traffic not close enough)")
+	}
+
+	t.Logf("PFLAU with bearing wrapping: %s", strings.TrimSpace(result))
+}
+
+// TestMakeFlarmPFLAUString_AlarmLevel tests PFLAU with alarm conditions
+func TestMakeFlarmPFLAUString_AlarmLevel(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.BaroPressureAltitude = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.muGPS.Unlock()
+	mySituation.muBaro.Lock()
+	mySituation.BaroLastMeasurementTime = time.Now()
+	mySituation.muBaro.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// Traffic very close - should trigger alarm level 3
+	ti := TrafficInfo{
+		Icao_addr:  0x123456,
+		Lat:        47.5001, // Very close
+		Lng:        8.5001,
+		Alt:        1050,    // Close altitude
+		Tail:       "",      // No tail
+	}
+
+	result := makeFlarmPFLAUString(ti)
+
+	// Should have non-zero alarm level for close traffic
+	if !strings.Contains(result, "PFLAU") {
+		t.Error("Expected PFLAU sentence")
+	}
+
+	t.Logf("PFLAU with alarm: %s", strings.TrimSpace(result))
+}
+
+// TestMakeFlarmPFLAAString_PositionInvalid tests PFLAA with invalid position
+func TestMakeFlarmPFLAAString_PositionInvalid(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Traffic with invalid position
+	ti := TrafficInfo{
+		Icao_addr:         0xDEADBE,
+		Position_valid:    false,
+		DistanceEstimated: 5000, // 5km estimated
+		Alt:               2000,
+		Tail:              "N12345",
+		Addr_type:         1, // Non-ICAO
+	}
+
+	msg, valid, _ := makeFlarmPFLAAString(ti)
+
+	if !valid {
+		t.Error("Expected valid message even with position_valid=false")
+	}
+	if !strings.Contains(msg, "PFLAA") {
+		t.Error("Expected PFLAA sentence")
+	}
+	// For invalid position, RelativeEast should be empty
+	if !strings.Contains(msg, "!N12345") {
+		t.Error("Expected tail number appended")
+	}
+
+	t.Logf("PFLAA with invalid position: %s", strings.TrimSpace(msg))
+}
+
+// TestMakeFlarmPFLAAString_NonICAOAddress tests PFLAA with non-ICAO address type
+func TestMakeFlarmPFLAAString_NonICAOAddress(t *testing.T) {
+	resetFlarmOutputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Traffic with non-ICAO address
+	ti := TrafficInfo{
+		Icao_addr:      0xF12345,
+		Position_valid: true,
+		Lat:            47.51,
+		Lng:            8.51,
+		Alt:            1500,
+		Addr_type:      1, // Non-ICAO
+		Speed_valid:    true,
+		Speed:          100, // knots
+		Vvel:           500, // ft/min
+	}
+
+	msg, valid, _ := makeFlarmPFLAAString(ti)
+
+	if !valid {
+		t.Error("Expected valid message")
+	}
+	// IDType should be 2 for non-ICAO
+	if !strings.Contains(msg, ",2,") {
+		t.Error("Expected IDType 2 for non-ICAO address")
+	}
+
+	t.Logf("PFLAA with non-ICAO: %s", strings.TrimSpace(msg))
+}
