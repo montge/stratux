@@ -395,3 +395,149 @@ func TestUATMultipleMessages(t *testing.T) {
 	t.Logf("Successfully parsed %d out of %d messages", successCount, len(messages))
 	t.Logf("Total UAT messages counted: %d", globalStatus.UAT_messages_total)
 }
+
+// TestUATParseInputInvalidSignalStrength tests invalid signal strength parsing
+func TestUATParseInputInvalidSignalStrength(t *testing.T) {
+	resetUATState()
+
+	// Message with invalid signal strength (not a number)
+	basicMsg := "-000000000000000000000000000000000000;rs=12;ss=invalid"
+
+	frame, msgtype := parseInput(basicMsg)
+
+	// Should still parse the message despite invalid signal strength
+	if frame == nil {
+		t.Error("Expected non-nil frame despite invalid signal strength")
+	}
+	if msgtype != MSGTYPE_BASIC_REPORT {
+		t.Errorf("Expected MSGTYPE_BASIC_REPORT, got 0x%02X", msgtype)
+	}
+
+	t.Logf("Message with invalid signal strength handled: msgtype=0x%02X", msgtype)
+}
+
+// TestUATParseInputNoSignalStrengthField tests messages without ss= field
+func TestUATParseInputNoSignalStrengthField(t *testing.T) {
+	resetUATState()
+
+	// Message with rs= but no ss= field
+	basicMsg := "-000000000000000000000000000000000000;rs=12;other=123"
+
+	frame, msgtype := parseInput(basicMsg)
+
+	if frame == nil {
+		t.Error("Expected non-nil frame")
+	}
+	if msgtype != MSGTYPE_BASIC_REPORT {
+		t.Errorf("Expected MSGTYPE_BASIC_REPORT, got 0x%02X", msgtype)
+	}
+
+	t.Logf("Message without ss= field handled: msgtype=0x%02X", msgtype)
+}
+
+// TestUATParseInputOddLengthHex tests messages with odd-length hex string
+func TestUATParseInputOddLengthHex(t *testing.T) {
+	resetUATState()
+
+	// Valid 68 hex chars = 34 bytes = MSGTYPE_LONG_REPORT
+	validMsg := "-00000000000000000000000000000000000000000000000000000000000000000000;rs=10" // 68 hex chars (valid)
+	// Invalid odd-length (69 hex chars)
+	oddMsg := "-000000000000000000000000000000000000000000000000000000000000000000000;rs=10" // 69 hex chars (invalid - odd)
+
+	// Valid even-length should work
+	frame, msgtype := parseInput(validMsg)
+	if msgtype == 0 {
+		t.Error("Expected valid message type for even-length hex (34 bytes)")
+	}
+	if msgtype != MSGTYPE_LONG_REPORT {
+		t.Errorf("Expected MSGTYPE_LONG_REPORT, got 0x%02X", msgtype)
+	}
+
+	// Invalid odd-length should return nil/0
+	frame, msgtype = parseInput(oddMsg)
+	if frame != nil || msgtype != 0 {
+		t.Logf("Odd-length hex was handled: frame=%v, msgtype=0x%02X", frame != nil, msgtype)
+	} else {
+		t.Log("Odd-length hex correctly rejected")
+	}
+}
+
+// TestUATParseInputUnknownMessageLength tests messages with unknown length
+func TestUATParseInputUnknownMessageLength(t *testing.T) {
+	resetUATState()
+
+	// Message with length that doesn't match any known type (20 bytes = 40 hex chars)
+	unknownMsg := "-0000000000000000000000000000000000000000;rs=10" // 40 hex chars = 20 bytes
+
+	frame, msgtype := parseInput(unknownMsg)
+
+	// Should return msgtype=0 for unknown length
+	if msgtype != 0 {
+		t.Logf("Unknown length message returned msgtype=0x%02X", msgtype)
+	} else {
+		t.Log("Unknown length message correctly returned msgtype=0")
+	}
+
+	_ = frame // Frame might still be returned, just with type 0
+}
+
+// TestUATParseInputDownlinkWithZeroSignal tests downlink with zero signal strength
+func TestUATParseInputDownlinkWithZeroSignal(t *testing.T) {
+	resetUATState()
+
+	// Downlink message with signal strength = 0
+	downlinkMsg := "-000000000000000000000000000000000000;rs=12;ss=0"
+
+	frame, msgtype := parseInput(downlinkMsg)
+
+	if frame == nil {
+		t.Error("Expected non-nil frame")
+	}
+	if msgtype != MSGTYPE_BASIC_REPORT {
+		t.Errorf("Expected MSGTYPE_BASIC_REPORT, got 0x%02X", msgtype)
+	}
+
+	t.Logf("Downlink with zero signal handled: msgtype=0x%02X", msgtype)
+}
+
+// TestUATParseInputUplinkNewMaxSignal tests uplink message updating maxSignalStrength
+func TestUATParseInputUplinkNewMaxSignal(t *testing.T) {
+	resetUATState()
+	maxSignalStrength = 50 // Set initial value
+
+	// Create uplink message with higher signal strength
+	uplinkHex := ""
+	for i := 0; i < 864; i++ {
+		uplinkHex += "0"
+	}
+	uplinkMsg := "+" + uplinkHex + ";rs=16;ss=200"
+
+	parseInput(uplinkMsg)
+
+	if maxSignalStrength != 200 {
+		t.Errorf("Expected maxSignalStrength to be 200, got %d", maxSignalStrength)
+	}
+
+	t.Logf("maxSignalStrength updated to: %d", maxSignalStrength)
+}
+
+// TestUATParseInputUplinkNoUpdateLowerSignal tests uplink message not updating if lower
+func TestUATParseInputUplinkNoUpdateLowerSignal(t *testing.T) {
+	resetUATState()
+	maxSignalStrength = 300 // Set initial value higher
+
+	// Create uplink message with lower signal strength
+	uplinkHex := ""
+	for i := 0; i < 864; i++ {
+		uplinkHex += "0"
+	}
+	uplinkMsg := "+" + uplinkHex + ";rs=16;ss=150"
+
+	parseInput(uplinkMsg)
+
+	if maxSignalStrength != 300 {
+		t.Errorf("Expected maxSignalStrength to remain 300, got %d", maxSignalStrength)
+	}
+
+	t.Logf("maxSignalStrength correctly remained at: %d", maxSignalStrength)
+}

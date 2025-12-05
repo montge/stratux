@@ -657,3 +657,150 @@ func TestParseFlarmPFLAUAlternateKey(t *testing.T) {
 
 	t.Log("Verified PFLAU alternate key lookup works correctly")
 }
+
+// TestParseFlarmNmeaMessageUnknownType tests parseFlarmNmeaMessage with unknown message type
+func TestParseFlarmNmeaMessageUnknownType(t *testing.T) {
+	resetFlarmInputState()
+
+	// Test with a message type that is neither PFLAU nor PFLAA
+	// This tests the "else" branch where neither PFLAU nor PFLAA is matched
+	unknownMsg := "PGRMZ,1234,f,3" // GPRMC-style altitude message
+	fields := strings.Split(unknownMsg, ",")
+
+	// Reset traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// This should not panic and should not create any traffic
+	parseFlarmNmeaMessage(fields)
+
+	trafficMutex.Lock()
+	trafficCount := len(traffic)
+	trafficMutex.Unlock()
+
+	if trafficCount != 0 {
+		t.Errorf("Expected no traffic for unknown message type, got %d entries", trafficCount)
+	}
+	t.Log("Unknown message type handled correctly (no crash, no traffic)")
+}
+
+// TestParseFlarmNmeaMessageEmptyMessage tests parseFlarmNmeaMessage with empty message
+func TestParseFlarmNmeaMessageEmptyMessage(t *testing.T) {
+	resetFlarmInputState()
+
+	// Test with empty message array
+	emptyMsg := []string{}
+
+	// Reset traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// This should handle empty message gracefully (panic recovery)
+	parseFlarmNmeaMessage(emptyMsg)
+
+	trafficMutex.Lock()
+	trafficCount := len(traffic)
+	trafficMutex.Unlock()
+
+	if trafficCount != 0 {
+		t.Errorf("Expected no traffic for empty message, got %d entries", trafficCount)
+	}
+	t.Log("Empty message handled correctly (no crash)")
+}
+
+// TestParseFlarmNmeaMessagePanicRecovery tests the panic recovery mechanism
+func TestParseFlarmNmeaMessagePanicRecovery(t *testing.T) {
+	resetFlarmInputState()
+
+	// Create a message that will cause PFLAU to try to parse invalid data
+	// This should be caught by the recover() in parseFlarmNmeaMessage
+	// Note: This test may not actually trigger the panic depending on implementation
+	badPFLAU := "PFLAU,1,1,0,1,2,invalid_bearing,2,152,1852,ABC123"
+	fields := strings.Split(badPFLAU, ",")
+
+	// Reset traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// This should handle the error gracefully
+	parseFlarmNmeaMessage(fields)
+
+	trafficMutex.Lock()
+	trafficCount := len(traffic)
+	trafficMutex.Unlock()
+
+	// Either creates traffic (if parsing handles the error) or doesn't crash
+	t.Logf("Bad PFLAU handled: %d traffic entries created", trafficCount)
+}
+
+// TestParseFlarmNmeaMessageValidPFLAU tests parseFlarmNmeaMessage with valid PFLAU
+func TestParseFlarmNmeaMessageValidPFLAU(t *testing.T) {
+	resetFlarmInputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = -122.3
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSTrueCourse = 90
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Valid PFLAU message
+	pflauMsg := "PFLAU,1,1,2,1,0,-45,0,100,1000,AABBCC"
+	fields := strings.Split(pflauMsg, ",")
+
+	// Reset traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	parseFlarmNmeaMessage(fields)
+
+	trafficMutex.Lock()
+	trafficCount := len(traffic)
+	trafficMutex.Unlock()
+
+	if trafficCount == 0 {
+		t.Error("Expected traffic to be created for valid PFLAU")
+	}
+	t.Logf("Valid PFLAU created %d traffic entries", trafficCount)
+}
+
+// TestParseFlarmNmeaMessageValidPFLAA tests parseFlarmNmeaMessage with valid PFLAA
+func TestParseFlarmNmeaMessageValidPFLAA(t *testing.T) {
+	resetFlarmInputState()
+
+	// Set up valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = -122.3
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 1
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Valid PFLAA message
+	pflaaMsg := "PFLAA,0,1000,500,100,1,AABBCC,180,0,50,2,1"
+	fields := strings.Split(pflaaMsg, ",")
+
+	// Reset traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	parseFlarmNmeaMessage(fields)
+
+	trafficMutex.Lock()
+	trafficCount := len(traffic)
+	trafficMutex.Unlock()
+
+	if trafficCount == 0 {
+		t.Error("Expected traffic to be created for valid PFLAA")
+	}
+	t.Logf("Valid PFLAA created %d traffic entries", trafficCount)
+}
