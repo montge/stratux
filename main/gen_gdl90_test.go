@@ -626,3 +626,59 @@ func TestGetProductNameFromIdEdgeCases(t *testing.T) {
 		}
 	}
 }
+
+// =============================================================================
+// Ownship Report Tests
+// =============================================================================
+
+// Note: makeOwnshipReport and makeOwnshipGeometricAltitudeReport call sendGDL90()
+// and sendXPlane() which require network initialization. They are tested via
+// integration tests (TestE2E*) rather than unit tests.
+
+// TestIsDetectedOwnshipValidEdgeCases tests additional edge cases for ownship validity
+func TestIsDetectedOwnshipValidEdgeCases(t *testing.T) {
+	// Save original
+	origOwnshipTrafficInfo := OwnshipTrafficInfo
+	defer func() {
+		OwnshipTrafficInfo = origOwnshipTrafficInfo
+	}()
+
+	t.Run("recently_seen_is_valid", func(t *testing.T) {
+		OwnshipTrafficInfo = TrafficInfo{
+			Last_seen: stratuxClock.Time,
+		}
+
+		if !isDetectedOwnshipValid() {
+			t.Error("Expected recently seen ownship to be valid")
+		}
+	})
+
+	t.Run("old_ownship_is_invalid", func(t *testing.T) {
+		OwnshipTrafficInfo = TrafficInfo{
+			Last_seen: stratuxClock.Time.Add(-15 * time.Second),
+		}
+
+		if isDetectedOwnshipValid() {
+			t.Error("Expected old ownship to be invalid")
+		}
+	})
+
+	t.Run("boundary_at_10_seconds", func(t *testing.T) {
+		// Test exactly at the 10 second boundary
+		OwnshipTrafficInfo = TrafficInfo{
+			Last_seen: stratuxClock.Time.Add(-9 * time.Second),
+		}
+
+		if !isDetectedOwnshipValid() {
+			t.Error("Expected ownship at 9 seconds to still be valid")
+		}
+
+		OwnshipTrafficInfo = TrafficInfo{
+			Last_seen: stratuxClock.Time.Add(-11 * time.Second),
+		}
+
+		if isDetectedOwnshipValid() {
+			t.Error("Expected ownship at 11 seconds to be invalid")
+		}
+	})
+}
