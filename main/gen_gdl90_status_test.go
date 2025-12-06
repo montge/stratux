@@ -823,3 +823,67 @@ func TestMakeStratuxStatus_EdgeVersions(t *testing.T) {
 		})
 	}
 }
+
+// TestMakeStratuxStatus_UnknownGPSFixQuality tests the default case for GPS fix quality
+// This covers the default case in the switch statement
+func TestMakeStratuxStatus_UnknownGPSFixQuality(t *testing.T) {
+	// Initialize required components
+	crcInit()
+
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+
+	// Initialize mySituation mutexes
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+
+	// Save original values
+	origVersion := stratuxVersion
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origTowers := ADSBTowers
+	origFixQuality := mySituation.GPSFixQuality
+
+	defer func() {
+		stratuxVersion = origVersion
+		globalSettings = origSettings
+		globalStatus = origStatus
+		ADSBTowers = origTowers
+		mySituation.muGPS.Lock()
+		mySituation.GPSFixQuality = origFixQuality
+		mySituation.muGPS.Unlock()
+	}()
+
+	// Initialize towers map
+	ADSBTowers = make(map[string]ADSBTower)
+	stratuxVersion = "v1.6"
+	globalSettings = settings{}
+	globalStatus = status{}
+
+	// Set GPS fix quality to an unknown value (not 0, 1, or 2)
+	// Also need to make GPS valid for the switch statement to be entered
+	mySituation.muGPS.Lock()
+	mySituation.GPSFixQuality = 99 // Unknown value - should trigger default case
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Make GPS "valid" (recent fix)
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	msg := makeStratuxStatus()
+
+	if len(msg) < 14 {
+		t.Fatalf("Message too short: got %d bytes", len(msg))
+	}
+
+	// With unknown GPS fix quality, byte 13 should be 0 (default case)
+	if msg[13] != 0 {
+		t.Errorf("Expected msg[13]=0 for unknown GPS fix quality, got %d", msg[13])
+	}
+
+	t.Logf("Unknown GPS fix quality (99) test: msg[13]=%d", msg[13])
+}
