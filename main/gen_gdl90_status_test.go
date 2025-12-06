@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -1956,4 +1957,607 @@ func TestSystemErrors_AddRemoveSequence(t *testing.T) {
 	}
 
 	t.Log("Successfully completed add/remove sequence")
+}
+
+// TestAddSystemError tests the addSystemError function
+func TestAddSystemError(t *testing.T) {
+	// Save original errors
+	origErrors := globalStatus.Errors
+	defer func() {
+		globalStatus.Errors = origErrors
+	}()
+
+	// Reset to empty state
+	globalStatus.Errors = []string{}
+
+	// Call addSystemError with a test error
+	testError := "test system error message"
+	addSystemError(errors.New(testError))
+
+	// Verify the error was appended
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error in globalStatus.Errors, got %d", len(globalStatus.Errors))
+	}
+
+	if globalStatus.Errors[0] != testError {
+		t.Errorf("Expected error message '%s', got '%s'", testError, globalStatus.Errors[0])
+	}
+
+	// Test adding multiple errors
+	addSystemError(errors.New("second error"))
+	addSystemError(errors.New("third error"))
+
+	if len(globalStatus.Errors) != 3 {
+		t.Errorf("Expected 3 errors in globalStatus.Errors, got %d", len(globalStatus.Errors))
+	}
+
+	expectedErrors := []string{testError, "second error", "third error"}
+	for i, expected := range expectedErrors {
+		if globalStatus.Errors[i] != expected {
+			t.Errorf("Error at index %d: expected '%s', got '%s'", i, expected, globalStatus.Errors[i])
+		}
+	}
+
+	t.Logf("Successfully tested addSystemError with %d errors", len(globalStatus.Errors))
+}
+
+// TestDefaultSettings_BasicDefaults tests that defaultSettings() sets correct default values
+func TestDefaultSettings_BasicDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Set globalSettings to a non-default state
+	globalSettings = settings{}
+	globalSettings.UAT_Enabled = false
+	globalSettings.ES_Enabled = false
+	globalSettings.GPS_Enabled = false
+	globalSettings.DeveloperMode = true
+	globalSettings.WiFiSSID = "CustomSSID"
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify key boolean defaults
+	if !globalSettings.UAT_Enabled {
+		t.Error("UAT_Enabled should be true")
+	}
+	if !globalSettings.ES_Enabled {
+		t.Error("ES_Enabled should be true")
+	}
+	if globalSettings.OGN_Enabled {
+		t.Error("OGN_Enabled should be false")
+	}
+	if !globalSettings.APRS_Enabled {
+		t.Error("APRS_Enabled should be true")
+	}
+	if !globalSettings.GPS_Enabled {
+		t.Error("GPS_Enabled should be true")
+	}
+	if !globalSettings.IMU_Sensor_Enabled {
+		t.Error("IMU_Sensor_Enabled should be true")
+	}
+	if !globalSettings.BMP_Sensor_Enabled {
+		t.Error("BMP_Sensor_Enabled should be true")
+	}
+
+	// Verify debug/developer flags are disabled
+	if globalSettings.DEBUG {
+		t.Error("DEBUG should be false")
+	}
+	if globalSettings.DeveloperMode {
+		t.Error("DeveloperMode should be false")
+	}
+	if globalSettings.DisplayTrafficSource {
+		t.Error("DisplayTrafficSource should be false")
+	}
+	if globalSettings.ReplayLog {
+		t.Error("ReplayLog should be false")
+	}
+	if globalSettings.AHRSLog {
+		t.Error("AHRSLog should be false")
+	}
+	if globalSettings.NoSleep {
+		t.Error("NoSleep should be false")
+	}
+
+	t.Log("Basic default settings verified successfully")
+}
+
+// TestDefaultSettings_NumericDefaults tests numeric default values
+func TestDefaultSettings_NumericDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state
+	globalSettings = settings{}
+	globalSettings.Dump1090Gain = 99.9
+	globalSettings.WiFiChannel = 99
+	globalSettings.RadarLimits = 9999
+	globalSettings.RadarRange = 999
+	globalSettings.AltitudeOffset = 12345
+	globalSettings.PWMDutyMin = 100
+	globalSettings.GpsManualTargetBaud = 9600
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify numeric defaults
+	if globalSettings.Dump1090Gain != 37.2 {
+		t.Errorf("Dump1090Gain should be 37.2, got %f", globalSettings.Dump1090Gain)
+	}
+	if globalSettings.WiFiChannel != 1 {
+		t.Errorf("WiFiChannel should be 1, got %d", globalSettings.WiFiChannel)
+	}
+	if globalSettings.RadarLimits != 2000 {
+		t.Errorf("RadarLimits should be 2000, got %d", globalSettings.RadarLimits)
+	}
+	if globalSettings.RadarRange != 10 {
+		t.Errorf("RadarRange should be 10, got %d", globalSettings.RadarRange)
+	}
+	if globalSettings.AltitudeOffset != 0 {
+		t.Errorf("AltitudeOffset should be 0, got %d", globalSettings.AltitudeOffset)
+	}
+	if globalSettings.PWMDutyMin != 0 {
+		t.Errorf("PWMDutyMin should be 0, got %d", globalSettings.PWMDutyMin)
+	}
+	if globalSettings.GpsManualTargetBaud != 115200 {
+		t.Errorf("GpsManualTargetBaud should be 115200, got %d", globalSettings.GpsManualTargetBaud)
+	}
+
+	t.Log("Numeric default settings verified successfully")
+}
+
+// TestDefaultSettings_StringDefaults tests string default values
+func TestDefaultSettings_StringDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state
+	globalSettings = settings{}
+	globalSettings.WiFiIPAddress = "10.0.0.1"
+	globalSettings.WiFiPassphrase = "secret123"
+	globalSettings.WiFiSSID = "CustomWiFi"
+	globalSettings.OwnshipModeS = "123456"
+	globalSettings.GpsManualDevice = "/dev/ttyUSB0"
+	globalSettings.GpsManualChip = "mtk"
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify string defaults
+	if globalSettings.WiFiIPAddress != "192.168.10.1" {
+		t.Errorf("WiFiIPAddress should be '192.168.10.1', got '%s'", globalSettings.WiFiIPAddress)
+	}
+	if globalSettings.WiFiPassphrase != "" {
+		t.Errorf("WiFiPassphrase should be empty, got '%s'", globalSettings.WiFiPassphrase)
+	}
+	if globalSettings.WiFiSSID != "Stratux" {
+		t.Errorf("WiFiSSID should be 'Stratux', got '%s'", globalSettings.WiFiSSID)
+	}
+	if globalSettings.OwnshipModeS != "F00000" {
+		t.Errorf("OwnshipModeS should be 'F00000', got '%s'", globalSettings.OwnshipModeS)
+	}
+	if globalSettings.GpsManualDevice != "/dev/ttyAMA0" {
+		t.Errorf("GpsManualDevice should be '/dev/ttyAMA0', got '%s'", globalSettings.GpsManualDevice)
+	}
+	if globalSettings.GpsManualChip != "ublox" {
+		t.Errorf("GpsManualChip should be 'ublox', got '%s'", globalSettings.GpsManualChip)
+	}
+
+	t.Log("String default settings verified successfully")
+}
+
+// TestDefaultSettings_NetworkOutputs tests network outputs default configuration
+func TestDefaultSettings_NetworkOutputs(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state
+	globalSettings = settings{}
+	globalSettings.NetworkOutputs = []networkConnection{
+		{Conn: nil, Ip: "1.2.3.4", Port: 1234, Capability: 0},
+	}
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify NetworkOutputs
+	if len(globalSettings.NetworkOutputs) != 3 {
+		t.Errorf("NetworkOutputs should have 3 entries, got %d", len(globalSettings.NetworkOutputs))
+	}
+
+	// Check first output (GDL90/AHRS on port 4000)
+	if globalSettings.NetworkOutputs[0].Port != 4000 {
+		t.Errorf("NetworkOutputs[0].Port should be 4000, got %d", globalSettings.NetworkOutputs[0].Port)
+	}
+	expectedCap0 := uint8(NETWORK_GDL90_STANDARD | NETWORK_AHRS_GDL90)
+	if globalSettings.NetworkOutputs[0].Capability != expectedCap0 {
+		t.Errorf("NetworkOutputs[0].Capability should be %d, got %d", expectedCap0, globalSettings.NetworkOutputs[0].Capability)
+	}
+
+	// Check second output (FLARM NMEA on port 2000)
+	if globalSettings.NetworkOutputs[1].Port != 2000 {
+		t.Errorf("NetworkOutputs[1].Port should be 2000, got %d", globalSettings.NetworkOutputs[1].Port)
+	}
+	if globalSettings.NetworkOutputs[1].Capability != NETWORK_FLARM_NMEA {
+		t.Errorf("NetworkOutputs[1].Capability should be %d, got %d", NETWORK_FLARM_NMEA, globalSettings.NetworkOutputs[1].Capability)
+	}
+
+	// Check third output (FFSIM on port 49002)
+	if globalSettings.NetworkOutputs[2].Port != 49002 {
+		t.Errorf("NetworkOutputs[2].Port should be 49002, got %d", globalSettings.NetworkOutputs[2].Port)
+	}
+	expectedCap2 := uint8(NETWORK_POSITION_FFSIM | NETWORK_AHRS_FFSIM)
+	if globalSettings.NetworkOutputs[2].Capability != expectedCap2 {
+		t.Errorf("NetworkOutputs[2].Capability should be %d, got %d", expectedCap2, globalSettings.NetworkOutputs[2].Capability)
+	}
+
+	t.Log("NetworkOutputs default configuration verified successfully")
+}
+
+// TestDefaultSettings_BleOutputs tests BLE outputs default configuration
+func TestDefaultSettings_BleOutputs(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state
+	globalSettings = settings{}
+	globalSettings.BleOutputs = []bleConnection{}
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify BleOutputs
+	if len(globalSettings.BleOutputs) != 2 {
+		t.Errorf("BleOutputs should have 2 entries, got %d", len(globalSettings.BleOutputs))
+	}
+
+	// Check first BLE output (SoftRF style)
+	if globalSettings.BleOutputs[0].Capability != NETWORK_FLARM_NMEA {
+		t.Errorf("BleOutputs[0].Capability should be %d, got %d", NETWORK_FLARM_NMEA, globalSettings.BleOutputs[0].Capability)
+	}
+	if globalSettings.BleOutputs[0].UUIDService != "FFE0" {
+		t.Errorf("BleOutputs[0].UUIDService should be 'FFE0', got '%s'", globalSettings.BleOutputs[0].UUIDService)
+	}
+	if globalSettings.BleOutputs[0].UUIDGatt != "FFE1" {
+		t.Errorf("BleOutputs[0].UUIDGatt should be 'FFE1', got '%s'", globalSettings.BleOutputs[0].UUIDGatt)
+	}
+
+	// Check second BLE output (nRF UART)
+	if globalSettings.BleOutputs[1].Capability != NETWORK_FLARM_NMEA {
+		t.Errorf("BleOutputs[1].Capability should be %d, got %d", NETWORK_FLARM_NMEA, globalSettings.BleOutputs[1].Capability)
+	}
+	if globalSettings.BleOutputs[1].UUIDService != "6E400001-B5A3-F393-E0A9-E50E24DCCA9E" {
+		t.Errorf("BleOutputs[1].UUIDService incorrect, got '%s'", globalSettings.BleOutputs[1].UUIDService)
+	}
+	if globalSettings.BleOutputs[1].UUIDGatt != "6E400003-B5A3-F393-E0A9-E50E24DCCA9E" {
+		t.Errorf("BleOutputs[1].UUIDGatt incorrect, got '%s'", globalSettings.BleOutputs[1].UUIDGatt)
+	}
+
+	t.Log("BleOutputs default configuration verified successfully")
+}
+
+// TestDefaultSettings_WiFiDefaults tests WiFi-related default values
+func TestDefaultSettings_WiFiDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state
+	globalSettings = settings{}
+	globalSettings.WiFiChannel = 11
+	globalSettings.WiFiIPAddress = "10.10.10.1"
+	globalSettings.WiFiPassphrase = "password123"
+	globalSettings.WiFiSSID = "MyWiFi"
+	globalSettings.WiFiSecurityEnabled = true
+	globalSettings.WiFiClientNetworks = []wifiClientNetwork{
+		{SSID: "SomeNetwork"},
+	}
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify WiFi defaults
+	if globalSettings.WiFiChannel != 1 {
+		t.Errorf("WiFiChannel should be 1, got %d", globalSettings.WiFiChannel)
+	}
+	if globalSettings.WiFiIPAddress != "192.168.10.1" {
+		t.Errorf("WiFiIPAddress should be '192.168.10.1', got '%s'", globalSettings.WiFiIPAddress)
+	}
+	if globalSettings.WiFiPassphrase != "" {
+		t.Errorf("WiFiPassphrase should be empty, got '%s'", globalSettings.WiFiPassphrase)
+	}
+	if globalSettings.WiFiSSID != "Stratux" {
+		t.Errorf("WiFiSSID should be 'Stratux', got '%s'", globalSettings.WiFiSSID)
+	}
+	if globalSettings.WiFiSecurityEnabled {
+		t.Error("WiFiSecurityEnabled should be false")
+	}
+	if len(globalSettings.WiFiClientNetworks) != 0 {
+		t.Errorf("WiFiClientNetworks should be empty, got %d entries", len(globalSettings.WiFiClientNetworks))
+	}
+
+	t.Log("WiFi default settings verified successfully")
+}
+
+// TestDefaultSettings_IMUMappingDefaults tests IMU mapping default values
+func TestDefaultSettings_IMUMappingDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state
+	globalSettings = settings{}
+	globalSettings.IMUMapping = [2]int{5, 6}
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify IMUMapping defaults
+	if globalSettings.IMUMapping[0] != -1 {
+		t.Errorf("IMUMapping[0] should be -1, got %d", globalSettings.IMUMapping[0])
+	}
+	if globalSettings.IMUMapping[1] != 0 {
+		t.Errorf("IMUMapping[1] should be 0, got %d", globalSettings.IMUMapping[1])
+	}
+
+	t.Log("IMUMapping default settings verified successfully")
+}
+
+// TestDefaultSettings_SliceDefaults tests that slice fields are properly initialized
+func TestDefaultSettings_SliceDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state with nil slices
+	globalSettings = settings{}
+	globalSettings.StaticIps = nil
+	globalSettings.WiFiClientNetworks = nil
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify slices are initialized (not nil)
+	if globalSettings.StaticIps == nil {
+		t.Error("StaticIps should not be nil")
+	}
+	if len(globalSettings.StaticIps) != 0 {
+		t.Errorf("StaticIps should be empty, got %d entries", len(globalSettings.StaticIps))
+	}
+
+	if globalSettings.WiFiClientNetworks == nil {
+		t.Error("WiFiClientNetworks should not be nil")
+	}
+	if len(globalSettings.WiFiClientNetworks) != 0 {
+		t.Errorf("WiFiClientNetworks should be empty, got %d entries", len(globalSettings.WiFiClientNetworks))
+	}
+
+	t.Log("Slice default initialization verified successfully")
+}
+
+// TestDefaultSettings_GpsDefaults tests GPS-related default values
+func TestDefaultSettings_GpsDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state
+	globalSettings = settings{}
+	globalSettings.GpsManualConfig = true
+	globalSettings.GpsManualDevice = "/dev/ttyUSB0"
+	globalSettings.GpsManualTargetBaud = 9600
+	globalSettings.GpsManualChip = "sirf"
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify GPS defaults
+	if globalSettings.GpsManualConfig {
+		t.Error("GpsManualConfig should be false")
+	}
+	if globalSettings.GpsManualDevice != "/dev/ttyAMA0" {
+		t.Errorf("GpsManualDevice should be '/dev/ttyAMA0', got '%s'", globalSettings.GpsManualDevice)
+	}
+	if globalSettings.GpsManualTargetBaud != 115200 {
+		t.Errorf("GpsManualTargetBaud should be 115200, got %d", globalSettings.GpsManualTargetBaud)
+	}
+	if globalSettings.GpsManualChip != "ublox" {
+		t.Errorf("GpsManualChip should be 'ublox', got '%s'", globalSettings.GpsManualChip)
+	}
+
+	t.Log("GPS default settings verified successfully")
+}
+
+// TestDefaultSettings_RegionAndMiscDefaults tests region and miscellaneous default values
+func TestDefaultSettings_RegionAndMiscDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to non-default state
+	globalSettings = settings{}
+	globalSettings.RegionSelected = 2
+	globalSettings.DarkMode = true
+	globalSettings.EstimateBearinglessDist = true
+	globalSettings.OGNI2CTXEnabled = false
+	globalSettings.ClearLogOnStart = true
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Verify region and misc defaults
+	if globalSettings.RegionSelected != 0 {
+		t.Errorf("RegionSelected should be 0 (none/US), got %d", globalSettings.RegionSelected)
+	}
+	if globalSettings.DarkMode {
+		t.Error("DarkMode should be false")
+	}
+	if globalSettings.EstimateBearinglessDist {
+		t.Error("EstimateBearinglessDist should be false")
+	}
+	if !globalSettings.OGNI2CTXEnabled {
+		t.Error("OGNI2CTXEnabled should be true")
+	}
+	if globalSettings.ClearLogOnStart {
+		t.Error("ClearLogOnStart should be false")
+	}
+
+	t.Log("Region and miscellaneous default settings verified successfully")
+}
+
+// TestDefaultSettings_ResetToDefaults tests that calling defaultSettings multiple times resets to defaults
+func TestDefaultSettings_ResetToDefaults(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Call defaultSettings first time
+	defaultSettings()
+	firstCallUAT := globalSettings.UAT_Enabled
+	firstCallES := globalSettings.ES_Enabled
+	firstCallSSID := globalSettings.WiFiSSID
+
+	// Modify settings
+	globalSettings.UAT_Enabled = false
+	globalSettings.ES_Enabled = false
+	globalSettings.WiFiSSID = "Modified"
+	globalSettings.DeveloperMode = true
+	globalSettings.Dump1090Gain = 99.9
+
+	// Call defaultSettings second time
+	defaultSettings()
+
+	// Verify settings are reset to defaults
+	if globalSettings.UAT_Enabled != firstCallUAT {
+		t.Errorf("UAT_Enabled should reset to %v, got %v", firstCallUAT, globalSettings.UAT_Enabled)
+	}
+	if globalSettings.ES_Enabled != firstCallES {
+		t.Errorf("ES_Enabled should reset to %v, got %v", firstCallES, globalSettings.ES_Enabled)
+	}
+	if globalSettings.WiFiSSID != firstCallSSID {
+		t.Errorf("WiFiSSID should reset to '%s', got '%s'", firstCallSSID, globalSettings.WiFiSSID)
+	}
+	if globalSettings.DeveloperMode {
+		t.Error("DeveloperMode should reset to false")
+	}
+	if globalSettings.Dump1090Gain != 37.2 {
+		t.Errorf("Dump1090Gain should reset to 37.2, got %f", globalSettings.Dump1090Gain)
+	}
+
+	// Verify consistent behavior
+	if !globalSettings.UAT_Enabled {
+		t.Error("UAT_Enabled should be true after reset")
+	}
+	if !globalSettings.ES_Enabled {
+		t.Error("ES_Enabled should be true after reset")
+	}
+	if globalSettings.WiFiSSID != "Stratux" {
+		t.Errorf("WiFiSSID should be 'Stratux' after reset, got '%s'", globalSettings.WiFiSSID)
+	}
+
+	t.Log("Settings correctly reset to defaults on multiple calls")
+}
+
+// TestDefaultSettings_AllFieldsCovered tests comprehensive coverage of all default settings
+func TestDefaultSettings_AllFieldsCovered(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+	defer func() {
+		globalSettings = origSettings
+	}()
+
+	// Reset to completely empty state
+	globalSettings = settings{}
+
+	// Call defaultSettings
+	defaultSettings()
+
+	// Create a comprehensive test of all set defaults
+	tests := []struct {
+		name     string
+		checkFn  func() bool
+		errorMsg string
+	}{
+		{"RegionSelected", func() bool { return globalSettings.RegionSelected == 0 }, "RegionSelected should be 0"},
+		{"DarkMode", func() bool { return !globalSettings.DarkMode }, "DarkMode should be false"},
+		{"UAT_Enabled", func() bool { return globalSettings.UAT_Enabled }, "UAT_Enabled should be true"},
+		{"ES_Enabled", func() bool { return globalSettings.ES_Enabled }, "ES_Enabled should be true"},
+		{"OGN_Enabled", func() bool { return !globalSettings.OGN_Enabled }, "OGN_Enabled should be false"},
+		{"Dump1090Gain", func() bool { return globalSettings.Dump1090Gain == 37.2 }, "Dump1090Gain should be 37.2"},
+		{"APRS_Enabled", func() bool { return globalSettings.APRS_Enabled }, "APRS_Enabled should be true"},
+		{"GPS_Enabled", func() bool { return globalSettings.GPS_Enabled }, "GPS_Enabled should be true"},
+		{"IMU_Sensor_Enabled", func() bool { return globalSettings.IMU_Sensor_Enabled }, "IMU_Sensor_Enabled should be true"},
+		{"BMP_Sensor_Enabled", func() bool { return globalSettings.BMP_Sensor_Enabled }, "BMP_Sensor_Enabled should be true"},
+		{"NetworkOutputs_count", func() bool { return len(globalSettings.NetworkOutputs) == 3 }, "NetworkOutputs should have 3 entries"},
+		{"BleOutputs_count", func() bool { return len(globalSettings.BleOutputs) == 2 }, "BleOutputs should have 2 entries"},
+		{"DEBUG", func() bool { return !globalSettings.DEBUG }, "DEBUG should be false"},
+		{"DisplayTrafficSource", func() bool { return !globalSettings.DisplayTrafficSource }, "DisplayTrafficSource should be false"},
+		{"ReplayLog", func() bool { return !globalSettings.ReplayLog }, "ReplayLog should be false"},
+		{"AHRSLog", func() bool { return !globalSettings.AHRSLog }, "AHRSLog should be false"},
+		{"IMUMapping_0", func() bool { return globalSettings.IMUMapping[0] == -1 }, "IMUMapping[0] should be -1"},
+		{"IMUMapping_1", func() bool { return globalSettings.IMUMapping[1] == 0 }, "IMUMapping[1] should be 0"},
+		{"OwnshipModeS", func() bool { return globalSettings.OwnshipModeS == "F00000" }, "OwnshipModeS should be 'F00000'"},
+		{"DeveloperMode", func() bool { return !globalSettings.DeveloperMode }, "DeveloperMode should be false"},
+		{"StaticIps_count", func() bool { return len(globalSettings.StaticIps) == 0 }, "StaticIps should be empty"},
+		{"NoSleep", func() bool { return !globalSettings.NoSleep }, "NoSleep should be false"},
+		{"EstimateBearinglessDist", func() bool { return !globalSettings.EstimateBearinglessDist }, "EstimateBearinglessDist should be false"},
+		{"WiFiChannel", func() bool { return globalSettings.WiFiChannel == 1 }, "WiFiChannel should be 1"},
+		{"WiFiIPAddress", func() bool { return globalSettings.WiFiIPAddress == "192.168.10.1" }, "WiFiIPAddress should be '192.168.10.1'"},
+		{"WiFiPassphrase", func() bool { return globalSettings.WiFiPassphrase == "" }, "WiFiPassphrase should be empty"},
+		{"WiFiSSID", func() bool { return globalSettings.WiFiSSID == "Stratux" }, "WiFiSSID should be 'Stratux'"},
+		{"WiFiSecurityEnabled", func() bool { return !globalSettings.WiFiSecurityEnabled }, "WiFiSecurityEnabled should be false"},
+		{"WiFiClientNetworks_count", func() bool { return len(globalSettings.WiFiClientNetworks) == 0 }, "WiFiClientNetworks should be empty"},
+		{"RadarLimits", func() bool { return globalSettings.RadarLimits == 2000 }, "RadarLimits should be 2000"},
+		{"RadarRange", func() bool { return globalSettings.RadarRange == 10 }, "RadarRange should be 10"},
+		{"AltitudeOffset", func() bool { return globalSettings.AltitudeOffset == 0 }, "AltitudeOffset should be 0"},
+		{"PWMDutyMin", func() bool { return globalSettings.PWMDutyMin == 0 }, "PWMDutyMin should be 0"},
+		{"OGNI2CTXEnabled", func() bool { return globalSettings.OGNI2CTXEnabled }, "OGNI2CTXEnabled should be true"},
+		{"ClearLogOnStart", func() bool { return !globalSettings.ClearLogOnStart }, "ClearLogOnStart should be false"},
+		{"GpsManualConfig", func() bool { return !globalSettings.GpsManualConfig }, "GpsManualConfig should be false"},
+		{"GpsManualDevice", func() bool { return globalSettings.GpsManualDevice == "/dev/ttyAMA0" }, "GpsManualDevice should be '/dev/ttyAMA0'"},
+		{"GpsManualTargetBaud", func() bool { return globalSettings.GpsManualTargetBaud == 115200 }, "GpsManualTargetBaud should be 115200"},
+		{"GpsManualChip", func() bool { return globalSettings.GpsManualChip == "ublox" }, "GpsManualChip should be 'ublox'"},
+	}
+
+	failCount := 0
+	for _, test := range tests {
+		if !test.checkFn() {
+			t.Errorf("%s: %s", test.name, test.errorMsg)
+			failCount++
+		}
+	}
+
+	if failCount == 0 {
+		t.Logf("All %d default settings verified successfully", len(tests))
+	} else {
+		t.Errorf("%d out of %d default settings failed", failCount, len(tests))
+	}
 }

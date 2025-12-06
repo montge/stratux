@@ -689,3 +689,341 @@ func TestMessageQueuePruneRemoveMultipleCategories(t *testing.T) {
 		}
 	}
 }
+
+// TestMessageQueueCloseNotifiesChannel tests that Close sends notification on DataAvailable channel
+func TestMessageQueueCloseNotifiesChannel(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	// Close should notify the channel
+	queue.Close()
+
+	// Check if channel is notified
+	select {
+	case <-queue.DataAvailable:
+		// Expected
+	case <-time.After(100 * time.Millisecond):
+		t.Error("DataAvailable channel was not notified after Close")
+	}
+}
+
+// TestMessageQueuePeekDoesNotRemove tests that PeekFirst doesn't modify queue
+func TestMessageQueuePeekDoesNotRemove(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	queue.Put(100, 10*time.Second, "test1")
+	queue.Put(200, 10*time.Second, "test2")
+
+	// Peek multiple times
+	for i := 0; i < 5; i++ {
+		data, prio := queue.PeekFirst()
+		if data.(string) != "test1" {
+			t.Errorf("Peek iteration %d: data = %v, expected 'test1'", i, data)
+		}
+		if prio != 100 {
+			t.Errorf("Peek iteration %d: priority = %d, expected 100", i, prio)
+		}
+	}
+
+	// Queue should still have both entries
+	dump := queue.GetQueueDump(false)
+	if len(dump) != 2 {
+		t.Errorf("Queue length = %d, expected 2 after multiple peeks", len(dump))
+	}
+}
+
+// TestMessageQueuePopRemoves tests that PopFirst removes entry
+func TestMessageQueuePopRemoves(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	queue.Put(100, 10*time.Second, "test1")
+	queue.Put(200, 10*time.Second, "test2")
+	queue.Put(300, 10*time.Second, "test3")
+
+	// Verify initial size
+	dump := queue.GetQueueDump(false)
+	if len(dump) != 3 {
+		t.Fatalf("Initial queue length = %d, expected 3", len(dump))
+	}
+
+	// Pop first entry
+	data, _ := queue.PopFirst()
+	if data.(string) != "test1" {
+		t.Errorf("First pop data = %v, expected 'test1'", data)
+	}
+
+	// Verify size decreased
+	dump = queue.GetQueueDump(false)
+	if len(dump) != 2 {
+		t.Errorf("Queue length after first pop = %d, expected 2", len(dump))
+	}
+
+	// Pop second entry
+	data, _ = queue.PopFirst()
+	if data.(string) != "test2" {
+		t.Errorf("Second pop data = %v, expected 'test2'", data)
+	}
+
+	// Verify size decreased again
+	dump = queue.GetQueueDump(false)
+	if len(dump) != 1 {
+		t.Errorf("Queue length after second pop = %d, expected 1", len(dump))
+	}
+}
+
+// TestMessageQueueConcurrentAccess tests thread safety with concurrent operations
+func TestMessageQueueConcurrentAccess(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(1000)
+	done := make(chan bool)
+
+	// Writer goroutine
+	go func() {
+		for i := 0; i < 100; i++ {
+			queue.Put(int32(i), 10*time.Second, i)
+			time.Sleep(1 * time.Millisecond)
+		}
+		done <- true
+	}()
+
+	// Reader goroutine
+	go func() {
+		for i := 0; i < 50; i++ {
+			queue.PopFirst()
+			time.Sleep(2 * time.Millisecond)
+		}
+		done <- true
+	}()
+
+	// Peek goroutine
+	go func() {
+		for i := 0; i < 50; i++ {
+			queue.PeekFirst()
+			time.Sleep(2 * time.Millisecond)
+		}
+		done <- true
+	}()
+
+	// Wait for all goroutines to complete
+	for i := 0; i < 3; i++ {
+		<-done
+	}
+
+	// If we got here without crashing, test passed
+}
+
+// TestMessageQueueNotifyDataMultipleCalls tests that multiple notifyData calls don't block
+func TestMessageQueueNotifyDataMultipleCalls(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	// Add multiple entries rapidly (each triggers notifyData)
+	for i := 0; i < 10; i++ {
+		queue.Put(int32(i), 10*time.Second, i)
+	}
+
+	// Should not have blocked, even though channel buffer is 1
+	// Verify at least one notification was sent
+	select {
+	case <-queue.DataAvailable:
+		// Expected
+	case <-time.After(100 * time.Millisecond):
+		t.Error("DataAvailable channel was not notified")
+	}
+}
+
+// TestMessageQueuePutAfterClose tests that Put is a no-op after Close
+func TestMessageQueuePutAfterClose(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	// Add an entry before closing
+	queue.Put(100, 10*time.Second, "before")
+
+	// Close the queue
+	queue.Close()
+
+	// Try to add entries after close
+	queue.Put(200, 10*time.Second, "after1")
+	queue.Put(300, 10*time.Second, "after2")
+
+	// Should only have the first entry
+	dump := queue.GetQueueDump(false)
+	if len(dump) != 1 {
+		t.Errorf("Queue length = %d, expected 1 (entries after Close should be ignored)", len(dump))
+	}
+
+	if dump[0].(string) != "before" {
+		t.Errorf("Queue entry = %v, expected 'before'", dump[0])
+	}
+}
+
+// TestMessageQueuePruneWithOnlyExpiredEntries tests pruning when all entries are expired
+func TestMessageQueuePruneWithOnlyExpiredEntries(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(5)
+
+	// Add entries with very short timeout
+	for i := 0; i < 10; i++ {
+		queue.Put(int32(100+i*10), 1*time.Millisecond, i)
+	}
+
+	// Wait for all to expire
+	time.Sleep(50 * time.Millisecond)
+
+	// Force prune - should clear all entries
+	dump := queue.GetQueueDump(true)
+
+	if len(dump) != 0 {
+		t.Errorf("Queue length = %d, expected 0 (all entries should be expired and pruned)", len(dump))
+	}
+}
+
+// TestMessageQueueZeroMaxSize tests behavior with maxSize of 0
+func TestMessageQueueZeroMaxSize(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(0)
+
+	// Add entries to a zero-size queue
+	queue.Put(100, 10*time.Second, "test1")
+	queue.Put(200, 10*time.Second, "test2")
+
+	// Force prune
+	dump := queue.GetQueueDump(true)
+
+	// Should prune everything since maxSize is 0
+	if len(dump) != 0 {
+		t.Errorf("Queue length = %d, expected 0 for maxSize=0", len(dump))
+	}
+}
+
+// TestMessageQueueLargeNumberOfEntries tests handling of many entries
+func TestMessageQueueLargeNumberOfEntries(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(5000)
+
+	// Add many entries
+	for i := 0; i < 1000; i++ {
+		queue.Put(int32(i), 10*time.Second, i)
+	}
+
+	dump := queue.GetQueueDump(false)
+	if len(dump) != 1000 {
+		t.Errorf("Queue length = %d, expected 1000", len(dump))
+	}
+
+	// Verify they're in priority order
+	for i := 0; i < 1000; i++ {
+		data, prio := queue.PopFirst()
+		if data == nil {
+			t.Fatalf("Entry %d is nil", i)
+		}
+		if prio != int32(i) {
+			t.Errorf("Entry %d: priority = %d, expected %d", i, prio, i)
+		}
+	}
+}
+
+// TestMessageQueueGetQueueDumpDoesNotModify tests that GetQueueDump doesn't change queue
+func TestMessageQueueGetQueueDumpDoesNotModify(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	queue.Put(100, 10*time.Second, "a")
+	queue.Put(200, 10*time.Second, "b")
+	queue.Put(300, 10*time.Second, "c")
+
+	// Get dump without pruning
+	dump1 := queue.GetQueueDump(false)
+
+	// Verify queue still has all entries
+	dump2 := queue.GetQueueDump(false)
+
+	if len(dump1) != len(dump2) {
+		t.Errorf("Queue size changed: before=%d, after=%d", len(dump1), len(dump2))
+	}
+
+	for i := range dump1 {
+		if dump1[i] != dump2[i] {
+			t.Errorf("Entry %d changed: %v -> %v", i, dump1[i], dump2[i])
+		}
+	}
+}
+
+// TestMessageQueueSingleEntry tests queue with only one entry
+func TestMessageQueueSingleEntry(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queue := NewMessageQueue(10)
+
+	queue.Put(100, 10*time.Second, "single")
+
+	// Peek
+	data, prio := queue.PeekFirst()
+	if data.(string) != "single" {
+		t.Errorf("PeekFirst data = %v, expected 'single'", data)
+	}
+	if prio != 100 {
+		t.Errorf("PeekFirst priority = %d, expected 100", prio)
+	}
+
+	// Pop
+	data, prio = queue.PopFirst()
+	if data.(string) != "single" {
+		t.Errorf("PopFirst data = %v, expected 'single'", data)
+	}
+	if prio != 100 {
+		t.Errorf("PopFirst priority = %d, expected 100", prio)
+	}
+
+	// Queue should be empty
+	data, prio = queue.PopFirst()
+	if data != nil {
+		t.Errorf("Expected nil after popping only entry, got %v", data)
+	}
+}
