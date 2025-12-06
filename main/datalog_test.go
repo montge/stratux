@@ -695,3 +695,117 @@ func TestCheckTimestamp(t *testing.T) {
 		t.Logf("New timestamp type: %d", newTs.Time_type_preference)
 	})
 }
+
+// TestSetDataLogTimeWithGPS tests the GPS time logging function
+func TestSetDataLogTimeWithGPS(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Save original state
+	origTimestamps := dataLogTimestamps
+	origCurTimestamp := dataLogCurTimestamp
+	origDataLogStarted := dataLogStarted
+	origGPSLastGPSTime := mySituation.GPSLastGPSTimeStratuxTime
+	defer func() {
+		dataLogTimestamps = origTimestamps
+		dataLogCurTimestamp = origCurTimestamp
+		dataLogStarted = origDataLogStarted
+		mySituation.GPSLastGPSTimeStratuxTime = origGPSLastGPSTime
+	}()
+
+	t.Run("logs_gps_time_when_conditions_met", func(t *testing.T) {
+		// Setup: datalog started and GPS clock valid
+		dataLogStarted = true
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time // Make GPS clock valid
+		dataLogTimestamps = []StratuxTimestamp{}
+		dataLogCurTimestamp = -1
+
+		// Create test situation with GPS time
+		gpsTime := time.Now().UTC()
+		testSit := SituationData{
+			GPSTime: gpsTime,
+		}
+
+		setDataLogTimeWithGPS(testSit)
+
+		// Should have added a timestamp
+		if len(dataLogTimestamps) != 1 {
+			t.Errorf("Expected 1 timestamp, got %d", len(dataLogTimestamps))
+		}
+
+		if len(dataLogTimestamps) > 0 {
+			ts := dataLogTimestamps[0]
+			if ts.Time_type_preference != 1 {
+				t.Errorf("Expected Time_type_preference=1 (GPS), got %d", ts.Time_type_preference)
+			}
+			if !ts.GPSClock_value.Equal(gpsTime) {
+				t.Errorf("Expected GPSClock_value=%v, got %v", gpsTime, ts.GPSClock_value)
+			}
+			if !ts.PreferredTime_value.Equal(gpsTime) {
+				t.Errorf("Expected PreferredTime_value=%v, got %v", gpsTime, ts.PreferredTime_value)
+			}
+		}
+	})
+
+	t.Run("no_log_when_datalog_not_started", func(t *testing.T) {
+		// Setup: datalog NOT started
+		dataLogStarted = false
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time // GPS clock valid
+		dataLogTimestamps = []StratuxTimestamp{}
+		dataLogCurTimestamp = -1
+
+		testSit := SituationData{
+			GPSTime: time.Now().UTC(),
+		}
+
+		setDataLogTimeWithGPS(testSit)
+
+		// Should NOT have added a timestamp
+		if len(dataLogTimestamps) != 0 {
+			t.Errorf("Expected 0 timestamps when datalog not started, got %d", len(dataLogTimestamps))
+		}
+	})
+
+	t.Run("no_log_when_gps_clock_invalid", func(t *testing.T) {
+		// Setup: datalog started but GPS clock invalid
+		dataLogStarted = true
+		mySituation.GPSLastGPSTimeStratuxTime = time.Time{} // Invalid (zero time)
+		dataLogTimestamps = []StratuxTimestamp{}
+		dataLogCurTimestamp = -1
+
+		testSit := SituationData{
+			GPSTime: time.Now().UTC(),
+		}
+
+		setDataLogTimeWithGPS(testSit)
+
+		// Should NOT have added a timestamp
+		if len(dataLogTimestamps) != 0 {
+			t.Errorf("Expected 0 timestamps when GPS clock invalid, got %d", len(dataLogTimestamps))
+		}
+	})
+
+	t.Run("updates_current_timestamp_index", func(t *testing.T) {
+		// Setup
+		dataLogStarted = true
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		dataLogTimestamps = []StratuxTimestamp{
+			{id: 0}, // Existing timestamp
+		}
+		dataLogCurTimestamp = 0
+
+		testSit := SituationData{
+			GPSTime: time.Now().UTC(),
+		}
+
+		setDataLogTimeWithGPS(testSit)
+
+		// Current timestamp should now be 1 (the new one)
+		if dataLogCurTimestamp != 1 {
+			t.Errorf("Expected dataLogCurTimestamp=1, got %d", dataLogCurTimestamp)
+		}
+	})
+}
