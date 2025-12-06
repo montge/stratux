@@ -2902,3 +2902,292 @@ func TestMsgLogAppend_WithExistingMessages(t *testing.T) {
 
 	t.Log("Successfully appended to existing message log")
 }
+
+// TestRegisterADSBTextMessageReceived_TooFewFields tests the early return for messages with too few fields
+func TestRegisterADSBTextMessageReceived_TooFewFields(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_METAR_total = 0
+	globalStatus.UAT_TAF_total = 0
+	globalStatus.UAT_PIREP_total = 0
+
+	// Test with messages that have fewer than 5 fields
+	testCases := []string{
+		"",                  // Empty string
+		"METAR",             // 1 field
+		"METAR KJFK",        // 2 fields
+		"METAR KJFK 121853", // 3 fields
+		"METAR KJFK 121853 AUTO", // 4 fields
+	}
+
+	for _, msg := range testCases {
+		registerADSBTextMessageReceived(msg, nil)
+
+		// Verify counters were not incremented
+		if globalStatus.UAT_METAR_total != 0 {
+			t.Errorf("For msg '%s': Expected UAT_METAR_total to be 0, got %d",
+				msg, globalStatus.UAT_METAR_total)
+		}
+	}
+
+	t.Log("Successfully handled messages with too few fields")
+}
+
+// TestRegisterADSBTextMessageReceived_METAR tests METAR message handling
+func TestRegisterADSBTextMessageReceived_METAR(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_METAR_total = 0
+
+	// Test METAR message
+	msg := "METAR KJFK 121853Z AUTO 09008KT 10SM FEW250 M04/M17 A3034 RMK AO2"
+	registerADSBTextMessageReceived(msg, nil)
+
+	if globalStatus.UAT_METAR_total != 1 {
+		t.Errorf("Expected UAT_METAR_total to be 1, got %d", globalStatus.UAT_METAR_total)
+	}
+
+	t.Log("Successfully processed METAR message")
+}
+
+// TestRegisterADSBTextMessageReceived_SPECI tests SPECI message handling
+func TestRegisterADSBTextMessageReceived_SPECI(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_METAR_total = 0
+
+	// Test SPECI message (should increment METAR counter)
+	msg := "SPECI KJFK 121920Z 09010KT 10SM FEW250 M03/M16 A3034"
+	registerADSBTextMessageReceived(msg, nil)
+
+	if globalStatus.UAT_METAR_total != 1 {
+		t.Errorf("Expected UAT_METAR_total to be 1 for SPECI, got %d", globalStatus.UAT_METAR_total)
+	}
+
+	t.Log("Successfully processed SPECI message")
+}
+
+// TestRegisterADSBTextMessageReceived_TAF tests TAF message handling
+func TestRegisterADSBTextMessageReceived_TAF(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_TAF_total = 0
+
+	// Test TAF message
+	msg := "TAF KJFK 121720Z 1218/1324 09008KT P6SM FEW250 FM130200 09012KT P6SM SKC"
+	registerADSBTextMessageReceived(msg, nil)
+
+	if globalStatus.UAT_TAF_total != 1 {
+		t.Errorf("Expected UAT_TAF_total to be 1, got %d", globalStatus.UAT_TAF_total)
+	}
+
+	t.Log("Successfully processed TAF message")
+}
+
+// TestRegisterADSBTextMessageReceived_TAF_AMD tests TAF.AMD message handling
+func TestRegisterADSBTextMessageReceived_TAF_AMD(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_TAF_total = 0
+
+	// Test TAF.AMD message
+	msg := "TAF.AMD KJFK 121815Z 1218/1324 09010KT P6SM FEW250"
+	registerADSBTextMessageReceived(msg, nil)
+
+	if globalStatus.UAT_TAF_total != 1 {
+		t.Errorf("Expected UAT_TAF_total to be 1 for TAF.AMD, got %d", globalStatus.UAT_TAF_total)
+	}
+
+	t.Log("Successfully processed TAF.AMD message")
+}
+
+// TestRegisterADSBTextMessageReceived_WINDS tests WINDS message handling
+func TestRegisterADSBTextMessageReceived_WINDS(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_TAF_total = 0
+
+	// Test WINDS message (note: WINDS increments TAF counter)
+	msg := "WINDS ALOFT 121800Z 3000 2714+04 2826+00 2939-05"
+	registerADSBTextMessageReceived(msg, nil)
+
+	if globalStatus.UAT_TAF_total != 1 {
+		t.Errorf("Expected UAT_TAF_total to be 1 for WINDS, got %d", globalStatus.UAT_TAF_total)
+	}
+
+	t.Log("Successfully processed WINDS message")
+}
+
+// TestRegisterADSBTextMessageReceived_PIREP tests PIREP message handling
+func TestRegisterADSBTextMessageReceived_PIREP(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_PIREP_total = 0
+
+	// Test PIREP message
+	msg := "PIREP JFK UA /OV JFK /TM 1853 /FL095 /TP B737 /SK BKN250 /RM SMOOTH"
+	registerADSBTextMessageReceived(msg, nil)
+
+	if globalStatus.UAT_PIREP_total != 1 {
+		t.Errorf("Expected UAT_PIREP_total to be 1, got %d", globalStatus.UAT_PIREP_total)
+	}
+
+	t.Log("Successfully processed PIREP message")
+}
+
+// TestRegisterADSBTextMessageReceived_UnknownType tests handling of unknown message types
+func TestRegisterADSBTextMessageReceived_UnknownType(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_METAR_total = 0
+	globalStatus.UAT_TAF_total = 0
+	globalStatus.UAT_PIREP_total = 0
+
+	// Test with an unknown message type - should not increment any counters
+	msg := "UNKNOWN TYPE 121853Z SOME DATA HERE"
+	registerADSBTextMessageReceived(msg, nil)
+
+	if globalStatus.UAT_METAR_total != 0 {
+		t.Errorf("Expected UAT_METAR_total to be 0 for unknown type, got %d",
+			globalStatus.UAT_METAR_total)
+	}
+	if globalStatus.UAT_TAF_total != 0 {
+		t.Errorf("Expected UAT_TAF_total to be 0 for unknown type, got %d",
+			globalStatus.UAT_TAF_total)
+	}
+	if globalStatus.UAT_PIREP_total != 0 {
+		t.Errorf("Expected UAT_PIREP_total to be 0 for unknown type, got %d",
+			globalStatus.UAT_PIREP_total)
+	}
+
+	t.Log("Successfully handled unknown message type")
+}
+
+// TestRegisterADSBTextMessageReceived_MultipleMessages tests processing multiple messages
+func TestRegisterADSBTextMessageReceived_MultipleMessages(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original status
+	origStatus := globalStatus
+	defer func() {
+		globalStatus = origStatus
+	}()
+
+	// Reset counters
+	globalStatus.UAT_METAR_total = 0
+	globalStatus.UAT_TAF_total = 0
+	globalStatus.UAT_PIREP_total = 0
+
+	// Process multiple different message types
+	messages := []struct {
+		msg   string
+		mType string
+	}{
+		{"METAR KJFK 121853Z AUTO 09008KT 10SM FEW250 M04/M17 A3034", "METAR"},
+		{"SPECI KLGA 121900Z 09009KT 10SM FEW200 M05/M18 A3035", "SPECI"},
+		{"TAF KEWR 121720Z 1218/1324 09008KT P6SM FEW250", "TAF"},
+		{"TAF.AMD KTEB 121815Z 1218/1324 09010KT P6SM FEW250", "TAF.AMD"},
+		{"PIREP EWR UA /OV EWR /TM 1853 /FL095 /TP B737", "PIREP"},
+		{"WINDS ALOFT 121800Z 3000 2714+04 2826+00", "WINDS"},
+	}
+
+	for _, tc := range messages {
+		registerADSBTextMessageReceived(tc.msg, nil)
+	}
+
+	// Verify counters
+	if globalStatus.UAT_METAR_total != 2 { // METAR + SPECI
+		t.Errorf("Expected UAT_METAR_total to be 2, got %d", globalStatus.UAT_METAR_total)
+	}
+	if globalStatus.UAT_TAF_total != 3 { // TAF + TAF.AMD + WINDS
+		t.Errorf("Expected UAT_TAF_total to be 3, got %d", globalStatus.UAT_TAF_total)
+	}
+	if globalStatus.UAT_PIREP_total != 1 {
+		t.Errorf("Expected UAT_PIREP_total to be 1, got %d", globalStatus.UAT_PIREP_total)
+	}
+
+	t.Log("Successfully processed multiple messages")
+}

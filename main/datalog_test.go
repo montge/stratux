@@ -428,6 +428,33 @@ func TestMarshalFunctionsIntegration(t *testing.T) {
 	}
 }
 
+// TestIsDataLogReady tests the isDataLogReady function
+func TestIsDataLogReady(t *testing.T) {
+	// Save original state
+	origReadyToWrite := dataLogReadyToWrite
+	defer func() {
+		dataLogReadyToWrite = origReadyToWrite
+	}()
+
+	t.Run("Returns true when dataLogReadyToWrite is true", func(t *testing.T) {
+		dataLogReadyToWrite = true
+		result := isDataLogReady()
+		if !result {
+			t.Error("Expected isDataLogReady() to return true when dataLogReadyToWrite is true")
+		}
+		t.Log("isDataLogReady() correctly returned true")
+	})
+
+	t.Run("Returns false when dataLogReadyToWrite is false", func(t *testing.T) {
+		dataLogReadyToWrite = false
+		result := isDataLogReady()
+		if result {
+			t.Error("Expected isDataLogReady() to return false when dataLogReadyToWrite is false")
+		}
+		t.Log("isDataLogReady() correctly returned false")
+	})
+}
+
 // TestLogMsg tests the logMsg function which logs message data
 func TestLogMsg(t *testing.T) {
 	// Save original settings
