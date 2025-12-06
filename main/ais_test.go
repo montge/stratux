@@ -19,7 +19,12 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/BertoldVdb/go-ais"
 )
+
+// Ensure ais package is imported for test construction
+var _ = ais.CodecNew
 
 // resetAISState clears global state for AIS testing
 func resetAISState() {
