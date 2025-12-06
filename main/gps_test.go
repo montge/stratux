@@ -596,3 +596,99 @@ func TestUpdateConstellation_SolutionTimeout(t *testing.T) {
 	t.Logf("Solution timeout test: InSolution=%v, GPSSatellites=%d",
 		sat.InSolution, mySituation.GPSSatellites)
 }
+
+// TestCalculateNavRate tests the GPS navigation rate calculation
+func TestCalculateNavRate(t *testing.T) {
+	// Save original state
+	origPerfStats := myGPSPerfStats
+	defer func() { myGPSPerfStats = origPerfStats }()
+
+	t.Run("empty_stats", func(t *testing.T) {
+		myGPSPerfStats = []gpsPerfStats{}
+		result := calculateNavRate()
+		// With empty stats, Mean returns invalid, halfwidth defaults to 3.5
+		if result != 3.5 {
+			t.Errorf("Expected halfwidth=3.5 for empty stats, got %f", result)
+		}
+		if mySituation.GPSPositionSampleRate != 0 {
+			t.Errorf("Expected GPSPositionSampleRate=0 for empty stats, got %f", mySituation.GPSPositionSampleRate)
+		}
+	})
+
+	t.Run("single_point", func(t *testing.T) {
+		myGPSPerfStats = []gpsPerfStats{
+			{nmeaTime: 1.0},
+		}
+		result := calculateNavRate()
+		// Single point can't calculate rate
+		if result != 3.5 {
+			t.Errorf("Expected halfwidth=3.5 for single point, got %f", result)
+		}
+	})
+
+	t.Run("1hz_samples", func(t *testing.T) {
+		// Simulate 1Hz GPS (1 second between samples)
+		myGPSPerfStats = []gpsPerfStats{
+			{nmeaTime: 0.0},
+			{nmeaTime: 1.0},
+			{nmeaTime: 2.0},
+			{nmeaTime: 3.0},
+			{nmeaTime: 4.0},
+		}
+		result := calculateNavRate()
+		// 1Hz = 1.0s dt_avg, halfwidth = 9 * 1.0 = 9.0, clamped to 3.5
+		if result != 3.5 {
+			t.Errorf("Expected halfwidth=3.5 (clamped) for 1Hz samples, got %f", result)
+		}
+	})
+
+	t.Run("5hz_samples", func(t *testing.T) {
+		// Simulate 5Hz GPS (0.2 seconds between samples)
+		myGPSPerfStats = []gpsPerfStats{
+			{nmeaTime: 0.0},
+			{nmeaTime: 0.2},
+			{nmeaTime: 0.4},
+			{nmeaTime: 0.6},
+			{nmeaTime: 0.8},
+			{nmeaTime: 1.0},
+		}
+		result := calculateNavRate()
+		// 5Hz = 0.2s dt_avg, halfwidth = 9 * 0.2 = 1.8, between 1.5 and 3.5
+		if result < 1.5 || result > 3.5 {
+			t.Errorf("Expected halfwidth between 1.5 and 3.5 for 5Hz samples, got %f", result)
+		}
+	})
+
+	t.Run("10hz_samples", func(t *testing.T) {
+		// Simulate 10Hz GPS (0.1 seconds between samples)
+		myGPSPerfStats = []gpsPerfStats{
+			{nmeaTime: 0.0},
+			{nmeaTime: 0.1},
+			{nmeaTime: 0.2},
+			{nmeaTime: 0.3},
+			{nmeaTime: 0.4},
+			{nmeaTime: 0.5},
+		}
+		result := calculateNavRate()
+		// 10Hz = 0.1s dt_avg, halfwidth = 9 * 0.1 = 0.9, clamped to 1.5
+		if result != 1.5 {
+			t.Errorf("Expected halfwidth=1.5 (clamped) for 10Hz samples, got %f", result)
+		}
+	})
+
+	t.Run("filters_duplicate_timestamps", func(t *testing.T) {
+		// Some samples with same timestamp (< 0.05s apart) should be filtered
+		myGPSPerfStats = []gpsPerfStats{
+			{nmeaTime: 0.0},
+			{nmeaTime: 0.01}, // Should be filtered (< 0.05)
+			{nmeaTime: 1.0},
+			{nmeaTime: 1.02}, // Should be filtered (< 0.05)
+			{nmeaTime: 2.0},
+		}
+		result := calculateNavRate()
+		// After filtering, we have samples at 0.0, 1.0, 2.0 = 1Hz rate
+		if result != 3.5 {
+			t.Errorf("Expected halfwidth=3.5 after filtering duplicates, got %f", result)
+		}
+	})
+}

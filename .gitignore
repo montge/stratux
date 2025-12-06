@@ -47,3 +47,25 @@ test/uatsummary
 
 .DS_Store
 
+
+# Virtual environment
+venv/
+.venv/
+
+# AI working directory
+.local/
+
+# Coverage files
+*.out
+main/*.out
+
+# Node modules
+web/node_modules/
+node_modules/
+
+# Coverage reports
+web/coverage/
+coverage/
+
+# Backup files
+*.bak
