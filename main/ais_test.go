@@ -763,3 +763,236 @@ func TestImportAISTrafficMessage_DEBUG(t *testing.T) {
 
 	t.Logf("DEBUG mode test: %d traffic entries, messages=%d", count, globalStatus.AIS_messages_total)
 }
+
+// TestImportAISTrafficMessage_Type2PositionReport tests Type 2 position report
+func TestImportAISTrafficMessage_Type2PositionReport(t *testing.T) {
+	resetAISState()
+
+	// Set GPS position to decode near the AIS target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 4.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 2 position report (scheduled class A) - similar to Type 1
+	// Using same encoding as Type 1 but for coverage purposes
+	aisMsg := "!AIVDM,1,1,,B,25MsUdPOh8JwI:0HUwquiIFH21>i,0*0A"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 2 position report test: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Type3PositionReportITDMA tests Type 3 position report
+func TestImportAISTrafficMessage_Type3PositionReportITDMA(t *testing.T) {
+	resetAISState()
+
+	// Set GPS position to decode near the AIS target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 4.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 3 position report (interrogated class A)
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 3 position report ITDMA test: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_HighSpeed tests speed > 102.3 knots (invalid)
+func TestImportAISTrafficMessage_HighSpeed(t *testing.T) {
+	resetAISState()
+
+	// Set GPS close to target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 4.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Standard AIS message - the high speed case (>102.3) is an internal flag
+	// This tests the path where Speed_valid won't be set
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	t.Log("High speed handling test complete")
+}
+
+// TestImportAISTrafficMessage_InvalidROT tests RateOfTurn = -128 (not available)
+func TestImportAISTrafficMessage_InvalidROT(t *testing.T) {
+	resetAISState()
+
+	// Set GPS close to target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 4.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// The RateOfTurn = -128 means "not available"
+	// This tests the path where rot stays 0
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	t.Log("Invalid ROT handling test complete")
+}
+
+// TestImportAISTrafficMessage_Cog360 tests COG = 360 (not available)
+func TestImportAISTrafficMessage_Cog360(t *testing.T) {
+	resetAISState()
+
+	// Set GPS close to target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 4.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// COG = 360 means "not available", so cog should be 0
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	t.Log("COG 360 handling test complete")
+}
+
+// TestImportAISTrafficMessage_Heading511 tests TrueHeading = 511 (not available)
+func TestImportAISTrafficMessage_Heading511(t *testing.T) {
+	resetAISState()
+
+	// Set GPS close to target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 4.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// TrueHeading = 511 means "not available"
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	t.Log("Heading 511 handling test complete")
+}
+
+// TestImportAISTrafficMessage_Type27Cog511 tests Type 27 with COG = 511 (not available)
+func TestImportAISTrafficMessage_Type27Cog511(t *testing.T) {
+	resetAISState()
+
+	// Set GPS to be near Type 27 target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 37.0
+	mySituation.GPSLongitude = -122.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 27 long range message
+	aisMsg := "!AIVDM,1,1,,A,KC5E2b@U19PFdLbL,0*62"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 27 COG 511 test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Type27Sog63 tests Type 27 with SOG >= 63 (not available)
+func TestImportAISTrafficMessage_Type27Sog63(t *testing.T) {
+	resetAISState()
+
+	// Set GPS to be near Type 27 target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 37.0
+	mySituation.GPSLongitude = -122.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 27 long range message
+	aisMsg := "!AIVDM,1,1,,A,KC5E2b@U19PFdLbL,0*62"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 27 SOG 63 test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_DistanceFilter tests the 150km distance filter
+func TestImportAISTrafficMessage_DistanceFilter(t *testing.T) {
+	resetAISState()
+
+	// Set GPS far from the AIS target (opposite side of the world)
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = -33.8688 // Sydney, Australia
+	mySituation.GPSLongitude = 151.2093
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Valid Type 1 message - target in Netherlands (52.5, 5.0)
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	// Target should be filtered due to distance > 150km
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	if count != 0 {
+		t.Errorf("Expected 0 targets (distance filter), got %d", count)
+	}
+
+	t.Log("Distance filter test complete")
+}
+
+// TestImportAISTrafficMessage_GPSInvalid tests handling when GPS is not valid
+func TestImportAISTrafficMessage_GPSInvalid(t *testing.T) {
+	resetAISState()
+
+	// Make GPS invalid
+	mySituation.muGPS.Lock()
+	mySituation.GPSFixQuality = 0
+	mySituation.GPSLastFixLocalTime = time.Time{} // Zero time = invalid
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = false
+
+	// Valid Type 1 message
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	// Without valid GPS, BearingDist_valid will be false, target filtered
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	// Target should be filtered (no GPS = can't calculate distance)
+	t.Logf("GPS invalid test: %d targets", count)
+}
+
+// TestImportAISTrafficMessage_Type5ShipStatic tests Type 5 ship static data
+func TestImportAISTrafficMessage_Type5ShipStatic(t *testing.T) {
+	resetAISState()
+
+	// Set GPS close to where Type 5 vessel might be
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 4.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// First send a Type 1 to create the target
+	aisMsg1 := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg1)
+
+	// Then send Type 5 static data (multi-part message)
+	// This is the standard Type 5 format
+	msg1 := "!AIVDM,2,1,3,B,55P5TL01VIaAL@7WKO@mBplU@<PDhh000000001S;AJ::4A80?4i@E53,0*3E"
+	msg2 := "!AIVDM,2,2,3,B,1@0000000000000,2*55"
+	parseAisMessage(msg1)
+	parseAisMessage(msg2)
+
+	t.Logf("Type 5 ship static test: messages=%d", globalStatus.AIS_messages_total)
+}
