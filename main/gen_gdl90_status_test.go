@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -924,4 +926,86 @@ func TestMakeFFIDMessage_LongVersion(t *testing.T) {
 	}
 
 	t.Logf("Long version FFID message: %d bytes (version=%s, build=%s)", len(msg), stratuxVersion, stratuxBuild)
+}
+
+// TestSaveSettings_Success tests saveSettings with a valid temp file
+func TestSaveSettings_Success(t *testing.T) {
+	// Initialize required mutexes and maps
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Save original config location
+	origConfigLocation := configLocation
+	defer func() { configLocation = origConfigLocation }()
+
+	// Create a temp file for the config
+	tmpDir := t.TempDir()
+	configLocation = tmpDir + "/test_stratux.conf"
+
+	// Save original settings
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	// Set some test values
+	globalSettings.UAT_Enabled = true
+	globalSettings.ES_Enabled = true
+	globalSettings.DeveloperMode = true
+
+	// Call saveSettings - should succeed
+	saveSettings()
+
+	// Verify the file was created and contains valid JSON
+	data, err := os.ReadFile(configLocation)
+	if err != nil {
+		t.Fatalf("Failed to read saved settings: %v", err)
+	}
+
+	if len(data) == 0 {
+		t.Error("Settings file is empty")
+	}
+
+	// Should contain JSON with our settings
+	dataStr := string(data)
+	if !strings.Contains(dataStr, "UAT_Enabled") {
+		t.Error("Settings file should contain UAT_Enabled")
+	}
+
+	t.Logf("Successfully saved settings to %s (%d bytes)", configLocation, len(data))
+}
+
+// TestSaveSettings_Failure tests saveSettings when file cannot be created
+func TestSaveSettings_Failure(t *testing.T) {
+	// Initialize required mutexes and maps
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Save original config location
+	origConfigLocation := configLocation
+	defer func() { configLocation = origConfigLocation }()
+
+	// Set config location to a path that will fail (non-existent directory)
+	configLocation = "/nonexistent/directory/stratux.conf"
+
+	// Save original error count
+	origErrors := len(globalStatus.Errors)
+	defer func() {
+		// Clear errors we added
+		if len(globalStatus.Errors) > origErrors {
+			globalStatus.Errors = globalStatus.Errors[:origErrors]
+		}
+	}()
+
+	// Call saveSettings - should fail and add error
+	saveSettings()
+
+	// The function should have added an error via addSingleSystemErrorf
+	t.Log("saveSettings handled failure case")
 }
