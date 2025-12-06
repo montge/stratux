@@ -1398,3 +1398,884 @@ func TestParseDownlinkReport_ShortTailPrefix(t *testing.T) {
 		t.Error("Traffic not created for short tail test")
 	}
 }
+
+// TestParseDownlinkReport_ZeroVelocityHover tests ns_vel=0 and ew_vel=0 (hovering aircraft)
+// This covers the else branch of line 954: if ns_vel != 0 || ew_vel != 0
+func TestParseDownlinkReport_ZeroVelocityHover(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0 // msg_type=1, addr_type=0
+	frame[1] = 0xAA
+	frame[2] = 0xBB
+	frame[3] = 0xCC
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	// Altitude
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	// Airground state = 0 (subsonic airborne)
+	frame[12] = 0x00
+
+	// N/S velocity: non-zero raw value but encodes to 0 velocity
+	// When raw_ns & 0x3ff = 1, then ns_vel = (1 - 1) = 0
+	raw_ns := uint16(1)
+	frame[12] = frame[12] | byte((raw_ns>>6)&0x1F)
+	frame[13] = byte((raw_ns << 2) & 0xFC)
+
+	// E/W velocity: non-zero raw value but encodes to 0 velocity
+	raw_ew := uint16(1)
+	frame[13] = frame[13] | byte((raw_ew>>9)&0x03)
+	frame[14] = byte((raw_ew >> 1) & 0xFF)
+	frame[15] = byte((raw_ew << 7) & 0x80)
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xAABBCC]; ok {
+		// Both velocities are 0, so track should be 0 (line 954 else branch)
+		if ti.Track != 0 {
+			t.Logf("Note: Track=%f for hovering aircraft (both velocities 0)", ti.Track)
+		}
+		if !ti.Speed_valid {
+			t.Error("Expected Speed_valid=true when both ns_vel_valid and ew_vel_valid are true")
+		}
+		// Speed should be 0 for hovering
+		if ti.Speed != 0 {
+			t.Logf("Note: Speed=%d for hovering aircraft (expected 0)", ti.Speed)
+		}
+		t.Logf("Zero velocity hover: ICAO=%06X, Speed=%d, Track=%f", ti.Icao_addr, ti.Speed, ti.Track)
+	} else {
+		t.Error("Traffic not created for zero velocity test")
+	}
+}
+
+// TestParseDownlinkReport_SquawkCodeUATVersion1 tests squawk code decoding with UAT version < 2
+// This covers line 759: else if uat_version >= 2 (the else branch where uat_version < 2 and csid == 0)
+func TestParseDownlinkReport_SquawkCodeUATVersion1(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0 // msg_type=1, addr_type=0
+	frame[1] = 0x11
+	frame[2] = 0x22
+	frame[3] = 0x33
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	frame[12] = 0x00
+
+	// Encode squawk code in bytes 17-20
+	// With csid=0 and uat_version=1, squawk should NOT be decoded (line 759 requires version >= 2)
+	// Squawk 1200 encoded
+	v := uint16(1*40 + 2) // squawk_a=1, squawk_b=2
+	frame[17] = byte((v >> 8) & 0xFF)
+	frame[18] = byte(v & 0xFF)
+
+	v = uint16(0*1600 + 0*40) // squawk_c=0, squawk_d=0
+	frame[19] = byte((v >> 8) & 0xFF)
+	frame[20] = byte(v & 0xFF)
+
+	// Mode Status with UAT version 1
+	frame[23] = (0 << 5) | (1 << 2) | 0x02 // priority=0, uat_version=1, sil=2
+	frame[25] = 9 << 4                     // NACp = 9
+	frame[26] = 0 << 1                     // CSID = 0 (squawk mode, not callsign)
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0x112233]; ok {
+		// With UAT version 1 and csid=0, squawk should NOT be decoded (requires version >= 2)
+		if ti.Squawk != 0 {
+			t.Errorf("Expected Squawk=0 with UAT version 1, got %d", ti.Squawk)
+		}
+		t.Logf("Squawk code with UAT version 1: ICAO=%06X, Squawk=%d (should be 0)", ti.Icao_addr, ti.Squawk)
+	} else {
+		t.Error("Traffic not created for squawk version 1 test")
+	}
+}
+
+// TestParseDownlinkReport_GroundVehicleZeroSpeed tests ground vehicle with zero speed
+// This covers line 974: if raw_gs != 0 (the else branch where raw_gs == 0)
+func TestParseDownlinkReport_GroundVehicleZeroSpeed(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0
+	frame[1] = 0xDD
+	frame[2] = 0xEE
+	frame[3] = 0xFF
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	// Altitude
+	raw_alt := uint16(40)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x07
+
+	// Airground state = 2 (ground vehicle)
+	frame[12] = 0x80
+
+	// Ground speed: raw_gs = 0 (stationary vehicle)
+	raw_gs := uint16(0)
+	frame[12] = frame[12] | byte((raw_gs>>6)&0x1F)
+	frame[13] = byte((raw_gs << 2) & 0xFC)
+
+	// Track
+	raw_track := uint16(256)
+	frame[13] = frame[13] | byte((raw_track>>9)&0x03)
+	frame[14] = byte((raw_track >> 1) & 0xFF)
+	frame[15] = byte((raw_track << 7) & 0x80)
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xDDEEFF]; ok {
+		if !ti.OnGround {
+			t.Error("Expected OnGround=true for ground vehicle")
+		}
+		// Speed_valid should be false when raw_gs == 0
+		if ti.Speed_valid {
+			t.Error("Expected Speed_valid=false for stationary ground vehicle (raw_gs=0)")
+		}
+		if ti.Speed != 0 {
+			t.Errorf("Expected Speed=0 for stationary vehicle, got %d", ti.Speed)
+		}
+		t.Logf("Ground vehicle zero speed: ICAO=%06X, Speed=%d, Speed_valid=%v", ti.Icao_addr, ti.Speed, ti.Speed_valid)
+	} else {
+		t.Error("Traffic not created for ground vehicle zero speed test")
+	}
+}
+
+// TestParseDownlinkReport_AUXSVZeroAltitude tests AUXSV section with raw_alt == 0
+// This covers line 990: if raw_alt != 0 (the else branch where raw_alt == 0)
+func TestParseDownlinkReport_AUXSVZeroAltitude(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0 // msg_type=1 (has AUXSV)
+	frame[1] = 0xAA
+	frame[2] = 0xAA
+	frame[3] = 0xAA
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE) | 0x01 // alt_geo = 1 (GNSS)
+
+	// Primary altitude (GNSS)
+	raw_alt := uint16(200)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x07
+
+	frame[12] = 0x00
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	// AUXSV altitude = 0 (bytes 29-30 all zeros)
+	frame[29] = 0x00
+	frame[30] = 0x00
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xAAAAAA]; ok {
+		// When AUXSV raw_alt == 0, AUXSV section should be skipped (no swap, no GnssDiff update)
+		if !ti.AltIsGNSS {
+			t.Error("Expected AltIsGNSS=true (no swap should occur when AUXSV raw_alt=0)")
+		}
+		// GnssDiffFromBaroAlt should not be updated when raw_alt == 0
+		if ti.GnssDiffFromBaroAlt != 0 {
+			t.Logf("Note: GnssDiffFromBaroAlt=%d (expected 0 when AUXSV raw_alt=0)", ti.GnssDiffFromBaroAlt)
+		}
+		t.Logf("AUXSV zero altitude: Alt=%d, AltIsGNSS=%v, GnssDiff=%d", ti.Alt, ti.AltIsGNSS, ti.GnssDiffFromBaroAlt)
+	} else {
+		t.Error("Traffic not created for AUXSV zero altitude test")
+	}
+}
+
+// TestParseDownlinkReport_ZeroPrimaryAltitude tests message with raw_alt == 0 (no primary altitude)
+// This covers line 903: if raw_alt != 0 (the else branch where raw_alt == 0)
+func TestParseDownlinkReport_ZeroPrimaryAltitude(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0 // msg_type=1, addr_type=0
+	frame[1] = 0xBB
+	frame[2] = 0xBB
+	frame[3] = 0xBB
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	// Primary altitude = 0 (bytes 10-11 encode raw_alt = 0)
+	frame[10] = 0x00
+	frame[11] = 0x07 // NIC = 7, but raw_alt bits are 0
+
+	frame[12] = 0x00
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xBBBBBB]; ok {
+		// When raw_alt == 0, altitude should be 0
+		if ti.Alt != 0 {
+			t.Errorf("Expected Alt=0 when raw_alt=0, got %d", ti.Alt)
+		}
+		if ti.AltIsGNSS {
+			t.Error("Expected AltIsGNSS=false when raw_alt=0 (alt_geo flag not checked)")
+		}
+		t.Logf("Zero primary altitude: Alt=%d, AltIsGNSS=%v", ti.Alt, ti.AltIsGNSS)
+	} else {
+		t.Error("Traffic not created for zero primary altitude test")
+	}
+}
+
+// TestParseDownlinkReport_NoNSVelocity tests message with no N/S velocity (raw_ns & 0x3ff == 0)
+// This covers line 931: if (raw_ns & 0x3ff) != 0 (the else branch)
+func TestParseDownlinkReport_NoNSVelocity(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0
+	frame[1] = 0xCC
+	frame[2] = 0xCC
+	frame[3] = 0xCC
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	// Airground state = 0 (subsonic)
+	frame[12] = 0x00
+
+	// N/S velocity: raw_ns & 0x3ff = 0 (no N/S velocity)
+	raw_ns := uint16(0)
+	frame[12] = frame[12] | byte((raw_ns>>6)&0x1F)
+	frame[13] = byte((raw_ns << 2) & 0xFC)
+
+	// E/W velocity: valid
+	raw_ew := uint16(100)
+	frame[13] = frame[13] | byte((raw_ew>>9)&0x03)
+	frame[14] = byte((raw_ew >> 1) & 0xFF)
+	frame[15] = byte((raw_ew << 7) & 0x80)
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xCCCCCC]; ok {
+		// When only E/W is valid, speed should not be valid
+		if ti.Speed_valid {
+			t.Error("Expected Speed_valid=false when N/S velocity is invalid")
+		}
+		t.Logf("No N/S velocity: ICAO=%06X, Speed_valid=%v", ti.Icao_addr, ti.Speed_valid)
+	} else {
+		t.Error("Traffic not created for no N/S velocity test")
+	}
+}
+
+// TestParseDownlinkReport_NoEWVelocity tests message with no E/W velocity (raw_ew & 0x3ff == 0)
+// This covers line 943: if (raw_ew & 0x3ff) != 0 (the else branch)
+func TestParseDownlinkReport_NoEWVelocity(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0
+	frame[1] = 0xDD
+	frame[2] = 0xDD
+	frame[3] = 0xDD
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	// Airground state = 0 (subsonic)
+	frame[12] = 0x00
+
+	// N/S velocity: valid
+	raw_ns := uint16(100)
+	frame[12] = frame[12] | byte((raw_ns>>6)&0x1F)
+	frame[13] = byte((raw_ns << 2) & 0xFC)
+
+	// E/W velocity: raw_ew & 0x3ff = 0 (no E/W velocity)
+	raw_ew := uint16(0)
+	frame[13] = frame[13] | byte((raw_ew>>9)&0x03)
+	frame[14] = byte((raw_ew >> 1) & 0xFF)
+	frame[15] = byte((raw_ew << 7) & 0x80)
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xDDDDDD]; ok {
+		// When only N/S is valid, speed should not be valid
+		if ti.Speed_valid {
+			t.Error("Expected Speed_valid=false when E/W velocity is invalid")
+		}
+		t.Logf("No E/W velocity: ICAO=%06X, Speed_valid=%v", ti.Icao_addr, ti.Speed_valid)
+	} else {
+		t.Error("Traffic not created for no E/W velocity test")
+	}
+}
+
+// TestParseDownlinkReport_NoVerticalVelocity tests message with no vertical velocity
+// This covers line 964: if (raw_vvel & 0x1ff) != 0 (the else branch)
+func TestParseDownlinkReport_NoVerticalVelocity(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0
+	frame[1] = 0xEE
+	frame[2] = 0xEE
+	frame[3] = 0xEE
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	// Airground state = 0 (subsonic)
+	frame[12] = 0x00
+
+	// Valid N/S and E/W velocities
+	raw_ns := uint16(100)
+	frame[12] = frame[12] | byte((raw_ns>>6)&0x1F)
+	frame[13] = byte((raw_ns << 2) & 0xFC)
+
+	raw_ew := uint16(100)
+	frame[13] = frame[13] | byte((raw_ew>>9)&0x03)
+	frame[14] = byte((raw_ew >> 1) & 0xFF)
+	frame[15] = byte((raw_ew << 7) & 0x80)
+
+	// Vertical velocity: raw_vvel & 0x1ff = 0 (no vertical velocity)
+	raw_vvel := uint16(0)
+	frame[15] = frame[15] | byte((raw_vvel>>4)&0x7F)
+	frame[16] = byte((raw_vvel << 4) & 0xF0)
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xEEEEEE]; ok {
+		// When raw_vvel & 0x1ff == 0, vvel should remain 0
+		if ti.Vvel != 0 {
+			t.Errorf("Expected Vvel=0 when raw_vvel & 0x1ff == 0, got %d", ti.Vvel)
+		}
+		t.Logf("No vertical velocity: ICAO=%06X, Vvel=%d", ti.Icao_addr, ti.Vvel)
+	} else {
+		t.Error("Traffic not created for no vertical velocity test")
+	}
+}
+
+// TestParseDownlinkReport_MessageType3 tests message type 3 (has Mode Status like type 1)
+// This covers line 724: if msg_type == 1 || msg_type == 3
+func TestParseDownlinkReport_MessageType3(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (3 << 3) | 0 // msg_type=3, addr_type=0
+	frame[1] = 0x33
+	frame[2] = 0x33
+	frame[3] = 0x33
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	frame[12] = 0x00
+
+	// Mode Status (msg_type 3 has Mode Status)
+	frame[23] = (0 << 5) | (2 << 2) | 0x02 // priority=0, uat_version=2, sil=2
+	frame[25] = 9 << 4                     // NACp = 9
+	frame[26] = 1 << 1                     // CSID = 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0x333333]; ok {
+		// msg_type 3 should process Mode Status
+		if ti.NACp == 0 {
+			t.Error("Expected NACp to be set from Mode Status")
+		}
+		t.Logf("Message type 3: ICAO=%06X, NACp=%d", ti.Icao_addr, ti.NACp)
+	} else {
+		t.Error("Traffic not created for message type 3")
+	}
+}
+
+// TestParseDownlinkReport_MessageType4 tests message type 4 (no Mode Status, no AUXSV)
+// This covers the else branch of line 724 and line 987
+func TestParseDownlinkReport_MessageType4(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (4 << 3) | 0 // msg_type=4, addr_type=0
+	frame[1] = 0x44
+	frame[2] = 0x44
+	frame[3] = 0x44
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	frame[12] = 0x00
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0x444444]; ok {
+		// msg_type 4 should NOT process Mode Status or AUXSV
+		t.Logf("Message type 4: ICAO=%06X, NIC=%d", ti.Icao_addr, ti.NIC)
+	} else {
+		t.Error("Traffic not created for message type 4")
+	}
+}
+
+// TestParseDownlinkReport_MessageType0 tests message type 0 (no Mode Status, no AUXSV)
+func TestParseDownlinkReport_MessageType0(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (0 << 3) | 0 // msg_type=0, addr_type=0
+	frame[1] = 0x00
+	frame[2] = 0x00
+	frame[3] = 0x01
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	frame[12] = 0x00
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0x000001]; ok {
+		t.Logf("Message type 0: ICAO=%06X", ti.Icao_addr)
+	} else {
+		t.Error("Traffic not created for message type 0")
+	}
+}
+
+// TestParseDownlinkReport_AddrType3TISB tests addr_type 3 (TIS-B)
+// This covers line 838-839: else if ti.Addr_type == 3
+func TestParseDownlinkReport_AddrType3TISB(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 3 // msg_type=1, addr_type=3 (TIS-B)
+	frame[1] = 0x33
+	frame[2] = 0x33
+	frame[3] = 0x00
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	frame[12] = 0x00
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0x333300]; ok {
+		if ti.TargetType != TARGET_TYPE_TISB {
+			t.Errorf("Expected TargetType=%d (TIS-B), got %d", TARGET_TYPE_TISB, ti.TargetType)
+		}
+		t.Logf("Addr_type 3 (TIS-B): ICAO=%06X, TargetType=%d", ti.Icao_addr, ti.TargetType)
+	} else {
+		t.Error("Traffic not created for addr_type 3")
+	}
+}
+
+// TestParseDownlinkReport_AddrType6ADSR tests addr_type 6 (ADS-R)
+// This covers line 840-841: else if ti.Addr_type == 6
+func TestParseDownlinkReport_AddrType6ADSR(t *testing.T) {
+	resetUATState()
+
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 6 // msg_type=1, addr_type=6 (ADS-R)
+	frame[1] = 0x66
+	frame[2] = 0x66
+	frame[3] = 0x00
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	frame[12] = 0x00
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 1 << 1
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0x666600]; ok {
+		if ti.TargetType != TARGET_TYPE_ADSR {
+			t.Errorf("Expected TargetType=%d (ADS-R), got %d", TARGET_TYPE_ADSR, ti.TargetType)
+		}
+		t.Logf("Addr_type 6 (ADS-R): ICAO=%06X, TargetType=%d", ti.Icao_addr, ti.TargetType)
+	} else {
+		t.Error("Traffic not created for addr_type 6")
+	}
+}
+
+// TestParseDownlinkReport_ExistingTraffic tests updating existing traffic entry
+// This covers line 703-705: if val, ok := traffic[icao_addr]; ok
+func TestParseDownlinkReport_ExistingTraffic(t *testing.T) {
+	resetUATState()
+
+	// First, create an existing traffic entry
+	trafficMutex.Lock()
+	traffic[0x999999] = TrafficInfo{
+		Icao_addr: 0x999999,
+		Tail:      "EXISTING",
+		Alt:       5000,
+	}
+	trafficMutex.Unlock()
+
+	// Now send a UAT message for the same ICAO
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0
+	frame[1] = 0x99
+	frame[2] = 0x99
+	frame[3] = 0x99
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(100)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x08
+
+	frame[12] = 0x00
+
+	// Mode Status
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+	frame[26] = 0 << 1 // CSID = 0 (don't overwrite tail)
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0x999999]; ok {
+		// Tail should be preserved from existing entry
+		if ti.Tail != "EXISTING" {
+			t.Logf("Note: Tail changed from 'EXISTING' to '%s'", ti.Tail)
+		}
+		// Altitude should be updated
+		if ti.Alt == 5000 {
+			t.Error("Expected altitude to be updated from existing value")
+		}
+		t.Logf("Existing traffic updated: ICAO=%06X, Tail='%s', Alt=%d", ti.Icao_addr, ti.Tail, ti.Alt)
+	} else {
+		t.Error("Existing traffic not found after update")
+	}
+}

@@ -2155,3 +2155,221 @@ func TestMakeTrafficReportMsg_OnGround(t *testing.T) {
 	}
 	// The on-ground flag should be encoded in the "m" field
 }
+
+// TestParseDump1090Message_MissingLongitude tests handling of position message with missing longitude
+// Verifies: FR-401 (Traffic Reception - incomplete position data handling)
+func TestParseDump1090Message_MissingLongitude(t *testing.T) {
+	reset1090ESState()
+
+	// Position message with Lat but no Lng (Position_valid=true but Lng=nil)
+	// This simulates dump1090 receiving a position message it couldn't fully decode
+	msg := `{"Icao_addr":11230838,"DF":17,"CA":5,"TypeCode":11,"Lat":51.7657,"Alt":5850,"Position_valid":true,"SignalLevel":0.0512,"Timestamp":"2025-10-14T12:00:00.000Z"}`
+
+	parseDump1090Message(msg)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	icao := uint32(11230838)
+	ti, ok := traffic[icao]
+	if !ok {
+		t.Fatalf("Expected traffic for ICAO %X, not found", icao)
+	}
+
+	// Position should be invalid due to missing longitude
+	if ti.Position_valid {
+		t.Error("Expected Position_valid to be false when longitude is missing")
+	}
+}
+
+// TestParseDump1090Message_MissingSpeed tests handling of velocity message with missing speed
+// Verifies: FR-401 (Traffic Reception - incomplete velocity data handling)
+func TestParseDump1090Message_MissingSpeed(t *testing.T) {
+	reset1090ESState()
+
+	// First create the target with position
+	posMsg := `{"Icao_addr":11230838,"DF":17,"CA":5,"TypeCode":11,"Lat":51.7657,"Lng":-1.1918,"Alt":5850,"Position_valid":true,"SignalLevel":0.0512,"Timestamp":"2025-10-14T12:00:00.000Z"}`
+	parseDump1090Message(posMsg)
+
+	// Velocity message with Track but no Speed (Speed_valid=true but Speed=nil)
+	velMsg := `{"Icao_addr":11230838,"DF":17,"CA":5,"TypeCode":19,"Track":89,"Vvel":-64,"Speed_valid":true,"SignalLevel":0.0498,"Timestamp":"2025-10-14T12:00:00.500Z"}`
+
+	parseDump1090Message(velMsg)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	icao := uint32(11230838)
+	ti, ok := traffic[icao]
+	if !ok {
+		t.Fatalf("Expected traffic for ICAO %X, not found", icao)
+	}
+
+	// Speed should be invalid due to missing speed value
+	if ti.Speed_valid {
+		t.Error("Expected Speed_valid to be false when speed is missing")
+	}
+}
+
+// TestParseDump1090Message_InvalidSpeedOnTC19 tests handling of invalid speed on TypeCode 19
+// Verifies: FR-401 (Traffic Reception - invalid velocity message handling)
+func TestParseDump1090Message_InvalidSpeedOnTC19(t *testing.T) {
+	reset1090ESState()
+
+	// First create the target with valid speed
+	posMsg := `{"Icao_addr":11230838,"DF":17,"CA":5,"TypeCode":11,"Lat":51.7657,"Lng":-1.1918,"Alt":5850,"Position_valid":true,"SignalLevel":0.0512,"Timestamp":"2025-10-14T12:00:00.000Z"}`
+	parseDump1090Message(posMsg)
+
+	velMsg := `{"Icao_addr":11230838,"DF":17,"CA":5,"TypeCode":19,"Speed":468,"Track":89,"Vvel":-64,"Speed_valid":true,"SignalLevel":0.0498,"Timestamp":"2025-10-14T12:00:00.500Z"}`
+	parseDump1090Message(velMsg)
+
+	// Verify speed is valid
+	trafficMutex.Lock()
+	icao := uint32(11230838)
+	ti := traffic[icao]
+	if !ti.Speed_valid {
+		t.Error("Expected Speed_valid to be true initially")
+	}
+	trafficMutex.Unlock()
+
+	// Now send a TypeCode 19 message with Speed_valid=false (invalid velocity)
+	invalidVelMsg := `{"Icao_addr":11230838,"DF":17,"CA":5,"TypeCode":19,"Speed_valid":false,"SignalLevel":0.0498,"Timestamp":"2025-10-14T12:00:01.000Z"}`
+	parseDump1090Message(invalidVelMsg)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	ti, ok := traffic[icao]
+	if !ok {
+		t.Fatalf("Expected traffic for ICAO %X, not found", icao)
+	}
+
+	// Speed_valid should be set to false
+	if ti.Speed_valid {
+		t.Error("Expected Speed_valid to be false after invalid TC19 message")
+	}
+}
+
+// TestParseDump1090Message_DisplayTrafficSource_Tail7Chars tests DisplayTrafficSource with 7-char tail
+// Verifies: FR-402 (Traffic Display - source indication with exact 7-char callsign)
+func TestParseDump1090Message_DisplayTrafficSource_Tail7Chars(t *testing.T) {
+	reset1090ESState()
+
+	// Save and restore DisplayTrafficSource setting
+	origDisplay := globalSettings.DisplayTrafficSource
+	defer func() { globalSettings.DisplayTrafficSource = origDisplay }()
+
+	globalSettings.DisplayTrafficSource = true
+
+	// ADS-B message with exactly 7-character tail
+	msg := `{"Icao_addr":11230838,"DF":17,"CA":5,"TypeCode":4,"Tail":"ABCDEFG","SignalLevel":0.0502,"Timestamp":"2025-10-14T12:00:00.000Z"}`
+	parseDump1090Message(msg)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	icao := uint32(11230838)
+	ti, ok := traffic[icao]
+	if !ok {
+		t.Fatalf("Expected traffic for ICAO %X, not found", icao)
+	}
+
+	// Should be "e" + "a" (ADS-B) + tail[1:] = "ea" + "BCDEFG" = "eaBCDEFG"
+	expected := "eaBCDEFG"
+	if ti.Tail != expected {
+		t.Errorf("Expected Tail=%s, got %s", expected, ti.Tail)
+	}
+}
+
+// TestParseDump1090Message_DisplayTrafficSource_TailGreaterThan7 tests DisplayTrafficSource with >7-char tail
+// Verifies: FR-402 (Traffic Display - source indication with long callsign)
+func TestParseDump1090Message_DisplayTrafficSource_TailGreaterThan7(t *testing.T) {
+	reset1090ESState()
+
+	// Save and restore DisplayTrafficSource setting
+	origDisplay := globalSettings.DisplayTrafficSource
+	defer func() { globalSettings.DisplayTrafficSource = origDisplay }()
+
+	globalSettings.DisplayTrafficSource = true
+
+	// ADS-R message with >7-character tail
+	msg := `{"Icao_addr":11230838,"DF":18,"CA":6,"TypeCode":4,"Tail":"ABCDEFGHIJ","SignalLevel":0.0502,"Timestamp":"2025-10-14T12:00:00.000Z"}`
+	parseDump1090Message(msg)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	icao := uint32(11230838)
+	ti, ok := traffic[icao]
+	if !ok {
+		t.Fatalf("Expected traffic for ICAO %X, not found", icao)
+	}
+
+	// Should be "e" + "r" (ADS-R) + tail[2:] = "er" + "CDEFGHIJ" = "erCDEFGHIJ"
+	expected := "erCDEFGHIJ"
+	if ti.Tail != expected {
+		t.Errorf("Expected Tail=%s, got %s", expected, ti.Tail)
+	}
+}
+
+// TestParseDump1090Message_DisplayTrafficSource_TailStartsWithE tests tail already starting with 'e'
+// Verifies: FR-402 (Traffic Display - source indication with existing prefix)
+func TestParseDump1090Message_DisplayTrafficSource_TailStartsWithE(t *testing.T) {
+	reset1090ESState()
+
+	// Save and restore DisplayTrafficSource setting
+	origDisplay := globalSettings.DisplayTrafficSource
+	defer func() { globalSettings.DisplayTrafficSource = origDisplay }()
+
+	globalSettings.DisplayTrafficSource = true
+
+	// TIS-B message with tail starting with 'e'
+	msg := `{"Icao_addr":11230838,"DF":18,"CA":2,"TypeCode":4,"Tail":"etTest","SignalLevel":0.0502,"Timestamp":"2025-10-14T12:00:00.000Z"}`
+	parseDump1090Message(msg)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	icao := uint32(11230838)
+	ti, ok := traffic[icao]
+	if !ok {
+		t.Fatalf("Expected traffic for ICAO %X, not found", icao)
+	}
+
+	// Should be "e" + "t" (TIS-B) + tail[2:] = "et" + "Test" = "etTest"
+	expected := "etTest"
+	if ti.Tail != expected {
+		t.Errorf("Expected Tail=%s, got %s", expected, ti.Tail)
+	}
+}
+
+// TestParseDump1090Message_DisplayTrafficSource_TailLength1 tests single-character tail
+// Verifies: FR-402 (Traffic Display - source indication bounds checking)
+func TestParseDump1090Message_DisplayTrafficSource_TailLength1(t *testing.T) {
+	reset1090ESState()
+
+	// Save and restore DisplayTrafficSource setting
+	origDisplay := globalSettings.DisplayTrafficSource
+	defer func() { globalSettings.DisplayTrafficSource = origDisplay }()
+
+	globalSettings.DisplayTrafficSource = true
+
+	// ADS-B message with single-character tail
+	msg := `{"Icao_addr":11230838,"DF":17,"CA":5,"TypeCode":4,"Tail":"X","SignalLevel":0.0502,"Timestamp":"2025-10-14T12:00:00.000Z"}`
+	parseDump1090Message(msg)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	icao := uint32(11230838)
+	ti, ok := traffic[icao]
+	if !ok {
+		t.Fatalf("Expected traffic for ICAO %X, not found", icao)
+	}
+
+	// Should be "e" + "a" (ADS-B) + original tail = "eaX"
+	expected := "eaX"
+	if ti.Tail != expected {
+		t.Errorf("Expected Tail=%s, got %s", expected, ti.Tail)
+	}
+}
