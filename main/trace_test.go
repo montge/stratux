@@ -356,6 +356,69 @@ func TestTraceLoggerRecord_NoFileHandle(t *testing.T) {
 	t.Log("Record with no file handle completed without panic")
 }
 
+// TestTraceLoggerRecord_WithFileHandle tests Record with actual file writing
+func TestTraceLoggerRecord_WithFileHandle(t *testing.T) {
+	// Save original state
+	origTraceLog := TraceLog
+	origStratuxClock := stratuxClock
+
+	// Initialize stratuxClock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Create temp directory for test files
+	tmpDir := t.TempDir()
+	traceFile := filepath.Join(tmpDir, "test_record.txt.gz")
+
+	// Create the trace file
+	fh, err := os.Create(traceFile)
+	if err != nil {
+		t.Fatalf("Failed to create trace file: %v", err)
+	}
+
+	gzw := gzip.NewWriter(fh)
+	csvw := csv.NewWriter(gzw)
+
+	TraceLog = TraceLogger{
+		fileHandle:  fh,
+		gzWriter:    gzw,
+		csvWriter:   csvw,
+		fileName:    traceFile,
+		isReplaying: false,
+	}
+
+	// Record some data
+	TraceLog.Record(CONTEXT_DUMP1090, []byte(`{"hex":"A12345"}`))
+	TraceLog.Record(CONTEXT_NMEA, []byte("$GPRMC,test"))
+	TraceLog.Record(CONTEXT_AIS, []byte("!AIVDM,test"))
+
+	// Give goroutines time to execute
+	time.Sleep(50 * time.Millisecond)
+
+	// Flush and close
+	csvw.Flush()
+	gzw.Close()
+	fh.Close()
+
+	// Verify the file was written
+	info, err := os.Stat(traceFile)
+	if err != nil {
+		t.Fatalf("Failed to stat trace file: %v", err)
+	}
+
+	if info.Size() == 0 {
+		t.Error("Trace file is empty, expected data to be written")
+	}
+
+	// Restore original
+	TraceLog = origTraceLog
+	stratuxClock = origStratuxClock
+
+	t.Logf("Record with file handle wrote %d bytes", info.Size())
+}
+
 // TestTraceLoggerRecord_IsReplaying tests Record when replaying
 func TestTraceLoggerRecord_IsReplaying(t *testing.T) {
 	// Save original state
