@@ -2077,10 +2077,30 @@ func TestIsOwnshipTrafficInfo_DEBUGMode(t *testing.T) {
 // TestMakeTrafficReportMsg_GNSSAltitudeConversion tests GNSS to baro altitude conversion
 // Verifies: FR-604 (GDL90 Traffic Report - GNSS altitude conversion)
 func TestMakeTrafficReportMsg_GNSSAltitudeConversion(t *testing.T) {
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// Initialize mutexes if not already initialized
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+
 	// Setup valid baro pressure
+	mySituation.muBaro.Lock()
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.BaroPressureAltitude = 5200
+	mySituation.muBaro.Unlock()
+
+	mySituation.muGPS.Lock()
 	mySituation.GPSGeoidSep = 100 // 100ft geoid separation
 	mySituation.GPSAltitudeMSL = 5000
-	mySituation.BaroPressureAltitude = 5200
+	mySituation.muGPS.Unlock()
 
 	ti := TrafficInfo{
 		Icao_addr: 0xABCDEF,
