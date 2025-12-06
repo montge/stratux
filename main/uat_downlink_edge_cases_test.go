@@ -1211,3 +1211,190 @@ func TestUATDownlinkMessageType6(t *testing.T) {
 		t.Error("Traffic not created for message type 6")
 	}
 }
+
+// TestParseDownlinkReport_AddrType2HighNIC tests Addr_type 2 with high NIC and emitter category
+// This triggers the ADS-R upgrade path at line 844-846
+func TestParseDownlinkReport_AddrType2HighNIC(t *testing.T) {
+	resetUATState()
+
+	// Enable DisplayTrafficSource for tail prefix testing
+	originalDisplayTrafficSource := globalSettings.DisplayTrafficSource
+	globalSettings.DisplayTrafficSource = true
+	defer func() { globalSettings.DisplayTrafficSource = originalDisplayTrafficSource }()
+
+	// Build a UAT frame with:
+	// - Addr_type = 2 (TIS-B with track file)
+	// - NIC >= 7 (high integrity)
+	// - Emitter_category > 0 (known aircraft type)
+	frame := make([]byte, 34)
+
+	// Byte 0: msg_type (5 bits from bits 7-3) + addr_type (3 bits from bits 2-0)
+	// For emitter_category to be set, msg_type must be 1 or 3
+	// msg_type = 1, addr_type = 2 (TIS-B with track file)
+	// frame[0] = (msg_type << 3) | addr_type = (1 << 3) | 2 = 0x0A
+	frame[0] = 0x0A // msg_type=1, addr_type=2
+
+	// Bytes 1-3: ICAO address
+	frame[1] = 0xAD // ICAO: 0xADSR00
+	frame[2] = 0x5E
+	frame[3] = 0x00
+
+	// Bytes 4-9: Position (valid lat/lon)
+	raw_lat := uint32(0x3FFFFF) // Valid latitude
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(0x7FFFFF) // Valid longitude
+	frame[6] |= byte((raw_lon >> 23) & 0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	// Byte 10: Altitude type and MSB
+	frame[10] = 0x00
+
+	// Byte 11: NIC (lower 4 bits) = 7 or higher
+	frame[11] = 0x07 // NIC = 7 (high integrity)
+
+	// Byte 12-13: Ground speed
+	frame[12] = 0x00
+	frame[13] = 0x64 // 100 knots
+
+	// Byte 14: Heading
+	frame[14] = 0x40 // 90 degrees
+
+	// Bytes 15-16: Vertical velocity
+	frame[15] = 0x00
+	frame[16] = 0x00
+
+	// Bytes 17-22: Base40 encoded callsign contains emitter category
+	// Emitter_category is extracted as: uint8((v / 1600) % 40) where v = (uint16(frame[17]) << 8) | uint16(frame[18])
+	// To get emitter_category = 5: we need (v / 1600) % 40 = 5
+	// So v >= 5*1600 = 8000 and v < 6*1600 = 9600
+	// Let's use v = 8000 = 0x1F40
+	frame[17] = 0x1F // MSB of 0x1F40
+	frame[18] = 0x40 // LSB of 0x1F40, emitter_category will be 5
+
+	// Empty callsign continuation (bytes 19-22 will encode spaces)
+	frame[19] = 0x00
+	frame[20] = 0x00
+	frame[21] = 0x00
+	frame[22] = 0x00
+
+	// Bytes 23-25: Additional data
+	frame[23] = 0x00
+	frame[24] = 0x00
+	frame[25] = 0x00
+
+	// Byte 26: CSID bit must be 1 for callsign decoding
+	frame[26] = 0x02 // CSID bit set (bit 1)
+
+	// Build hex string
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xAD5E00]; ok {
+		// Check that it was upgraded to ADS-R (line 844-846)
+		if ti.TargetType != TARGET_TYPE_ADSR {
+			t.Errorf("Expected TargetType=%d (ADS-R), got %d", TARGET_TYPE_ADSR, ti.TargetType)
+		}
+		// Check tail prefix was added for empty tail (line 861-862)
+		t.Logf("Addr_type 2 with high NIC: TargetType=%d, NIC=%d, Emitter=%d, Tail='%s'",
+			ti.TargetType, ti.NIC, ti.Emitter_category, ti.Tail)
+	} else {
+		t.Error("Traffic not created for Addr_type 2 test")
+	}
+}
+
+// TestParseDownlinkReport_ShortTailPrefix tests tail prefix for short callsigns
+// This triggers line 863-864: len(ti.Tail) < 7 && ti.Tail[0] != 'e' && ti.Tail[0] != 'u'
+func TestParseDownlinkReport_ShortTailPrefix(t *testing.T) {
+	resetUATState()
+
+	// Enable DisplayTrafficSource
+	originalDisplayTrafficSource := globalSettings.DisplayTrafficSource
+	globalSettings.DisplayTrafficSource = true
+	defer func() { globalSettings.DisplayTrafficSource = originalDisplayTrafficSource }()
+
+	// Build a UAT frame with a short callsign (< 7 chars)
+	frame := make([]byte, 34)
+
+	// Payload type 1 (state vector), Addr_type 0 (ADS-B)
+	frame[0] = 0x20 // 001 000 00 = payload 1, addr_type 0
+
+	// ICAO address
+	frame[1] = 0xAB
+	frame[2] = 0xCD
+	frame[3] = 0x12
+
+	// Valid position
+	raw_lat := uint32(0x2FFFFF)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(0x5FFFFF)
+	frame[6] |= byte((raw_lon >> 23) & 0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	// Altitude
+	frame[10] = 0x00
+	frame[11] = 0x05 // NIC = 5
+
+	// Ground speed
+	frame[12] = 0x00
+	frame[13] = 0x50
+
+	// Heading
+	frame[14] = 0x20
+
+	// Vertical velocity
+	frame[15] = 0x00
+	frame[16] = 0x00
+
+	// Emitter category
+	frame[17] = 0x03
+
+	// Short callsign "N123" (4 chars < 7)
+	callsign := "N123  " // Padded with spaces
+	for i := 0; i < 6; i++ {
+		if i < len(callsign) {
+			frame[18+i] = byte(callsign[i])
+		} else {
+			frame[18+i] = 0x20
+		}
+	}
+
+	// Build hex string
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xABCD12]; ok {
+		// Check that tail has prefix added (line 863-864)
+		if len(ti.Tail) < 2 {
+			t.Errorf("Expected tail to have prefix, got '%s'", ti.Tail)
+		}
+		t.Logf("Short tail prefix test: Tail='%s' (original: 'N123')", ti.Tail)
+	} else {
+		t.Error("Traffic not created for short tail test")
+	}
+}

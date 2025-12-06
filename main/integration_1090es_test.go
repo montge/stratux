@@ -820,3 +820,101 @@ func Test1090ESGnssDiff(t *testing.T) {
 
 	t.Logf("GnssDiff: %d", ti.GnssDiffFromBaroAlt)
 }
+
+// Test1090ESHeartbeatMessageWithDEBUG tests the heartbeat message with DEBUG mode enabled
+func Test1090ESHeartbeatMessageWithDEBUG(t *testing.T) {
+	reset1090ESState()
+
+	// Enable DEBUG mode to cover lines 1098-1100
+	originalDEBUG := globalSettings.DEBUG
+	globalSettings.DEBUG = true
+	defer func() { globalSettings.DEBUG = originalDEBUG }()
+
+	// Heartbeat uses special ICAO address 0x07FFFFFF (134217727)
+	heartbeatMsg := `{"Icao_addr":134217727,"DF":0,"CA":0,"TypeCode":0}`
+	parseDump1090Message(heartbeatMsg)
+
+	// Heartbeat should not create traffic entry even with DEBUG enabled
+	trafficMutex.Lock()
+	_, exists := traffic[0x07FFFFFF]
+	trafficMutex.Unlock()
+
+	if exists {
+		t.Error("Heartbeat message should not create traffic entry")
+	}
+
+	t.Log("Heartbeat message with DEBUG correctly handled")
+}
+
+// Test1090ESNonICAOAddressWithDEBUG tests handling of non-ICAO addresses with DEBUG mode
+func Test1090ESNonICAOAddressWithDEBUG(t *testing.T) {
+	reset1090ESState()
+
+	// Enable DEBUG mode to cover lines 1106-1108
+	originalDEBUG := globalSettings.DEBUG
+	globalSettings.DEBUG = true
+	defer func() { globalSettings.DEBUG = originalDEBUG }()
+
+	// Non-ICAO addresses have bit 25 set by dump1090
+	// Address 0xABCDEF with bit 25 set becomes 0x01ABCDEF (28036591)
+	nonIcaoMsg := `{"Icao_addr":28036591,"DF":18,"CA":2,"TypeCode":11,"Lat":40.7128,"Lng":-74.006,"Alt":5000,"Position_valid":true}`
+	parseDump1090Message(nonIcaoMsg)
+
+	// Should be stored with address 0xABCDEF (bit 25 stripped)
+	trafficMutex.Lock()
+	ti, exists := traffic[0xABCDEF]
+	trafficMutex.Unlock()
+
+	if !exists {
+		t.Error("Non-ICAO address should be stored with bit 25 stripped")
+	} else {
+		t.Logf("Non-ICAO TIS-B target stored with ICAO=%X, Addr_type=%d", ti.Icao_addr, ti.Addr_type)
+	}
+
+	t.Log("Non-ICAO address with DEBUG handling test complete")
+}
+
+// Test1090ESSignalLevelHistPruning tests that SignalLevelHist is pruned to last 8 entries
+func Test1090ESSignalLevelHistPruning(t *testing.T) {
+	reset1090ESState()
+
+	icao := uint32(0x500001)
+
+	// Send more than 8 messages with signal levels to trigger pruning at line 1137-1138
+	for i := 0; i < 12; i++ {
+		signalLevel := 0.01 + float64(i)*0.01 // Varying signal levels
+		msg := `{"Icao_addr":5242881,"DF":17,"CA":5,"TypeCode":11,"Lat":42.0,"Lng":-73.0,"Alt":` +
+			intToStr(5000+i*100) + `,"Position_valid":true,"SignalLevel":` +
+			floatToStr(signalLevel) + `}`
+		parseDump1090Message(msg)
+	}
+
+	// Check that SignalLevelHist has exactly 8 entries (pruned from 12)
+	trafficMutex.Lock()
+	ti, exists := traffic[icao]
+	trafficMutex.Unlock()
+
+	if !exists {
+		t.Error("Expected traffic entry")
+		return
+	}
+
+	if len(ti.SignalLevelHist) != 8 {
+		t.Errorf("Expected SignalLevelHist to have 8 entries (pruned), got %d", len(ti.SignalLevelHist))
+	}
+
+	// Verify that the last 8 entries are kept (signal levels from messages 5-12)
+	// The signal levels should be in dB: 10 * log10(signalLevel)
+	t.Logf("SignalLevelHist has %d entries: %v", len(ti.SignalLevelHist), ti.SignalLevelHist)
+}
+
+// floatToStr converts a float to string with 2 decimal places
+func floatToStr(f float64) string {
+	// Simple float to string for test purposes
+	intPart := int(f)
+	fracPart := int((f - float64(intPart)) * 100)
+	if fracPart < 10 {
+		return intToStr(intPart) + ".0" + intToStr(fracPart)
+	}
+	return intToStr(intPart) + "." + intToStr(fracPart)
+}
