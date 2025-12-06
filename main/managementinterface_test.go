@@ -804,9 +804,31 @@ func TestSetNoCache(t *testing.T) {
 	w := httptest.NewRecorder()
 	setNoCache(w)
 
+	// Verify Cache-Control header contains all required directives
 	cacheControl := w.Header().Get("Cache-Control")
 	if cacheControl == "" {
 		t.Error("Expected Cache-Control header to be set")
+	}
+	if !strings.Contains(cacheControl, "no-cache") {
+		t.Errorf("Expected Cache-Control to contain 'no-cache', got: %s", cacheControl)
+	}
+	if !strings.Contains(cacheControl, "no-store") {
+		t.Errorf("Expected Cache-Control to contain 'no-store', got: %s", cacheControl)
+	}
+	if !strings.Contains(cacheControl, "must-revalidate") {
+		t.Errorf("Expected Cache-Control to contain 'must-revalidate', got: %s", cacheControl)
+	}
+
+	// Verify Pragma header
+	pragma := w.Header().Get("Pragma")
+	if pragma != "no-cache" {
+		t.Errorf("Expected Pragma header to be 'no-cache', got: %s", pragma)
+	}
+
+	// Verify Expires header
+	expires := w.Header().Get("Expires")
+	if expires != "0" {
+		t.Errorf("Expected Expires header to be '0', got: %s", expires)
 	}
 }
 
@@ -815,9 +837,16 @@ func TestSetJSONHeaders(t *testing.T) {
 	w := httptest.NewRecorder()
 	setJSONHeaders(w)
 
+	// Verify Content-Type header
 	contentType := w.Header().Get("Content-Type")
-	if !strings.Contains(contentType, "application/json") {
-		t.Errorf("Expected Content-Type to contain application/json, got %s", contentType)
+	if contentType != "application/json" {
+		t.Errorf("Expected Content-Type to be 'application/json', got: %s", contentType)
+	}
+
+	// Verify Access-Control-Allow-Origin header (CORS)
+	corsOrigin := w.Header().Get("Access-Control-Allow-Origin")
+	if corsOrigin != "*" {
+		t.Errorf("Expected Access-Control-Allow-Origin to be '*', got: %s", corsOrigin)
 	}
 }
 

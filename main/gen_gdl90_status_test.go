@@ -2561,3 +2561,344 @@ func TestDefaultSettings_AllFieldsCovered(t *testing.T) {
 		t.Errorf("%d out of %d default settings failed", failCount, len(tests))
 	}
 }
+
+// TestMsgLogAppend_Basic tests basic message appending functionality
+func TestMsgLogAppend_Basic(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original msgLog and reset
+	origMsgLog := msgLog
+	defer func() {
+		msgLog = origMsgLog
+	}()
+
+	// Start with empty log
+	msgLog = []msg{}
+
+	// Create a test message
+	testMsg := msg{
+		MessageClass:     MSGCLASS_UAT,
+		TimeReceived:     stratuxClock.Time,
+		Data:             "test-data",
+		Products:         []uint32{413},
+		Signal_amplitude: 100,
+		Signal_strength:  -10.5,
+		ADSBTowerID:      "TEST123",
+	}
+
+	// Append the message
+	msgLogAppend(testMsg)
+
+	// Verify it was added
+	if len(msgLog) != 1 {
+		t.Fatalf("Expected msgLog length 1, got %d", len(msgLog))
+	}
+
+	// Verify the message content
+	if msgLog[0].MessageClass != MSGCLASS_UAT {
+		t.Errorf("Expected MessageClass %d, got %d", MSGCLASS_UAT, msgLog[0].MessageClass)
+	}
+	if msgLog[0].Data != "test-data" {
+		t.Errorf("Expected Data 'test-data', got '%s'", msgLog[0].Data)
+	}
+	if msgLog[0].Signal_amplitude != 100 {
+		t.Errorf("Expected Signal_amplitude 100, got %d", msgLog[0].Signal_amplitude)
+	}
+	if msgLog[0].Signal_strength != -10.5 {
+		t.Errorf("Expected Signal_strength -10.5, got %f", msgLog[0].Signal_strength)
+	}
+	if msgLog[0].ADSBTowerID != "TEST123" {
+		t.Errorf("Expected ADSBTowerID 'TEST123', got '%s'", msgLog[0].ADSBTowerID)
+	}
+
+	t.Log("Successfully appended and verified message")
+}
+
+// TestMsgLogAppend_MultipleMessages tests appending multiple messages
+func TestMsgLogAppend_MultipleMessages(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original msgLog and reset
+	origMsgLog := msgLog
+	defer func() {
+		msgLog = origMsgLog
+	}()
+
+	// Start with empty log
+	msgLog = []msg{}
+
+	// Append multiple messages of different classes
+	msgClasses := []uint{MSGCLASS_UAT, MSGCLASS_ES, MSGCLASS_OGN, MSGCLASS_AIS}
+
+	for i, msgClass := range msgClasses {
+		testMsg := msg{
+			MessageClass:     msgClass,
+			TimeReceived:     stratuxClock.Time,
+			Data:             "test-data-" + string(rune('0'+i)),
+			Signal_amplitude: 100 + i,
+			Signal_strength:  -10.0 - float64(i),
+		}
+		msgLogAppend(testMsg)
+	}
+
+	// Verify all messages were added
+	if len(msgLog) != len(msgClasses) {
+		t.Fatalf("Expected msgLog length %d, got %d", len(msgClasses), len(msgLog))
+	}
+
+	// Verify each message
+	for i, expectedClass := range msgClasses {
+		if msgLog[i].MessageClass != expectedClass {
+			t.Errorf("Message %d: Expected MessageClass %d, got %d", i, expectedClass, msgLog[i].MessageClass)
+		}
+		if msgLog[i].Signal_amplitude != 100+i {
+			t.Errorf("Message %d: Expected Signal_amplitude %d, got %d", i, 100+i, msgLog[i].Signal_amplitude)
+		}
+	}
+
+	t.Logf("Successfully appended and verified %d messages", len(msgClasses))
+}
+
+// TestMsgLogAppend_PreservesOrder tests that messages are appended in order
+func TestMsgLogAppend_PreservesOrder(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original msgLog and reset
+	origMsgLog := msgLog
+	defer func() {
+		msgLog = origMsgLog
+	}()
+
+	// Start with empty log
+	msgLog = []msg{}
+
+	// Append messages with sequential data
+	numMessages := 10
+	for i := 0; i < numMessages; i++ {
+		testMsg := msg{
+			MessageClass:     MSGCLASS_UAT,
+			TimeReceived:     stratuxClock.Time,
+			Signal_amplitude: i,
+		}
+		msgLogAppend(testMsg)
+	}
+
+	// Verify order is preserved
+	for i := 0; i < numMessages; i++ {
+		if msgLog[i].Signal_amplitude != i {
+			t.Errorf("Order not preserved: position %d has Signal_amplitude %d, expected %d",
+				i, msgLog[i].Signal_amplitude, i)
+		}
+	}
+
+	t.Logf("Successfully verified order preservation for %d messages", numMessages)
+}
+
+// TestMsgLogAppend_EmptyMessage tests appending an empty/zero-value message
+func TestMsgLogAppend_EmptyMessage(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original msgLog and reset
+	origMsgLog := msgLog
+	defer func() {
+		msgLog = origMsgLog
+	}()
+
+	// Start with empty log
+	msgLog = []msg{}
+
+	// Append an empty message
+	emptyMsg := msg{}
+	msgLogAppend(emptyMsg)
+
+	// Verify it was added
+	if len(msgLog) != 1 {
+		t.Fatalf("Expected msgLog length 1, got %d", len(msgLog))
+	}
+
+	// Verify zero values
+	if msgLog[0].MessageClass != 0 {
+		t.Errorf("Expected MessageClass 0, got %d", msgLog[0].MessageClass)
+	}
+	if msgLog[0].Data != "" {
+		t.Errorf("Expected empty Data, got '%s'", msgLog[0].Data)
+	}
+
+	t.Log("Successfully appended empty message")
+}
+
+// TestMsgLogAppend_LargeVolume tests appending a large number of messages
+func TestMsgLogAppend_LargeVolume(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original msgLog and reset
+	origMsgLog := msgLog
+	defer func() {
+		msgLog = origMsgLog
+	}()
+
+	// Start with empty log
+	msgLog = []msg{}
+
+	// Append a large number of messages
+	numMessages := 1000
+	for i := 0; i < numMessages; i++ {
+		testMsg := msg{
+			MessageClass:     MSGCLASS_ES,
+			TimeReceived:     stratuxClock.Time,
+			Signal_amplitude: i,
+		}
+		msgLogAppend(testMsg)
+	}
+
+	// Verify all were added
+	if len(msgLog) != numMessages {
+		t.Fatalf("Expected msgLog length %d, got %d", numMessages, len(msgLog))
+	}
+
+	// Spot check a few messages
+	if msgLog[0].Signal_amplitude != 0 {
+		t.Errorf("First message Signal_amplitude should be 0, got %d", msgLog[0].Signal_amplitude)
+	}
+	if msgLog[numMessages/2].Signal_amplitude != numMessages/2 {
+		t.Errorf("Middle message Signal_amplitude should be %d, got %d",
+			numMessages/2, msgLog[numMessages/2].Signal_amplitude)
+	}
+	if msgLog[numMessages-1].Signal_amplitude != numMessages-1 {
+		t.Errorf("Last message Signal_amplitude should be %d, got %d",
+			numMessages-1, msgLog[numMessages-1].Signal_amplitude)
+	}
+
+	t.Logf("Successfully appended %d messages", numMessages)
+}
+
+// TestMsgLogAppend_Concurrent tests thread safety with concurrent appends
+func TestMsgLogAppend_Concurrent(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original msgLog and reset
+	origMsgLog := msgLog
+	defer func() {
+		msgLog = origMsgLog
+	}()
+
+	// Start with empty log
+	msgLog = []msg{}
+
+	// Use a wait group to coordinate goroutines
+	var wg sync.WaitGroup
+	numGoroutines := 10
+	messagesPerGoroutine := 100
+
+	// Launch multiple goroutines that append messages concurrently
+	for g := 0; g < numGoroutines; g++ {
+		wg.Add(1)
+		go func(goroutineID int) {
+			defer wg.Done()
+			for i := 0; i < messagesPerGoroutine; i++ {
+				testMsg := msg{
+					MessageClass:     uint(goroutineID % 4), // Rotate through message classes
+					TimeReceived:     stratuxClock.Time,
+					Signal_amplitude: goroutineID*1000 + i,
+				}
+				msgLogAppend(testMsg)
+			}
+		}(g)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
+	// Verify the total count
+	expectedTotal := numGoroutines * messagesPerGoroutine
+	if len(msgLog) != expectedTotal {
+		t.Fatalf("Expected msgLog length %d, got %d", expectedTotal, len(msgLog))
+	}
+
+	// Verify no messages were lost or corrupted by checking uniqueness of Signal_amplitude values
+	amplitudeMap := make(map[int]bool)
+	for _, m := range msgLog {
+		if amplitudeMap[m.Signal_amplitude] {
+			t.Errorf("Duplicate Signal_amplitude found: %d (possible race condition)", m.Signal_amplitude)
+		}
+		amplitudeMap[m.Signal_amplitude] = true
+	}
+
+	t.Logf("Successfully appended %d messages concurrently from %d goroutines",
+		expectedTotal, numGoroutines)
+}
+
+// TestMsgLogAppend_WithExistingMessages tests appending to a non-empty log
+func TestMsgLogAppend_WithExistingMessages(t *testing.T) {
+	// Initialize clock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original msgLog and reset
+	origMsgLog := msgLog
+	defer func() {
+		msgLog = origMsgLog
+	}()
+
+	// Start with some existing messages
+	msgLog = []msg{
+		{MessageClass: MSGCLASS_UAT, Signal_amplitude: 1},
+		{MessageClass: MSGCLASS_ES, Signal_amplitude: 2},
+	}
+
+	initialLength := len(msgLog)
+
+	// Append a new message
+	newMsg := msg{
+		MessageClass:     MSGCLASS_OGN,
+		TimeReceived:     stratuxClock.Time,
+		Signal_amplitude: 3,
+	}
+	msgLogAppend(newMsg)
+
+	// Verify the length increased
+	if len(msgLog) != initialLength+1 {
+		t.Fatalf("Expected msgLog length %d, got %d", initialLength+1, len(msgLog))
+	}
+
+	// Verify existing messages are unchanged
+	if msgLog[0].Signal_amplitude != 1 {
+		t.Errorf("First existing message changed, expected Signal_amplitude 1, got %d",
+			msgLog[0].Signal_amplitude)
+	}
+	if msgLog[1].Signal_amplitude != 2 {
+		t.Errorf("Second existing message changed, expected Signal_amplitude 2, got %d",
+			msgLog[1].Signal_amplitude)
+	}
+
+	// Verify new message was appended
+	if msgLog[2].MessageClass != MSGCLASS_OGN {
+		t.Errorf("New message has wrong MessageClass, expected %d, got %d",
+			MSGCLASS_OGN, msgLog[2].MessageClass)
+	}
+	if msgLog[2].Signal_amplitude != 3 {
+		t.Errorf("New message has wrong Signal_amplitude, expected 3, got %d",
+			msgLog[2].Signal_amplitude)
+	}
+
+	t.Log("Successfully appended to existing message log")
+}
