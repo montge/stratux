@@ -427,3 +427,127 @@ func TestMarshalFunctionsIntegration(t *testing.T) {
 		})
 	}
 }
+
+// TestLogMsg tests the logMsg function which logs message data
+func TestLogMsg(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		// Drain the channel if there's anything left
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	// Create a test message
+	testMsg := msg{
+		MessageClass: MSGCLASS_UAT,
+		Data:         "test message data",
+	}
+
+	t.Run("LogMsg when ReplayLog enabled and datalog ready", func(t *testing.T) {
+		// Setup: enable replay logging and make datalog ready
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+
+		// Initialize the channel if it doesn't exist
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		// Call logMsg
+		logMsg(testMsg)
+
+		// Verify message was sent to channel
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "messages" {
+				t.Errorf("Expected table 'messages', got %q", row.tbl)
+			}
+			receivedMsg, ok := row.data.(msg)
+			if !ok {
+				t.Errorf("Expected data type msg, got %T", row.data)
+			}
+			if receivedMsg.Data != testMsg.Data {
+				t.Errorf("Expected message data %q, got %q", testMsg.Data, receivedMsg.Data)
+			}
+			if receivedMsg.MessageClass != testMsg.MessageClass {
+				t.Errorf("Expected MessageClass %d, got %d", testMsg.MessageClass, receivedMsg.MessageClass)
+			}
+			t.Logf("Successfully logged message: %+v", receivedMsg)
+		default:
+			t.Error("Expected message to be sent to dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("LogMsg when ReplayLog disabled", func(t *testing.T) {
+		// Setup: disable replay logging
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+
+		// Initialize the channel if it doesn't exist
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		// Call logMsg
+		logMsg(testMsg)
+
+		// Verify message was NOT sent to channel
+		select {
+		case row := <-dataLogChan:
+			t.Errorf("Expected no message, but got message with table %q", row.tbl)
+		default:
+			t.Log("Message correctly not logged when ReplayLog is disabled")
+		}
+	})
+
+	t.Run("LogMsg when datalog not ready", func(t *testing.T) {
+		// Setup: enable replay logging but datalog not ready
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = false
+
+		// Initialize the channel if it doesn't exist
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		// Call logMsg
+		logMsg(testMsg)
+
+		// Verify message was NOT sent to channel
+		select {
+		case row := <-dataLogChan:
+			t.Errorf("Expected no message, but got message with table %q", row.tbl)
+		default:
+			t.Log("Message correctly not logged when datalog is not ready")
+		}
+	})
+
+	t.Run("LogMsg when both disabled", func(t *testing.T) {
+		// Setup: both disabled
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = false
+
+		// Initialize the channel if it doesn't exist
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		// Call logMsg
+		logMsg(testMsg)
+
+		// Verify message was NOT sent to channel
+		select {
+		case row := <-dataLogChan:
+			t.Errorf("Expected no message, but got message with table %q", row.tbl)
+		default:
+			t.Log("Message correctly not logged when both conditions are false")
+		}
+	})
+}
