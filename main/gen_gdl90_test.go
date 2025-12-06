@@ -682,3 +682,14 @@ func TestIsDetectedOwnshipValidEdgeCases(t *testing.T) {
 		}
 	})
 }
+
+// =============================================================================
+// relayMessage Tests
+// =============================================================================
+
+// TestRelayMessage is skipped because relayMessage calls sendGDL90 which requires
+// full network infrastructure initialization including channels that block on send.
+// The function is indirectly tested through integration tests.
+func TestRelayMessage(t *testing.T) {
+	t.Skip("Skipped: relayMessage requires full network infrastructure (sendGDL90 blocks on nil channels)")
+}
