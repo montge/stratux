@@ -589,6 +589,24 @@ func TestHandleRegionGet(t *testing.T) {
 			expectedIsSet:  true,
 			expectedRegion: "EU",
 		},
+		{
+			name:           "negative_region",
+			regionSelected: -1,
+			expectedIsSet:  false,
+			expectedRegion: "",
+		},
+		{
+			name:           "large_region_value",
+			regionSelected: 999,
+			expectedIsSet:  false,
+			expectedRegion: "",
+		},
+		{
+			name:           "region_3",
+			regionSelected: 3,
+			expectedIsSet:  false,
+			expectedRegion: "",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -607,6 +625,17 @@ func TestHandleRegionGet(t *testing.T) {
 				t.Errorf("Expected status 200, got %d", resp.StatusCode)
 			}
 
+			// Verify HTTP headers
+			contentType := resp.Header.Get("Content-Type")
+			if !strings.Contains(contentType, "application/json") {
+				t.Errorf("Expected application/json content type, got %s", contentType)
+			}
+
+			cacheControl := resp.Header.Get("Cache-Control")
+			if !strings.Contains(cacheControl, "no-cache") {
+				t.Errorf("Expected Cache-Control to contain 'no-cache', got: %s", cacheControl)
+			}
+
 			bodyStr := string(body)
 			if tc.expectedIsSet {
 				if !strings.Contains(bodyStr, `"IsSet":true`) {
@@ -620,7 +649,67 @@ func TestHandleRegionGet(t *testing.T) {
 					t.Errorf("Expected IsSet:false in response, got: %s", bodyStr)
 				}
 			}
+
+			// Verify valid JSON structure
+			if !strings.HasPrefix(bodyStr, "{") {
+				t.Errorf("Expected JSON to start with '{', got: %s", bodyStr)
+			}
+			if !strings.HasSuffix(strings.TrimSpace(bodyStr), "}") {
+				t.Errorf("Expected JSON to end with '}', got: %s", bodyStr)
+			}
 		})
+	}
+}
+
+// TestHandleRegionGet_Headers verifies all HTTP headers are set correctly
+func TestHandleRegionGet_Headers(t *testing.T) {
+	// Save and restore global settings
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	globalSettings.RegionSelected = 1
+
+	req := httptest.NewRequest("GET", "/getRegion", nil)
+	w := httptest.NewRecorder()
+
+	handleRegionGet(w, req)
+
+	resp := w.Result()
+
+	// Verify Content-Type header
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "application/json" {
+		t.Errorf("Expected Content-Type 'application/json', got '%s'", contentType)
+	}
+
+	// Verify CORS header
+	corsOrigin := resp.Header.Get("Access-Control-Allow-Origin")
+	if corsOrigin != "*" {
+		t.Errorf("Expected Access-Control-Allow-Origin '*', got '%s'", corsOrigin)
+	}
+
+	// Verify Cache-Control header contains all required directives
+	cacheControl := resp.Header.Get("Cache-Control")
+	if !strings.Contains(cacheControl, "no-cache") {
+		t.Errorf("Expected Cache-Control to contain 'no-cache', got: %s", cacheControl)
+	}
+	if !strings.Contains(cacheControl, "no-store") {
+		t.Errorf("Expected Cache-Control to contain 'no-store', got: %s", cacheControl)
+	}
+	if !strings.Contains(cacheControl, "must-revalidate") {
+		t.Errorf("Expected Cache-Control to contain 'must-revalidate', got: %s", cacheControl)
+	}
+
+	// Verify Pragma header
+	pragma := resp.Header.Get("Pragma")
+	if pragma != "no-cache" {
+		t.Errorf("Expected Pragma 'no-cache', got '%s'", pragma)
+	}
+
+	// Verify Expires header
+	expires := resp.Header.Get("Expires")
+	if expires != "0" {
+		t.Errorf("Expected Expires '0', got '%s'", expires)
 	}
 }
 
@@ -945,6 +1034,40 @@ func TestHandleRegionSet_POST_EmptyBody(t *testing.T) {
 	resp := w.Result()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200 with empty body, got %d", resp.StatusCode)
+	}
+}
+
+// TestHandleRegionSet_POST_MultipleObjects tests multiple JSON objects in one request
+func TestHandleRegionSet_POST_MultipleObjects(t *testing.T) {
+	// Initialize required mutexes and maps
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Save original settings
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	// Test multiple JSON objects - decoder processes each one
+	multipleObjects := `{"Region": "US"}{"Region": "EU"}`
+
+	req := httptest.NewRequest("POST", "/setRegion", strings.NewReader(multipleObjects))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handleRegionSet(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Should have processed both and ended with EU
+	if globalSettings.RegionSelected != 2 {
+		t.Errorf("Expected RegionSelected=2 (EU), got %d", globalSettings.RegionSelected)
 	}
 }
 
