@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // TestChksumUBX tests UBX checksum calculation
@@ -411,4 +413,186 @@ func TestCalculateNACpBoundaries(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestUpdateConstellation tests the updateConstellation function
+func TestUpdateConstellation(t *testing.T) {
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mySituation mutexes
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original state
+	origSatellites := Satellites
+
+	defer func() {
+		Satellites = origSatellites
+	}()
+
+	// Initialize satellites map
+	Satellites = make(map[string]SatelliteInfo)
+
+	// Add a fresh satellite (tracked within last 10 seconds)
+	Satellites["G01"] = SatelliteInfo{
+		SatelliteID:      "G01",
+		Signal:           45,
+		InSolution:       true,
+		TimeLastTracked:  stratuxClock.Time,
+		TimeLastSolution: stratuxClock.Time,
+	}
+
+	// Add another fresh satellite with no signal
+	Satellites["G02"] = SatelliteInfo{
+		SatelliteID:     "G02",
+		Signal:          0,
+		InSolution:      false,
+		TimeLastTracked: stratuxClock.Time,
+	}
+
+	updateConstellation()
+
+	// Check that fresh satellites are still present
+	if _, ok := Satellites["G01"]; !ok {
+		t.Error("Expected G01 to still be in Satellites map")
+	}
+	if _, ok := Satellites["G02"]; !ok {
+		t.Error("Expected G02 to still be in Satellites map")
+	}
+
+	// Check mySituation values
+	if mySituation.GPSSatellites != 1 {
+		t.Errorf("Expected GPSSatellites=1, got %d", mySituation.GPSSatellites)
+	}
+	if mySituation.GPSSatellitesTracked != 2 {
+		t.Errorf("Expected GPSSatellitesTracked=2, got %d", mySituation.GPSSatellitesTracked)
+	}
+	if mySituation.GPSSatellitesSeen != 1 {
+		t.Errorf("Expected GPSSatellitesSeen=1 (only G01 has signal), got %d", mySituation.GPSSatellitesSeen)
+	}
+
+	t.Logf("updateConstellation: Sats=%d, Tracked=%d, Seen=%d",
+		mySituation.GPSSatellites, mySituation.GPSSatellitesTracked, mySituation.GPSSatellitesSeen)
+}
+
+// TestUpdateConstellation_StaleSatellites tests removal of stale satellites
+func TestUpdateConstellation_StaleSatellites(t *testing.T) {
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mySituation mutexes
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original state
+	origSatellites := Satellites
+
+	defer func() {
+		Satellites = origSatellites
+	}()
+
+	// Initialize satellites map
+	Satellites = make(map[string]SatelliteInfo)
+
+	// Add a stale satellite (tracked more than 10 seconds ago)
+	staleTime := stratuxClock.Time.Add(-15 * time.Second)
+	Satellites["G05"] = SatelliteInfo{
+		SatelliteID:     "G05",
+		Signal:          30,
+		InSolution:      true,
+		TimeLastTracked: staleTime, // 15 seconds ago - should be removed
+	}
+
+	// Add a fresh satellite for comparison
+	Satellites["G06"] = SatelliteInfo{
+		SatelliteID:      "G06",
+		Signal:           40,
+		InSolution:       true,
+		TimeLastTracked:  stratuxClock.Time,
+		TimeLastSolution: stratuxClock.Time,
+	}
+
+	// Verify we have 2 satellites before update
+	if len(Satellites) != 2 {
+		t.Fatalf("Expected 2 satellites before update, got %d", len(Satellites))
+	}
+
+	updateConstellation()
+
+	// Stale satellite G05 should be removed
+	if _, ok := Satellites["G05"]; ok {
+		t.Error("Expected stale satellite G05 to be removed")
+	}
+
+	// Fresh satellite G06 should still be present
+	if _, ok := Satellites["G06"]; !ok {
+		t.Error("Expected fresh satellite G06 to still be present")
+	}
+
+	// Check that only 1 satellite remains
+	if len(Satellites) != 1 {
+		t.Errorf("Expected 1 satellite after update, got %d", len(Satellites))
+	}
+
+	t.Logf("Stale satellite removal test: %d satellites remaining", len(Satellites))
+}
+
+// TestUpdateConstellation_SolutionTimeout tests the 5-second solution timeout
+func TestUpdateConstellation_SolutionTimeout(t *testing.T) {
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mySituation mutexes
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original state
+	origSatellites := Satellites
+
+	defer func() {
+		Satellites = origSatellites
+	}()
+
+	// Initialize satellites map
+	Satellites = make(map[string]SatelliteInfo)
+
+	// Add a satellite with old solution time (more than 5 seconds ago)
+	oldSolutionTime := stratuxClock.Time.Add(-8 * time.Second)
+	Satellites["G10"] = SatelliteInfo{
+		SatelliteID:      "G10",
+		Signal:           50,
+		InSolution:       true, // Currently marked as in solution
+		TimeLastTracked:  stratuxClock.Time,
+		TimeLastSolution: oldSolutionTime, // 8 seconds ago
+	}
+
+	updateConstellation()
+
+	// The satellite should still exist but InSolution should be set to false
+	sat, ok := Satellites["G10"]
+	if !ok {
+		t.Fatal("Expected satellite G10 to still exist")
+	}
+
+	if sat.InSolution {
+		t.Error("Expected InSolution=false after 5-second timeout")
+	}
+
+	// GPSSatellites count should be 0 since none are in solution
+	if mySituation.GPSSatellites != 0 {
+		t.Errorf("Expected GPSSatellites=0, got %d", mySituation.GPSSatellites)
+	}
+
+	t.Logf("Solution timeout test: InSolution=%v, GPSSatellites=%d",
+		sat.InSolution, mySituation.GPSSatellites)
 }

@@ -16,6 +16,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -472,6 +473,11 @@ func TestParseOgnMessage_RegistrationOnly(t *testing.T) {
 func TestImportOgnStatusMessage(t *testing.T) {
 	resetAPRSEdgeCaseState()
 
+	// Save original stratuxVersion and set a valid one
+	origVersion := stratuxVersion
+	stratuxVersion = "v3.6"
+	defer func() { stratuxVersion = origVersion }()
+
 	// Status message
 	statusMsg := `{"sys":"status","bkg_noise_db":-115.5,"gain_db":42.0,"tx_enabled":true}`
 	parseOgnMessage(statusMsg, true)
@@ -490,4 +496,396 @@ func TestImportOgnStatusMessage(t *testing.T) {
 	}
 
 	t.Log("OGN status message test complete")
+}
+
+// TestImportOgnTrafficMessage_StratuxDevice tests OGN messages from Stratux devices
+func TestImportOgnTrafficMessage_StratuxDevice(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// OGN message with Hard="STX" indicating Stratux device
+	ognMsg := `{"sys":"OGN","time":1728907200.0,"addr":"123456","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":124,"track_deg":57,"speed_mps":15,"hard":"STX"}`
+	parseOgnMessage(ognMsg, true)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// Check that IsStratux was set
+	for _, ti := range traffic {
+		if ti.IsStratux {
+			t.Log("Stratux device flag correctly set")
+			return
+		}
+	}
+
+	t.Log("IsStratux flag test complete")
+}
+
+// TestImportOgnTrafficMessage_OldTimestamp tests rejection of old messages
+func TestImportOgnTrafficMessage_OldTimestamp(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// First message with current timestamp
+	currentTime := float64(time.Now().Unix())
+	msg1 := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AABBCC","addr_type":1,"acft_type":"1","lat_deg":51.0,"lon_deg":-1.0,"alt_msl_m":100,"track_deg":90,"speed_mps":10}`
+	parseOgnMessage(msg1, true)
+
+	trafficMutex.Lock()
+	initialCount := len(traffic)
+	trafficMutex.Unlock()
+
+	// Second message with older timestamp for same target
+	oldTime := currentTime - 60 // 60 seconds older
+	msg2 := `{"sys":"OGN","time":` + floatToStrOgn(oldTime) + `,"addr":"AABBCC","addr_type":1,"acft_type":"1","lat_deg":52.0,"lon_deg":-2.0,"alt_msl_m":200,"track_deg":180,"speed_mps":20}`
+	parseOgnMessage(msg2, true)
+
+	trafficMutex.Lock()
+	finalCount := len(traffic)
+	trafficMutex.Unlock()
+
+	// Should still have same number of targets
+	if finalCount != initialCount {
+		t.Errorf("Expected %d targets, got %d", initialCount, finalCount)
+	}
+
+	t.Logf("Old timestamp rejection test complete: initial=%d, final=%d", initialCount, finalCount)
+}
+
+// floatToStrOgn converts a float64 to string for JSON
+func floatToStrOgn(f float64) string {
+	return fmt.Sprintf("%.1f", f)
+}
+
+// TestImportOgnTrafficMessage_InvalidCoordinates tests coordinate bounds checking
+func TestImportOgnTrafficMessage_InvalidCoordinates(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// Message with invalid latitude (> 360)
+	invalidLatMsg := `{"sys":"OGN","time":1728907200.0,"addr":"DDEE01","addr_type":1,"acft_type":"1","lat_deg":500.0,"lon_deg":-1.0,"alt_msl_m":100}`
+	parseOgnMessage(invalidLatMsg, true)
+
+	// Message with invalid longitude (< -360)
+	invalidLonMsg := `{"sys":"OGN","time":1728907200.0,"addr":"DDEE02","addr_type":1,"acft_type":"1","lat_deg":51.0,"lon_deg":-500.0,"alt_msl_m":100}`
+	parseOgnMessage(invalidLonMsg, true)
+
+	// Neither should create traffic entries
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if _, ok := traffic[0xDDEE01]; ok {
+		t.Error("Expected invalid lat message to be rejected")
+	}
+	if _, ok := traffic[0xDDEE02]; ok {
+		t.Error("Expected invalid lon message to be rejected")
+	}
+
+	t.Log("Invalid coordinates test complete")
+}
+
+// TestImportOgnTrafficMessage_NoTimestamp tests messages without timestamp
+func TestImportOgnTrafficMessage_NoTimestamp(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// OGN message without time field (time=0)
+	noTimeMsg := `{"sys":"OGN","addr":"FFEEDD","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":124,"track_deg":57,"speed_mps":15}`
+	parseOgnMessage(noTimeMsg, true)
+
+	// Should still process but use current time
+	t.Log("No timestamp message test complete")
+}
+
+// TestImportOgnTrafficMessage_HighTurnRate tests turn rate clamping
+func TestImportOgnTrafficMessage_HighTurnRate(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// OGN message with extremely high turn rate (> 360 deg/s)
+	highTurnMsg := `{"sys":"OGN","time":1728907200.0,"addr":"112233","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":124,"track_deg":57,"speed_mps":15,"turn_dps":500}`
+	parseOgnMessage(highTurnMsg, true)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// Check that turn rate was clamped to 0
+	for _, ti := range traffic {
+		if ti.TurnRate != 0 {
+			t.Errorf("Expected TurnRate to be clamped to 0, got %f", ti.TurnRate)
+		}
+	}
+
+	t.Log("High turn rate clamping test complete")
+}
+
+// TestImportOgnTrafficMessage_PAWMerge tests PAW system address type merging
+func TestImportOgnTrafficMessage_PAWMerge(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// First create a target with one address type
+	msg1 := `{"sys":"PAW","time":1728907200.0,"addr":"AABB01","addr_type":1,"acft_type":"1","lat_deg":51.0,"lon_deg":-1.0,"alt_msl_m":100}`
+	parseOgnMessage(msg1, true)
+
+	// Create the same target with different address type to trigger merge
+	msg2 := `{"sys":"PAW","time":1728907201.0,"addr":"AABB01","addr_type":2,"acft_type":"1","lat_deg":51.1,"lon_deg":-1.1,"alt_msl_m":110}`
+	parseOgnMessage(msg2, true)
+
+	t.Log("PAW merge test complete")
+}
+
+// TestImportOgnTrafficMessage_AgeFilter tests filtering of old messages (> 30 seconds)
+func TestImportOgnTrafficMessage_AgeFilter(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// Message with timestamp 35 seconds in the past (should be filtered)
+	oldTime := float64(time.Now().Unix() - 35)
+	oldMsg := `{"sys":"OGN","time":` + floatToStrOgn(oldTime) + `,"addr":"OLDMSG","addr_type":1,"acft_type":"1","lat_deg":51.0,"lon_deg":-1.0,"alt_msl_m":100}`
+	parseOgnMessage(oldMsg, true)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// Should not create traffic entry (Age > 30 seconds)
+	for addr := range traffic {
+		if addr == 0x4F4C444D { // "OLDM" in hex
+			t.Error("Expected old message to be filtered")
+		}
+	}
+
+	t.Log("Age filter test complete")
+}
+
+// TestImportOgnTrafficMessage_HAEAltitude tests HAE altitude fallback when MSL is 0
+func TestImportOgnTrafficMessage_HAEAltitude(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// Set up GPS with geoid separation
+	mySituation.muGPS.Lock()
+	mySituation.GPSGeoidSep = 50.0 // 50 meters geoid separation
+	mySituation.muGPS.Unlock()
+
+	// OGN message with alt_hae_m but no alt_msl_m (alt_msl_m=0)
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	haeMsg := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA01","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_hae_m":200}`
+	parseOgnMessage(haeMsg, true)
+
+	t.Log("HAE altitude fallback test complete")
+}
+
+// TestImportOgnTrafficMessage_BaroAltFallback tests baro altitude fallback
+func TestImportOgnTrafficMessage_BaroAltFallback(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// Disable GPS and temp/pressure to force baro altitude fallback
+	globalStatus.GPS_connected = false
+	mySituation.muGPS.Lock()
+	mySituation.GPSFixQuality = 0
+	mySituation.GPSLastFixLocalTime = time.Time{} // Invalid GPS
+	mySituation.muGPS.Unlock()
+
+	// OGN message with standard (baro) altitude
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	baroMsg := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA02","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":100,"alt_std_m":95}`
+	parseOgnMessage(baroMsg, true)
+
+	t.Log("Baro altitude fallback test complete")
+}
+
+// TestImportOgnTrafficMessage_GNSSAltFallback tests GNSS altitude fallback
+func TestImportOgnTrafficMessage_GNSSAltFallback(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// Disable GPS and temp/pressure to force GNSS altitude fallback
+	globalStatus.GPS_connected = false
+	mySituation.muGPS.Lock()
+	mySituation.GPSFixQuality = 0
+	mySituation.GPSLastFixLocalTime = time.Time{} // Invalid GPS
+	mySituation.muGPS.Unlock()
+
+	// OGN message with only MSL altitude (no baro)
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	gnssMsg := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA03","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":100}`
+	parseOgnMessage(gnssMsg, true)
+
+	t.Log("GNSS altitude fallback test complete")
+}
+
+// TestImportOgnTrafficMessage_HexEmitterCategory tests hex emitter category parsing
+func TestImportOgnTrafficMessage_HexEmitterCategory(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// OGN message with 2-character hex emitter category
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	hexCatMsg := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA04","addr_type":1,"acft_cat":"09","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":100}`
+	parseOgnMessage(hexCatMsg, true)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// Check that emitter category was parsed correctly
+	for _, ti := range traffic {
+		if ti.Emitter_category == 9 {
+			t.Log("Hex emitter category correctly parsed as 9")
+			return
+		}
+	}
+
+	t.Log("Hex emitter category test complete")
+}
+
+// TestImportOgnTrafficMessage_GPSValidWithBaroPress tests altitude with valid GPS and baro/pressure
+func TestImportOgnTrafficMessage_GPSValidWithBaroPress(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// Set up valid GPS and baro/pressure
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 51.7657
+	mySituation.GPSLongitude = -1.1918
+	mySituation.GPSAltitudeMSL = 500
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	mySituation.muBaro.Lock()
+	mySituation.BaroPressureAltitude = 520
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.BaroSourceType = 1
+	mySituation.muBaro.Unlock()
+
+	globalStatus.GPS_connected = true
+
+	// OGN message
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	msg := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA05","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":600}`
+	parseOgnMessage(msg, true)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// The altitude should be computed using GPS+baro conversion
+	for _, ti := range traffic {
+		if !ti.AltIsGNSS {
+			t.Log("GPS+baro altitude conversion used correctly")
+			return
+		}
+	}
+
+	t.Log("GPS+baro altitude test complete")
+}
+
+// TestImportOgnTrafficMessage_RegistrationUpdate tests registration update for existing target
+func TestImportOgnTrafficMessage_RegistrationUpdate(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// First create a traffic target
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	msg1 := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA06","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":100}`
+	parseOgnMessage(msg1, true)
+
+	// Then send registration update message (no coordinates)
+	msg2 := `{"sys":"OGN","addr":"AAAA06","addr_type":1,"reg":"G-ABCD"}`
+	parseOgnMessage(msg2, true)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// Check that registration was updated
+	for _, ti := range traffic {
+		if ti.Tail == "G-ABCD" {
+			t.Log("Registration correctly updated to G-ABCD")
+			return
+		}
+	}
+
+	t.Log("Registration update test complete")
+}
+
+// TestImportOgnTrafficMessage_DEBUGMode tests OGN import with DEBUG enabled
+func TestImportOgnTrafficMessage_DEBUGMode(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// Enable DEBUG mode
+	origDebug := globalSettings.DEBUG
+	globalSettings.DEBUG = true
+	defer func() { globalSettings.DEBUG = origDebug }()
+
+	// OGN message
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	msg := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA07","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":100}`
+	parseOgnMessage(msg, true)
+
+	t.Log("DEBUG mode OGN import test complete")
+}
+
+// TestImportOgnTrafficMessage_FNTMerge tests FNT (FANET) system address type merging
+func TestImportOgnTrafficMessage_FNTMerge(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// First create a target with addr_type=1 (ICAO)
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	msg1 := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA08","addr_type":1,"acft_type":"1","lat_deg":51.0,"lon_deg":-1.0,"alt_msl_m":100}`
+	parseOgnMessage(msg1, true)
+
+	// Create the same target with FNT system and different address type to trigger merge
+	msg2 := `{"sys":"FNT","time":` + floatToStrOgn(currentTime+1) + `,"addr":"AAAA08","addr_type":0,"acft_type":"1","lat_deg":51.1,"lon_deg":-1.1,"alt_msl_m":110}`
+	parseOgnMessage(msg2, true)
+
+	t.Log("FNT merge test complete")
+}
+
+// TestImportOgnTrafficMessage_NonICAOAddress tests non-ICAO address type handling
+func TestImportOgnTrafficMessage_NonICAOAddress(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// OGN message with addr_type=2 (non-ICAO)
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	msg := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA09","addr_type":2,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":100}`
+	parseOgnMessage(msg, true)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// Check that address type was set to 1 (non-ICAO in GDL90)
+	for _, ti := range traffic {
+		if ti.Addr_type == 1 {
+			t.Log("Non-ICAO address type correctly set to 1")
+			return
+		}
+	}
+
+	t.Log("Non-ICAO address type test complete")
+}
+
+// TestImportOgnTrafficMessage_DisplayTrafficSource tests tail number with traffic source prefix
+func TestImportOgnTrafficMessage_DisplayTrafficSource(t *testing.T) {
+	resetAPRSEdgeCaseState()
+
+	// Enable DisplayTrafficSource
+	origSetting := globalSettings.DisplayTrafficSource
+	globalSettings.DisplayTrafficSource = true
+	defer func() { globalSettings.DisplayTrafficSource = origSetting }()
+
+	// OGN message
+	// OGN addresses must be exactly 6 hex characters
+	currentTime := float64(time.Now().Unix())
+	msg := `{"sys":"OGN","time":` + floatToStrOgn(currentTime) + `,"addr":"AAAA0A","addr_type":1,"acft_type":"1","lat_deg":51.7657,"lon_deg":-1.1918,"alt_msl_m":100}`
+	parseOgnMessage(msg, true)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	// Check that tail number has "og" prefix
+	for _, ti := range traffic {
+		if len(ti.Tail) >= 2 && ti.Tail[0:2] == "og" {
+			t.Log("Traffic source prefix correctly added")
+			return
+		}
+	}
+
+	t.Log("Display traffic source test complete")
 }

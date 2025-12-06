@@ -887,3 +887,41 @@ func TestMakeStratuxStatus_UnknownGPSFixQuality(t *testing.T) {
 
 	t.Logf("Unknown GPS fix quality (99) test: msg[13]=%d", msg[13])
 }
+
+// TestMakeFFIDMessage_LongVersion tests FFID with version > 16 chars (truncation)
+func TestMakeFFIDMessage_LongVersion(t *testing.T) {
+	// Initialize required components
+	crcInit()
+
+	// Save original values
+	origVersion := stratuxVersion
+	origBuild := stratuxBuild
+
+	defer func() {
+		stratuxVersion = origVersion
+		stratuxBuild = origBuild
+	}()
+
+	// Set a long version and build that together exceed 16 characters
+	// devLongName = fmt.Sprintf("%s-%s", stratuxVersion, stratuxBuild)
+	// v1.6.2-beta1-rXXXXXXXX would be way over 16 chars
+	stratuxVersion = "v1.6.2-beta1"
+	stratuxBuild = "r1234567890"
+
+	msg := makeFFIDMessage()
+
+	// Should still produce valid message
+	if len(msg) < 10 {
+		t.Errorf("Message too short: got %d bytes", len(msg))
+	}
+
+	// Check frame markers
+	if msg[0] != 0x7E {
+		t.Errorf("Expected start frame marker 0x7E, got 0x%02X", msg[0])
+	}
+	if msg[len(msg)-1] != 0x7E {
+		t.Errorf("Expected end frame marker 0x7E, got 0x%02X", msg[len(msg)-1])
+	}
+
+	t.Logf("Long version FFID message: %d bytes (version=%s, build=%s)", len(msg), stratuxVersion, stratuxBuild)
+}
