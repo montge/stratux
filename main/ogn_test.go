@@ -141,3 +141,97 @@ func TestGetTailNumberEdgeCases(t *testing.T) {
 		t.Logf("Long sys truncated correctly: '%s'", result)
 	})
 }
+
+// TestLookupOgnTailNumber tests the lookupOgnTailNumber function directly
+func TestLookupOgnTailNumber(t *testing.T) {
+	// Save original cache
+	origCache := ognTailNumberCache
+	defer func() { ognTailNumberCache = origCache }()
+
+	t.Run("cache_lookup_found", func(t *testing.T) {
+		// Pre-populate cache
+		ognTailNumberCache = map[string]string{
+			"ABCDEF": "N12345",
+			"123456": "D-ELSA",
+			"FEDCBA": "G-GLID",
+		}
+
+		// Test looking up an existing entry
+		result := lookupOgnTailNumber("ABCDEF")
+		if result != "N12345" {
+			t.Errorf("Expected 'N12345', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("123456")
+		if result != "D-ELSA" {
+			t.Errorf("Expected 'D-ELSA', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("FEDCBA")
+		if result != "G-GLID" {
+			t.Errorf("Expected 'G-GLID', got '%s'", result)
+		}
+	})
+
+	t.Run("cache_lookup_not_found", func(t *testing.T) {
+		// Pre-populate cache with some entries
+		ognTailNumberCache = map[string]string{
+			"ABCDEF": "N12345",
+		}
+
+		// Look up non-existent entry - should return empty string
+		result := lookupOgnTailNumber("NONEXISTENT")
+		if result != "" {
+			t.Errorf("Expected empty string for non-existent ID, got '%s'", result)
+		}
+	})
+
+	t.Run("empty_cache_no_file", func(t *testing.T) {
+		// Clear cache to trigger file read attempt
+		ognTailNumberCache = make(map[string]string)
+
+		// Look up should try to load file, fail, and return the ognid
+		result := lookupOgnTailNumber("TEST123")
+		// When file load fails, it returns the ognid itself
+		if result != "TEST123" {
+			t.Errorf("Expected 'TEST123' when file not found, got '%s'", result)
+		}
+	})
+}
+
+// TestGetTailNumberWithCache tests getTailNumber with a pre-populated cache
+func TestGetTailNumberWithCache(t *testing.T) {
+	// Save original cache and setting
+	origCache := ognTailNumberCache
+	origDisplayTrafficSource := globalSettings.DisplayTrafficSource
+	defer func() {
+		ognTailNumberCache = origCache
+		globalSettings.DisplayTrafficSource = origDisplayTrafficSource
+	}()
+
+	// Pre-populate cache
+	ognTailNumberCache = map[string]string{
+		"ABC123": "N54321",
+		"DEF456": "D-KITE",
+	}
+
+	t.Run("with_traffic_source_prefix", func(t *testing.T) {
+		globalSettings.DisplayTrafficSource = true
+
+		result := getTailNumber("ABC123", "OGN")
+		expected := "ogN54321"
+		if result != expected {
+			t.Errorf("Expected '%s', got '%s'", expected, result)
+		}
+	})
+
+	t.Run("without_traffic_source_prefix", func(t *testing.T) {
+		globalSettings.DisplayTrafficSource = false
+
+		result := getTailNumber("DEF456", "FLARM")
+		expected := "D-KITE"
+		if result != expected {
+			t.Errorf("Expected '%s', got '%s'", expected, result)
+		}
+	})
+}

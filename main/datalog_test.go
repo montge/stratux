@@ -652,7 +652,7 @@ func TestCheckTimestamp(t *testing.T) {
 		}
 	})
 
-	t.Run("gps_extrapolation", func(t *testing.T) {
+	t.Run("gps_extrapolation_from_gps_time", func(t *testing.T) {
 		// Save GPS state
 		origGPSLastGPSTime := mySituation.GPSLastGPSTimeStratuxTime
 		origGPSConnected := globalStatus.GPS_connected
@@ -664,6 +664,112 @@ func TestCheckTimestamp(t *testing.T) {
 		// Set up GPS clock as valid (isGPSClockValid checks GPSLastGPSTimeStratuxTime)
 		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
 		globalStatus.GPS_connected = true
+
+		// Reset state with GPS timestamp (Time_type_preference = 1)
+		// Need index > 0 to trigger extrapolation (see: if isGPSClockValid() && thisCurTimestamp > 0)
+		baseTime := time.Now().UTC()
+		dataLogTimestamps = []StratuxTimestamp{
+			{
+				id:                   0,
+				Time_type_preference: 0, // Placeholder first timestamp
+				StratuxClock_value:   stratuxClock.Time.Add(-4 * time.Second),
+				PreferredTime_value:  stratuxClock.Time.Add(-4 * time.Second),
+			},
+			{
+				id:                   1,
+				Time_type_preference: 1, // GPS time (type 1)
+				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second),
+				GPSClock_value:       baseTime.Add(-2 * time.Second),
+				PreferredTime_value:  baseTime.Add(-2 * time.Second),
+			},
+		}
+		dataLogCurTimestamp = 1 // Must be > 0 for extrapolation
+
+		result := checkTimestamp()
+
+		// Should return false because new timestamp created
+		if result {
+			t.Error("Expected checkTimestamp to return false when creating new timestamp")
+		}
+
+		// Should have added a new timestamp
+		if len(dataLogTimestamps) < 2 {
+			t.Errorf("Expected at least 2 timestamps, got %d", len(dataLogTimestamps))
+		}
+
+		// New timestamp should be extrapolated (type 2) since GPS was valid and last was type 1
+		newTs := dataLogTimestamps[len(dataLogTimestamps)-1]
+		if newTs.Time_type_preference != 2 {
+			t.Errorf("Expected Time_type_preference=2 (extrapolated), got %d", newTs.Time_type_preference)
+		}
+		t.Logf("New timestamp type: %d (extrapolated from GPS)", newTs.Time_type_preference)
+	})
+
+	t.Run("gps_extrapolation_from_extrapolated_time", func(t *testing.T) {
+		// Save GPS state
+		origGPSLastGPSTime := mySituation.GPSLastGPSTimeStratuxTime
+		origGPSConnected := globalStatus.GPS_connected
+		defer func() {
+			mySituation.GPSLastGPSTimeStratuxTime = origGPSLastGPSTime
+			globalStatus.GPS_connected = origGPSConnected
+		}()
+
+		// Set up GPS clock as valid
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		globalStatus.GPS_connected = true
+
+		// Reset state with extrapolated timestamp (Time_type_preference = 2)
+		// Need index > 0 to trigger extrapolation
+		baseTime := time.Now().UTC()
+		dataLogTimestamps = []StratuxTimestamp{
+			{
+				id:                   0,
+				Time_type_preference: 0, // Placeholder first timestamp
+				StratuxClock_value:   stratuxClock.Time.Add(-4 * time.Second),
+				PreferredTime_value:  stratuxClock.Time.Add(-4 * time.Second),
+			},
+			{
+				id:                   1,
+				Time_type_preference: 2, // Extrapolated time (type 2)
+				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second),
+				GPSClock_value:       baseTime.Add(-2 * time.Second),
+				PreferredTime_value:  baseTime.Add(-2 * time.Second),
+			},
+		}
+		dataLogCurTimestamp = 1 // Must be > 0 for extrapolation
+
+		result := checkTimestamp()
+
+		// Should return false because new timestamp created
+		if result {
+			t.Error("Expected checkTimestamp to return false when creating new timestamp")
+		}
+
+		// Should have added a new timestamp
+		if len(dataLogTimestamps) < 2 {
+			t.Errorf("Expected at least 2 timestamps, got %d", len(dataLogTimestamps))
+		}
+
+		// New timestamp should be extrapolated (type 2) since GPS was valid and last was type 2
+		newTs := dataLogTimestamps[len(dataLogTimestamps)-1]
+		if newTs.Time_type_preference != 2 {
+			t.Errorf("Expected Time_type_preference=2 (extrapolated), got %d", newTs.Time_type_preference)
+		}
+		t.Logf("New timestamp type: %d (extrapolated from previous extrapolated)", newTs.Time_type_preference)
+	})
+
+	t.Run("no_extrapolation_when_gps_invalid", func(t *testing.T) {
+		// Save GPS state
+		origGPSLastGPSTime := mySituation.GPSLastGPSTimeStratuxTime
+		origGPSConnected := globalStatus.GPS_connected
+		defer func() {
+			mySituation.GPSLastGPSTimeStratuxTime = origGPSLastGPSTime
+			globalStatus.GPS_connected = origGPSConnected
+		}()
+
+		// Set up GPS clock as INVALID
+		mySituation.GPSLastGPSTimeStratuxTime = time.Time{}
+		globalStatus.GPS_connected = false
 
 		// Reset state with GPS timestamp
 		baseTime := time.Now().UTC()
@@ -690,9 +796,57 @@ func TestCheckTimestamp(t *testing.T) {
 			t.Errorf("Expected at least 2 timestamps, got %d", len(dataLogTimestamps))
 		}
 
-		// New timestamp may be extrapolated (type 2) if GPS was valid
+		// New timestamp should NOT be extrapolated (type 0) since GPS was invalid
 		newTs := dataLogTimestamps[len(dataLogTimestamps)-1]
-		t.Logf("New timestamp type: %d", newTs.Time_type_preference)
+		if newTs.Time_type_preference != 0 {
+			t.Errorf("Expected Time_type_preference=0 (stratuxClock), got %d", newTs.Time_type_preference)
+		}
+		t.Logf("New timestamp type: %d (stratuxClock, no GPS)", newTs.Time_type_preference)
+	})
+
+	t.Run("no_extrapolation_when_first_timestamp", func(t *testing.T) {
+		// Save GPS state
+		origGPSLastGPSTime := mySituation.GPSLastGPSTimeStratuxTime
+		origGPSConnected := globalStatus.GPS_connected
+		defer func() {
+			mySituation.GPSLastGPSTimeStratuxTime = origGPSLastGPSTime
+			globalStatus.GPS_connected = origGPSConnected
+		}()
+
+		// Set up GPS clock as valid
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		globalStatus.GPS_connected = true
+
+		// Reset state - index 0 means this is effectively the first real timestamp
+		dataLogTimestamps = []StratuxTimestamp{
+			{
+				id:                   0,
+				Time_type_preference: 0, // stratuxClock type
+				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second),
+				PreferredTime_value:  stratuxClock.Time.Add(-2 * time.Second),
+			},
+		}
+		dataLogCurTimestamp = 0
+
+		result := checkTimestamp()
+
+		// Should return false because new timestamp created
+		if result {
+			t.Error("Expected checkTimestamp to return false when creating new timestamp")
+		}
+
+		// Should have added a new timestamp
+		if len(dataLogTimestamps) < 2 {
+			t.Errorf("Expected at least 2 timestamps, got %d", len(dataLogTimestamps))
+		}
+
+		// New timestamp should NOT be extrapolated because thisCurTimestamp = 0
+		// The code checks "if isGPSClockValid() && thisCurTimestamp > 0"
+		newTs := dataLogTimestamps[len(dataLogTimestamps)-1]
+		if newTs.Time_type_preference != 0 {
+			t.Errorf("Expected Time_type_preference=0 (stratuxClock), got %d because thisCurTimestamp=0", newTs.Time_type_preference)
+		}
+		t.Logf("New timestamp type: %d (stratuxClock, thisCurTimestamp=0)", newTs.Time_type_preference)
 	})
 }
 
