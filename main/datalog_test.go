@@ -3,6 +3,7 @@ package main
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 // TestBoolMarshal tests boolean to string conversion for SQL
@@ -576,5 +577,121 @@ func TestLogMsg(t *testing.T) {
 		default:
 			t.Log("Message correctly not logged when both conditions are false")
 		}
+	})
+}
+
+// TestCheckTimestamp tests the timestamp management function
+func TestCheckTimestamp(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Save original state
+	origTimestamps := dataLogTimestamps
+	origCurTimestamp := dataLogCurTimestamp
+	defer func() {
+		dataLogTimestamps = origTimestamps
+		dataLogCurTimestamp = origCurTimestamp
+	}()
+
+	t.Run("first_call_creates_timestamp", func(t *testing.T) {
+		// Reset state
+		dataLogTimestamps = []StratuxTimestamp{
+			{
+				id:                   0,
+				Time_type_preference: 0,
+				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second), // Old enough to trigger new timestamp
+				PreferredTime_value:  stratuxClock.Time.Add(-2 * time.Second),
+			},
+		}
+		dataLogCurTimestamp = 0
+
+		result := checkTimestamp()
+
+		// Should return false because a new timestamp was created
+		if result {
+			t.Error("Expected checkTimestamp to return false when creating new timestamp")
+		}
+
+		// Should have added a new timestamp
+		if len(dataLogTimestamps) != 2 {
+			t.Errorf("Expected 2 timestamps, got %d", len(dataLogTimestamps))
+		}
+
+		// New timestamp should have StratuxClock type (0)
+		newTs := dataLogTimestamps[1]
+		if newTs.Time_type_preference != 0 {
+			t.Errorf("Expected Time_type_preference=0 (stratuxClock), got %d", newTs.Time_type_preference)
+		}
+	})
+
+	t.Run("recent_timestamp_returns_true", func(t *testing.T) {
+		// Reset state with very recent timestamp
+		dataLogTimestamps = []StratuxTimestamp{
+			{
+				id:                   0,
+				Time_type_preference: 0,
+				StratuxClock_value:   stratuxClock.Time, // Just now
+				PreferredTime_value:  stratuxClock.Time,
+			},
+		}
+		dataLogCurTimestamp = 0
+
+		result := checkTimestamp()
+
+		// Should return true because timestamp is still valid
+		if !result {
+			t.Error("Expected checkTimestamp to return true when timestamp is still valid")
+		}
+
+		// Should NOT have added a new timestamp
+		if len(dataLogTimestamps) != 1 {
+			t.Errorf("Expected 1 timestamp (unchanged), got %d", len(dataLogTimestamps))
+		}
+	})
+
+	t.Run("gps_extrapolation", func(t *testing.T) {
+		// Save GPS state
+		origGPSLastGPSTime := mySituation.GPSLastGPSTimeStratuxTime
+		origGPSConnected := globalStatus.GPS_connected
+		defer func() {
+			mySituation.GPSLastGPSTimeStratuxTime = origGPSLastGPSTime
+			globalStatus.GPS_connected = origGPSConnected
+		}()
+
+		// Set up GPS clock as valid (isGPSClockValid checks GPSLastGPSTimeStratuxTime)
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		globalStatus.GPS_connected = true
+
+		// Reset state with GPS timestamp
+		baseTime := time.Now().UTC()
+		dataLogTimestamps = []StratuxTimestamp{
+			{
+				id:                   0,
+				Time_type_preference: 1, // GPS time
+				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second),
+				GPSClock_value:       baseTime.Add(-2 * time.Second),
+				PreferredTime_value:  baseTime.Add(-2 * time.Second),
+			},
+		}
+		dataLogCurTimestamp = 0
+
+		result := checkTimestamp()
+
+		// Should return false because new timestamp created
+		if result {
+			t.Error("Expected checkTimestamp to return false when creating new timestamp")
+		}
+
+		// Should have added a new timestamp
+		if len(dataLogTimestamps) < 2 {
+			t.Errorf("Expected at least 2 timestamps, got %d", len(dataLogTimestamps))
+		}
+
+		// New timestamp may be extrapolated (type 2) if GPS was valid
+		newTs := dataLogTimestamps[len(dataLogTimestamps)-1]
+		t.Logf("New timestamp type: %d", newTs.Time_type_preference)
 	})
 }
