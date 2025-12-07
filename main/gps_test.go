@@ -1880,3 +1880,634 @@ func TestProcessNMEALine_POGNB(t *testing.T) {
 		})
 	}
 }
+
+// TestProcessNMEALineLow_PGRMZ tests PGRMZ (Garmin altitude) message parsing
+func TestProcessNMEALineLow_PGRMZ(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	// Save original state
+	origGPSType := globalStatus.GPS_detected_type
+	defer func() { globalStatus.GPS_detected_type = origGPSType }()
+
+	testCases := []struct {
+		name              string
+		input             string
+		gpsType           uint
+		baroSourceType    uint8
+		expectUsed        bool
+		expectPressureAlt float32
+		expectBaroSource  uint8
+	}{
+		{
+			name:              "Valid PGRMZ with feet from SoftRF",
+			input:             "$PGRMZ,1089,f,3*2B",
+			gpsType:           GPS_TYPE_SOFTRF,
+			baroSourceType:    BARO_TYPE_NONE,
+			expectUsed:        true,
+			expectPressureAlt: 1089.0,
+			expectBaroSource:  BARO_TYPE_NMEA,
+		},
+		{
+			name:              "Valid PGRMZ with meters from SoftRF dongle",
+			input:             "$PGRMZ,500,m,3*15",
+			gpsType:           GPS_TYPE_SOFTRF_DONGLE,
+			baroSourceType:    BARO_TYPE_NONE,
+			expectUsed:        true,
+			expectPressureAlt: 1640.42, // 500m * 3.28084
+			expectBaroSource:  BARO_TYPE_NMEA,
+		},
+		{
+			name:              "Valid PGRMZ with feet from serial GPS",
+			input:             "$PGRMZ,2000,f,3*29",
+			gpsType:           GPS_TYPE_SERIAL,
+			baroSourceType:    BARO_TYPE_NONE,
+			expectUsed:        true,
+			expectPressureAlt: 2000.0,
+			expectBaroSource:  BARO_TYPE_NMEA,
+		},
+		{
+			name:             "PGRMZ ignored when BMP280 sensor present",
+			input:            "$PGRMZ,1089,f,3*2B",
+			gpsType:          GPS_TYPE_SOFTRF,
+			baroSourceType:   BARO_TYPE_BMP280,
+			expectUsed:       false,
+			expectBaroSource: BARO_TYPE_BMP280,
+		},
+		{
+			name:             "PGRMZ ignored when OGN tracker present",
+			input:            "$PGRMZ,1089,f,3*2B",
+			gpsType:          GPS_TYPE_SOFTRF,
+			baroSourceType:   BARO_TYPE_OGNTRACKER,
+			expectUsed:       false,
+			expectBaroSource: BARO_TYPE_OGNTRACKER,
+		},
+		{
+			name:       "PGRMZ ignored for non-SoftRF GPS type",
+			input:      "$PGRMZ,1089,f,3*2B",
+			gpsType:    GPS_TYPE_UBX9,
+			expectUsed: false,
+		},
+		{
+			name:       "PGRMZ with too few fields",
+			input:      "$PGRMZ,1089*3A",
+			gpsType:    GPS_TYPE_SOFTRF,
+			expectUsed: false,
+		},
+		{
+			name:       "PGRMZ with invalid altitude",
+			input:      "$PGRMZ,invalid,f,3*46",
+			gpsType:    GPS_TYPE_SOFTRF,
+			expectUsed: false,
+		},
+		{
+			name:       "PGRMZ with invalid checksum",
+			input:      "$PGRMZ,1089,f,3*FF",
+			gpsType:    GPS_TYPE_SOFTRF,
+			expectUsed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset state
+			globalStatus.GPS_detected_type = tc.gpsType
+			mySituation.BaroSourceType = tc.baroSourceType
+			mySituation.BaroPressureAltitude = 0
+
+			// For BMP280/OGNTRACKER tests, set recent time to make isTempPressValid() return true
+			if tc.baroSourceType == BARO_TYPE_BMP280 || tc.baroSourceType == BARO_TYPE_OGNTRACKER {
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			} else {
+				mySituation.BaroLastMeasurementTime = time.Time{}
+			}
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			if tc.expectUsed {
+				altDiff := mySituation.BaroPressureAltitude - tc.expectPressureAlt
+				if altDiff < -0.1 || altDiff > 0.1 {
+					t.Errorf("Expected BaroPressureAltitude=%.2f, got %.2f",
+						tc.expectPressureAlt, mySituation.BaroPressureAltitude)
+				}
+			}
+
+			if tc.expectBaroSource != 0 {
+				if mySituation.BaroSourceType != tc.expectBaroSource {
+					t.Errorf("Expected BaroSourceType=%d, got %d",
+						tc.expectBaroSource, mySituation.BaroSourceType)
+				}
+			}
+
+			t.Logf("PGRMZ test complete: used=%v, alt=%.2f ft, source=%d",
+				result, mySituation.BaroPressureAltitude, mySituation.BaroSourceType)
+		})
+	}
+}
+
+// TestProcessNMEALineLow_PFLAU_PFLAA tests FLARM NMEA message parsing
+func TestProcessNMEALineLow_PFLAU_PFLAA(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name       string
+		input      string
+		expectUsed bool
+	}{
+		{
+			name:       "Valid PFLAU message",
+			input:      "$PFLAU,0,1,2,1,0,-30,2,+30,400*50",
+			expectUsed: true,
+		},
+		{
+			name:       "Valid PFLAA message",
+			input:      "$PFLAA,0,1000,500,100,2,DD1234,180,10,15,1.5,1*52",
+			expectUsed: true,
+		},
+		{
+			name:       "PFLAU with invalid checksum",
+			input:      "$PFLAU,0,1,2,1,0,-30,2,+30,400*FF",
+			expectUsed: false,
+		},
+		{
+			name:       "PFLAA with invalid checksum",
+			input:      "$PFLAA,0,1000,500,100,2,DD1234,180,10,15,1.5,1*FF",
+			expectUsed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			t.Logf("FLARM test complete: used=%v", result)
+		})
+	}
+}
+
+// TestProcessNMEALineLow_EdgeCases tests edge cases and error paths
+func TestProcessNMEALineLow_EdgeCases(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name       string
+		input      string
+		expectUsed bool
+	}{
+		// GPVTG edge cases
+		{
+			name:       "GPVTG with invalid groundspeed",
+			input:      "$GPVTG,054.7,T,034.4,M,ABC,N,010.2,K*64",
+			expectUsed: false,
+		},
+		{
+			name:       "GPVTG with invalid true course",
+			input:      "$GPVTG,XYZ,T,034.4,M,005.5,N,010.2,K*52",
+			expectUsed: false,
+		},
+
+		// GPGGA edge cases
+		{
+			name:       "GPGGA with invalid fix quality",
+			input:      "$GPGGA,123519.0,4807.038,N,01131.000,E,X,08,0.9,545.4,M,46.9,M,,*35",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with timestamp too short",
+			input:      "$GPGGA,12351,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*45",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid hour in timestamp",
+			input:      "$GPGGA,XX3519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*60",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid minute in timestamp",
+			input:      "$GPGGA,12XX19.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*77",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid second in timestamp",
+			input:      "$GPGGA,1235XX.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*36",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with latitude too short",
+			input:      "$GPGGA,123519.0,480,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*6B",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid latitude degrees",
+			input:      "$GPGGA,123519.0,XX07.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4B",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid latitude minutes",
+			input:      "$GPGGA,123519.0,48XX.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*6E",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with longitude too short",
+			input:      "$GPGGA,123519.0,4807.038,N,0113,E,1,08,0.9,545.4,M,46.9,M,,*52",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid longitude degrees",
+			input:      "$GPGGA,123519.0,4807.038,N,XXX31.000,E,1,08,0.9,545.4,M,46.9,M,,*0C",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid longitude minutes",
+			input:      "$GPGGA,123519.0,4807.038,N,011XX.000,E,1,08,0.9,545.4,M,46.9,M,,*21",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid altitude",
+			input:      "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,XXX,M,46.9,M,,*5C",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with invalid geoid separation",
+			input:      "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,XXX,M,,*77",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA with fix quality out of bounds (negative)",
+			input:      "$GPGGA,123519.0,4807.038,N,01131.000,E,-1,08,0.9,545.4,M,46.9,M,,*74",
+			expectUsed: true, // Should clamp to 0
+		},
+		{
+			name:       "GPGGA with fix quality out of bounds (too high)",
+			input:      "$GPGGA,123519.0,4807.038,N,01131.000,E,15,08,0.9,545.4,M,46.9,M,,*6C",
+			expectUsed: true, // Should clamp to 9
+		},
+
+		// GPRMC edge cases
+		{
+			name:       "GPRMC with invalid hour",
+			input:      "$GPRMC,XX3519.0,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*53",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with invalid minute",
+			input:      "$GPRMC,12XX19.0,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*34",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with invalid second",
+			input:      "$GPRMC,1235XX.0,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*73",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with latitude too short",
+			input:      "$GPRMC,123519.0,A,480,N,01131.000,E,022.4,084.4,230394,003.1,W*28",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with invalid latitude degrees",
+			input:      "$GPRMC,123519.0,A,XX07.038,N,01131.000,E,022.4,084.4,230394,003.1,W*08",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with invalid latitude minutes",
+			input:      "$GPRMC,123519.0,A,48XX.038,N,01131.000,E,022.4,084.4,230394,003.1,W*2D",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with longitude too short",
+			input:      "$GPRMC,123519.0,A,4807.038,N,0113,E,022.4,084.4,230394,003.1,W*11",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with invalid longitude degrees",
+			input:      "$GPRMC,123519.0,A,4807.038,N,XXX31.000,E,022.4,084.4,230394,003.1,W*4F",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with invalid longitude minutes",
+			input:      "$GPRMC,123519.0,A,4807.038,N,011XX.000,E,022.4,084.4,230394,003.1,W*62",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with invalid ground speed",
+			input:      "$GPRMC,123519.0,A,4807.038,N,01131.000,E,XXX,084.4,230394,003.1,W*2C",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with invalid course when speed > 3",
+			input:      "$GPRMC,123519.0,A,4807.038,N,01131.000,E,022.4,XXX,230394,003.1,W*57",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC with timestamp too short",
+			input:      "$GPRMC,12351,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*06",
+			expectUsed: false,
+		},
+
+		// GPGSA edge cases
+		{
+			name:       "GPGSA with empty solution type",
+			input:      "$GPGSA,A,,03,04,05,06,07,08,09,10,11,12,13,14,1.0,1.0,1.0*39",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSA with solution type 1 (no solution)",
+			input:      "$GPGSA,A,1,03,04,05,06,07,08,09,10,11,12,13,14,1.0,1.0,1.0*30",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSA with invalid HDOP",
+			input:      "$GPGSA,A,3,03,04,05,06,07,08,09,10,11,12,13,14,XXX,1.0,1.0*75",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSA with invalid VDOP",
+			input:      "$GPGSA,A,3,03,04,05,06,07,08,09,10,11,12,13,14,1.0,1.0,XXX*7F",
+			expectUsed: false,
+		},
+
+		// GPGST edge cases
+		{
+			name:       "GPGST with invalid latitude error",
+			input:      "$GPGST,205246.00,1.19,0.02,0.01,-2.4501,XXX,0.01,0.03*3E",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGST with invalid longitude error",
+			input:      "$GPGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,XXX,0.03*3E",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGST with invalid altitude error",
+			input:      "$GPGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,0.01,XXX*3E",
+			expectUsed: false,
+		},
+
+		// GPGSV edge cases
+		{
+			name:       "GPGSV with invalid message number",
+			input:      "$GPGSV,X,1,08,01,40,083,46,02,17,308,41,12,07,344,39,14,22,228,45*7F",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSV with invalid message index",
+			input:      "$GPGSV,2,X,08,01,40,083,46,02,17,308,41,12,07,344,39,14,22,228,45*7F",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSV with invalid satellite ID",
+			input:      "$GPGSV,2,1,08,XX,40,083,46,02,17,308,41,12,07,344,39,14,22,228,45*47",
+			expectUsed: false,
+		},
+
+		// POGNB edge cases
+		{
+			name:       "POGNB with invalid pressure altitude",
+			input:      "$POGNB,22.0,+29.1,100972.3,3.8,XXX,+87.2,-0.04,+32.6*77",
+			expectUsed: false,
+		},
+		{
+			name:       "POGNB with invalid vertical speed",
+			input:      "$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,XXX,+32.6*70",
+			expectUsed: false,
+		},
+
+		// Unknown message types (should return false)
+		{
+			name:       "Unknown NMEA sentence type",
+			input:      "$GPXYZ,123,456,789*3C",
+			expectUsed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset satellite state
+			Satellites = make(map[string]SatelliteInfo)
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			t.Logf("Edge case test complete: used=%v", result)
+		})
+	}
+}
+
+// TestProcessNMEALineLow_GPSTypeDetection tests GPS type detection from NMEA messages
+func TestProcessNMEALineLow_GPSTypeDetection(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	// Save original state
+	origGPSType := globalStatus.GPS_detected_type
+	defer func() { globalStatus.GPS_detected_type = origGPSType }()
+
+	testCases := []struct {
+		name            string
+		input           string
+		initialGPSType  uint
+		expectProtocol  uint
+	}{
+		{
+			name:           "GPGGA sets NMEA protocol when type is unset",
+			input:          "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*59",
+			initialGPSType: 0,
+			expectProtocol: GPS_PROTOCOL_NMEA,
+		},
+		{
+			name:           "GNGGA sets NMEA protocol when type is unset",
+			input:          "$GNGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47",
+			initialGPSType: 0,
+			expectProtocol: GPS_PROTOCOL_NMEA,
+		},
+		{
+			name:           "GPRMC sets NMEA protocol when type is unset",
+			input:          "$GPRMC,123519.0,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*74",
+			initialGPSType: 0,
+			expectProtocol: GPS_PROTOCOL_NMEA,
+		},
+		{
+			name:           "GNRMC sets NMEA protocol when type is unset",
+			input:          "$GNRMC,081836.0,A,3751.65,S,14507.36,E,000.0,360.0,130998,011.3,E*62",
+			initialGPSType: 0,
+			expectProtocol: GPS_PROTOCOL_NMEA,
+		},
+		{
+			name:           "NMEA protocol not set when already has protocol",
+			input:          "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*59",
+			initialGPSType: GPS_TYPE_UBX9 | 0x20,
+			expectProtocol: 0x20,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			globalStatus.GPS_detected_type = tc.initialGPSType
+
+			result := processNMEALine(tc.input)
+
+			if !result {
+				t.Errorf("processNMEALine(%q) returned false, expected true", tc.input)
+			}
+
+			if tc.expectProtocol != 0 {
+				detectedProtocol := globalStatus.GPS_detected_type & 0xf0
+				if detectedProtocol != tc.expectProtocol {
+					t.Errorf("Expected GPS protocol 0x%X, got 0x%X",
+						tc.expectProtocol, detectedProtocol)
+				}
+			}
+
+			t.Logf("GPS type detection test complete: type=0x%X",
+				globalStatus.GPS_detected_type)
+		})
+	}
+}
+
+// TestProcessNMEALineLow_SatelliteTypes tests satellite type classification
+func TestProcessNMEALineLow_SatelliteTypes(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name          string
+		input         string
+		expectSatID   string
+		expectSatType uint8
+	}{
+		{
+			name:          "GPS satellite (1-32)",
+			input:         "$GPGSV,1,1,04,01,40,083,46,02,17,308,41,03,07,344,39,04,22,228,45*7B",
+			expectSatID:   "G1",
+			expectSatType: SAT_TYPE_GPS,
+		},
+		{
+			name:          "SBAS satellite (33-64)",
+			input:         "$GPGSV,1,1,01,33,40,083,46*45",
+			expectSatID:   "S120",
+			expectSatType: SAT_TYPE_SBAS,
+		},
+		{
+			name:          "GLONASS satellite (65-96)",
+			input:         "$GLGSV,1,1,01,65,40,083,46*5A",
+			expectSatID:   "R1",
+			expectSatType: SAT_TYPE_GLONASS,
+		},
+		{
+			name:          "SBAS satellite (152-158)",
+			input:         "$GPGSV,1,1,01,152,40,083,46*73",
+			expectSatID:   "S152",
+			expectSatType: SAT_TYPE_SBAS,
+		},
+		{
+			name:          "QZSS satellite (193-202)",
+			input:         "$GPGSV,1,1,01,193,40,083,46*7E",
+			expectSatID:   "Q1",
+			expectSatType: SAT_TYPE_QZSS,
+		},
+		{
+			name:          "Galileo satellite (301-336)",
+			input:         "$GAGSV,1,1,01,301,40,083,46*66",
+			expectSatID:   "E1",
+			expectSatType: SAT_TYPE_GALILEO,
+		},
+		{
+			name:          "Beidou satellite (401-463)",
+			input:         "$GBGSV,1,1,01,401,40,083,46*62",
+			expectSatID:   "B1",
+			expectSatType: SAT_TYPE_BEIDOU,
+		},
+		{
+			name:          "Unknown satellite (>463)",
+			input:         "$GPGSV,1,1,01,500,40,083,46*70",
+			expectSatID:   "U500",
+			expectSatType: SAT_TYPE_UNKNOWN,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset satellite state
+			Satellites = make(map[string]SatelliteInfo)
+
+			result := processNMEALine(tc.input)
+
+			if !result {
+				t.Errorf("processNMEALine(%q) returned false, expected true", tc.input)
+			}
+
+			mySituation.muSatellite.Lock()
+			sat, exists := Satellites[tc.expectSatID]
+			mySituation.muSatellite.Unlock()
+
+			if !exists {
+				t.Errorf("Expected satellite %s to exist, but it doesn't", tc.expectSatID)
+			} else {
+				if sat.Type != tc.expectSatType {
+					t.Errorf("Expected satellite type %d, got %d",
+						tc.expectSatType, sat.Type)
+				}
+			}
+
+			t.Logf("Satellite type test complete: ID=%s, type=%d",
+				tc.expectSatID, tc.expectSatType)
+		})
+	}
+}

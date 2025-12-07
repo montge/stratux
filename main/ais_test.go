@@ -1216,3 +1216,281 @@ func TestImportAISTrafficMessage_Type27ValidSpeed(t *testing.T) {
 
 	t.Logf("Type 27 valid speed test: messages=%d", globalStatus.AIS_messages_total)
 }
+
+// ==================================================================================
+// Comprehensive tests for importAISTrafficMessage to improve coverage
+// ==================================================================================
+
+// TestImportAISTrafficMessage_Comprehensive_Type1Moving tests Type 1 with valid SOG>0
+func TestImportAISTrafficMessage_Comprehensive_Type1Moving(t *testing.T) {
+	resetAISState()
+
+	// Set GPS close to target (Netherlands area)
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 5.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 1 with SOG > 0 - should use COG for track
+	// Tests: if positionReport.Sog > 0.0 && positionReport.Sog < 102.3
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	t.Logf("Type 1 moving test: messages=%d, traffic=%d", globalStatus.AIS_messages_total, count)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_Type1Stationary tests Type 1 with SOG=0
+func TestImportAISTrafficMessage_Comprehensive_Type1Stationary(t *testing.T) {
+	resetAISState()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 5.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 1 with SOG = 0 - uses else branch for heading
+	aisMsg := "!AIVDM,1,1,,B,13HOI:0P0000PH0<0000000<0000,0*5A"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 1 stationary test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_Type2 tests Type 2 position report
+func TestImportAISTrafficMessage_Comprehensive_Type2(t *testing.T) {
+	resetAISState()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 5.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 2 position report - tests MessageID == 2 branch
+	aisMsg := "!AIVDM,1,1,,B,25MsUdPOh8JwI:0HUwquiIFH21>i,0*0A"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 2 test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_Type3 tests Type 3 position report
+func TestImportAISTrafficMessage_Comprehensive_Type3(t *testing.T) {
+	resetAISState()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 5.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 3 position report - tests MessageID == 3 branch
+	aisMsg := "!AIVDM,1,1,,B,33L=LN051HQj<HFG220J?v0L41fm,0*0F"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 3 test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_Type5Update tests Type 5 updating existing
+func TestImportAISTrafficMessage_Comprehensive_Type5Update(t *testing.T) {
+	resetAISState()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 5.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Send Type 1 first to create the traffic entry
+	msg1 := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(msg1)
+
+	// Then send Type 5 static data (multipart)
+	// Tests: if header.MessageID == 5
+	msg2_1 := "!AIVDM,2,1,3,B,55P5TL01VIaAL@7WKO@mBplU@<PDhh000000001S;AJ::4A80?4i@E53,0*3E"
+	msg2_2 := "!AIVDM,2,2,3,B,1@0000000000000,2*55"
+	parseAisMessage(msg2_1)
+	parseAisMessage(msg2_2)
+
+	t.Logf("Type 5 update test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_Type27 tests Type 27 long range
+func TestImportAISTrafficMessage_Comprehensive_Type27(t *testing.T) {
+	resetAISState()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 37.0
+	mySituation.GPSLongitude = -122.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 27 long range broadcast
+	// Tests: if header.MessageID == 27
+	aisMsg := "!AIVDM,1,1,,A,KC5E2b@U19PFdLbL,0*62"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 27 test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_DistanceOver150km tests distance filter
+func TestImportAISTrafficMessage_Comprehensive_DistanceOver150km(t *testing.T) {
+	resetAISState()
+
+	// Set GPS far from target (Sydney, Australia vs Netherlands)
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = -33.8688
+	mySituation.GPSLongitude = 151.2093
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 1 message - target in Netherlands
+	// Tests: if ti.BearingDist_valid == false || ti.Distance >= 150000
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	// Should be filtered due to distance
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	if count != 0 {
+		t.Errorf("Expected 0 traffic (distance filter), got %d", count)
+	}
+
+	t.Log("Distance > 150km filter test complete")
+}
+
+// TestImportAISTrafficMessage_Comprehensive_NoGPS tests without GPS
+func TestImportAISTrafficMessage_Comprehensive_NoGPS(t *testing.T) {
+	resetAISState()
+
+	// Make GPS invalid
+	mySituation.muGPS.Lock()
+	mySituation.GPSFixQuality = 0
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = false
+
+	// Type 1 message
+	// Tests: if isGPSValid() && (ti.Lat != 0 && ti.Lng != 0)
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	// Without GPS, should be filtered
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	t.Logf("No GPS test complete: %d traffic entries", count)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_DEBUGMode tests DEBUG logging
+func TestImportAISTrafficMessage_Comprehensive_DEBUGMode(t *testing.T) {
+	resetAISState()
+
+	// Enable DEBUG
+	originalDEBUG := globalSettings.DEBUG
+	globalSettings.DEBUG = true
+	defer func() { globalSettings.DEBUG = originalDEBUG }()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 5.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 1 message
+	// Tests: if globalSettings.DEBUG
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)
+
+	t.Log("DEBUG mode test complete")
+}
+
+// TestImportAISTrafficMessage_Comprehensive_UpdateExisting tests update path
+func TestImportAISTrafficMessage_Comprehensive_UpdateExisting(t *testing.T) {
+	resetAISState()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 5.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Send same message twice
+	// Tests: if existingTi, ok := traffic[key]; ok
+	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
+	parseAisMessage(aisMsg)  // Creates new
+	parseAisMessage(aisMsg)  // Updates existing
+
+	t.Logf("Update existing test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_NewTarget tests new target creation
+func TestImportAISTrafficMessage_Comprehensive_NewTarget(t *testing.T) {
+	resetAISState()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 52.0
+	mySituation.GPSLongitude = 5.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 1 message creates new traffic
+	// Tests: else branch for new TrafficInfo
+	aisMsg := "!AIVDM,1,1,,A,13u@pD0P00PlL`<0HQDR8001@000,0*2F"
+	parseAisMessage(aisMsg)
+
+	t.Logf("New target creation test complete: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Comprehensive_MultipleTargets tests multiple different targets
+func TestImportAISTrafficMessage_Comprehensive_MultipleTargets(t *testing.T) {
+	resetAISState()
+
+	// Set GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 37.7749
+	mySituation.GPSLongitude = -122.4194
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Multiple different vessels
+	messages := []string{
+		"!AIVDM,1,1,,A,13u@pD0P00PlL`<0HQDR8001@000,0*2F",
+		"!AIVDM,1,1,,B,15MwkRgP00PlLe@0HQ@68?v00000,0*5E",
+	}
+
+	for _, msg := range messages {
+		parseAisMessage(msg)
+	}
+
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	t.Logf("Multiple targets test: messages=%d, traffic=%d", globalStatus.AIS_messages_total, count)
+}

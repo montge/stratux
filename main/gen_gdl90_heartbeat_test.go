@@ -69,6 +69,14 @@ func TestMakeFFIDMessageBasic(t *testing.T) {
 	// Initialize CRC table (required for prepareMessage)
 	crcInit()
 
+	// Save original values to restore after test
+	origVersion := stratuxVersion
+	origBuild := stratuxBuild
+	defer func() {
+		stratuxVersion = origVersion
+		stratuxBuild = origBuild
+	}()
+
 	// Set version strings to ensure function works
 	stratuxVersion = "v1.6"
 	stratuxBuild = "test"
@@ -96,6 +104,14 @@ func TestMakeFFIDMessageBasic(t *testing.T) {
 func TestMakeFFIDMessageLongNames(t *testing.T) {
 	// Initialize CRC table (required for prepareMessage)
 	crcInit()
+
+	// Save original values to restore after test
+	origVersion := stratuxVersion
+	origBuild := stratuxBuild
+	defer func() {
+		stratuxVersion = origVersion
+		stratuxBuild = origBuild
+	}()
 
 	// Set very long version strings to test truncation logic
 	stratuxVersion = "v999.999.999.999"
@@ -273,6 +289,14 @@ func TestMakeStratuxHeartbeatWithGPSAndAHRS(t *testing.T) {
 func TestMakeFFIDMessageShortNames(t *testing.T) {
 	// Initialize CRC table
 	crcInit()
+
+	// Save original values to restore after test
+	origVersion := stratuxVersion
+	origBuild := stratuxBuild
+	defer func() {
+		stratuxVersion = origVersion
+		stratuxBuild = origBuild
+	}()
 
 	// Set short version strings (no truncation needed)
 	stratuxVersion = "v1.6"
