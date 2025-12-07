@@ -121,3 +121,69 @@ func TestLogFileSize(t *testing.T) {
 	})
 }
 
+// TestClearDebugLogFile tests the clearDebugLogFile function
+func TestClearDebugLogFile(t *testing.T) {
+	// Save original log file handle
+	origLogFileHandle := logFileHandle
+	defer func() { logFileHandle = origLogFileHandle }()
+
+	t.Run("nil_handle", func(t *testing.T) {
+		logFileHandle = nil
+
+		// Should not panic with nil handle
+		clearDebugLogFile()
+		t.Log("clearDebugLogFile handled nil handle gracefully")
+	})
+
+	t.Run("valid_file_truncate", func(t *testing.T) {
+		// Create a temp file with content
+		tmpFile, err := os.CreateTemp("", "test-clear-log-*.log")
+		if err != nil {
+			t.Fatalf("Failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile.Name())
+
+		// Write some content
+		content := "Test log content that should be cleared\nLine 2\nLine 3\n"
+		tmpFile.WriteString(content)
+		tmpFile.Sync()
+
+		// Verify content was written
+		info, _ := tmpFile.Stat()
+		if info.Size() == 0 {
+			t.Fatal("Content was not written to temp file")
+		}
+
+		logFileHandle = tmpFile
+
+		// Clear the log file
+		clearDebugLogFile()
+
+		// Verify file was truncated
+		info, _ = tmpFile.Stat()
+		if info.Size() != 0 {
+			t.Errorf("Expected file to be truncated to 0 bytes, got %d", info.Size())
+		}
+
+		tmpFile.Close()
+		t.Log("clearDebugLogFile successfully truncated file")
+	})
+
+	t.Run("closed_file_seek_error", func(t *testing.T) {
+		// Create and close a temp file
+		tmpFile, err := os.CreateTemp("", "test-clear-closed-*.log")
+		if err != nil {
+			t.Fatalf("Failed to create temp file: %v", err)
+		}
+		tmpFile.WriteString("Some content")
+		tmpFile.Close()
+		defer os.Remove(tmpFile.Name())
+
+		logFileHandle = tmpFile
+
+		// Should handle error gracefully (seek will fail on closed file)
+		clearDebugLogFile()
+		t.Log("clearDebugLogFile handled closed file gracefully")
+	})
+}
+
