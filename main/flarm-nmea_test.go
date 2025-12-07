@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // TestAppendNmeaChecksum tests NMEA checksum calculation and formatting
@@ -665,6 +668,1177 @@ func TestGetIdTailEdgeCases(t *testing.T) {
 			idStr, tail, address := getIdTail(tc.input)
 			t.Logf("getIdTail(%q) -> ID: %q, Tail: %q, Address: 0x%08X",
 				tc.input, idStr, tail, address)
+		})
+	}
+}
+
+// TestMakeFlarmPFLAUString tests PFLAU sentence generation
+func TestMakeFlarmPFLAUString(t *testing.T) {
+	// Save original state and restore after test
+	origSituation := mySituation
+	origGlobalStatus := globalStatus
+	origTraffic := traffic
+	origClock := stratuxClock
+	defer func() {
+		mySituation = origSituation
+		globalStatus = origGlobalStatus
+		traffic = origTraffic
+		stratuxClock = origClock
+	}()
+
+	// Initialize stratuxClock
+	stratuxClock = NewMonotonic()
+
+	// Initialize mySituation mutexes
+	mySituation.muGPS = &sync.Mutex{}
+	mySituation.muGPSPerformance = &sync.Mutex{}
+	mySituation.muBaro = &sync.Mutex{}
+	mySituation.muSatellite = &sync.Mutex{}
+	mySituation.muAttitude = &sync.Mutex{}
+
+	// Initialize traffic map
+	traffic = make(map[uint32]TrafficInfo)
+
+	testCases := []struct {
+		name                  string
+		setupSituation        func()
+		setupGlobalStatus     func()
+		setupTraffic          func()
+		ti                    TrafficInfo
+		expectGPSStatus       string // "0" or "2"
+		expectRX              string // Number of traffic
+		expectAlarmLevel      bool   // Whether alarm info should be present
+		expectChecksumPresent bool
+	}{
+		{
+			name: "Valid GPS with close traffic - alarm level 3",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSTrueCourse = 90.0
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			setupTraffic: func() {
+				traffic[0xAABBCC] = TrafficInfo{Icao_addr: 0xAABBCC}
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0xAABBCC,
+				Lat:            47.005,  // ~500m away
+				Lng:            -122.0,
+				Alt:            1000,
+				Position_valid: true,
+			},
+			expectGPSStatus:       "2",
+			expectRX:              "1",
+			expectAlarmLevel:      true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Valid GPS with far traffic - no alarm",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSTrueCourse = 0.0
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			setupTraffic: func() {
+				traffic = make(map[uint32]TrafficInfo)
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0x123456,
+				Lat:            48.0, // ~111km away
+				Lng:            -122.0,
+				Alt:            5000,
+				Position_valid: true,
+			},
+			expectGPSStatus:       "2",
+			expectRX:              "0",
+			expectAlarmLevel:      false,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "No GPS fix",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 0.0
+				mySituation.GPSLongitude = 0.0
+				mySituation.GPSTrueCourse = 0.0
+				mySituation.GPSFixQuality = 0
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = false
+			},
+			setupTraffic: func() {
+				traffic = make(map[uint32]TrafficInfo)
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0xDEADBE,
+				Lat:            47.0,
+				Lng:            -122.0,
+				Alt:            1000,
+				Position_valid: true,
+			},
+			expectGPSStatus:       "0",
+			expectRX:              "0",
+			expectAlarmLevel:      false,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Traffic with tail number",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSTrueCourse = 45.0
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			setupTraffic: func() {
+				traffic = make(map[uint32]TrafficInfo)
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0xABC123,
+				Tail:           "N12345",
+				Lat:            47.004,
+				Lng:            -122.0,
+				Alt:            1500,
+				Position_valid: true,
+			},
+			expectGPSStatus:       "2",
+			expectRX:              "0",
+			expectAlarmLevel:      true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Bearing wrap around - positive to negative",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSTrueCourse = 350.0 // Heading nearly north
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			setupTraffic: func() {
+				traffic = make(map[uint32]TrafficInfo)
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0x111111,
+				Lat:            47.004,
+				Lng:            -122.0,
+				Alt:            1000,
+				Position_valid: true,
+			},
+			expectGPSStatus:       "2",
+			expectRX:              "0",
+			expectAlarmLevel:      true,
+			expectChecksumPresent: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup test environment
+			tc.setupSituation()
+			tc.setupGlobalStatus()
+			tc.setupTraffic()
+
+			// Call function
+			result := makeFlarmPFLAUString(tc.ti)
+
+			// Verify basic structure
+			if !strings.HasPrefix(result, "$PFLAU,") {
+				t.Errorf("Expected result to start with '$PFLAU,', got: %s", result)
+			}
+
+			if !strings.HasSuffix(result, "\r\n") {
+				t.Errorf("Expected result to end with \\r\\n, got: %s", result)
+			}
+
+			// Verify checksum is present
+			if tc.expectChecksumPresent && !strings.Contains(result, "*") {
+				t.Errorf("Expected checksum to be present, got: %s", result)
+			}
+
+			// Verify GPS status in message
+			if !strings.Contains(result, ","+tc.expectGPSStatus+",") {
+				t.Logf("Result: %s", result)
+				t.Logf("Expected GPS status %s to be in message", tc.expectGPSStatus)
+			}
+
+			// Verify checksum calculation
+			trimmed := strings.TrimSuffix(result, "\r\n")
+			parts := strings.Split(trimmed, "*")
+			if len(parts) == 2 {
+				// Verify checksum is valid hex
+				if len(parts[1]) != 2 {
+					t.Errorf("Checksum should be 2 characters, got %d: %q", len(parts[1]), parts[1])
+				}
+			}
+
+			t.Logf("Generated PFLAU: %s", strings.TrimSuffix(result, "\r\n"))
+		})
+	}
+}
+
+// TestMakeFlarmPFLAAString tests PFLAA sentence generation
+func TestMakeFlarmPFLAAString(t *testing.T) {
+	// Save original state
+	origSituation := mySituation
+	origGlobalSettings := globalSettings
+	origClock := stratuxClock
+	defer func() {
+		mySituation = origSituation
+		globalSettings = origGlobalSettings
+		stratuxClock = origClock
+	}()
+
+	// Initialize stratuxClock
+	stratuxClock = NewMonotonic()
+
+	// Initialize mySituation mutexes
+	mySituation.muGPS = &sync.Mutex{}
+	mySituation.muGPSPerformance = &sync.Mutex{}
+	mySituation.muBaro = &sync.Mutex{}
+	mySituation.muSatellite = &sync.Mutex{}
+	mySituation.muAttitude = &sync.Mutex{}
+
+	testCases := []struct {
+		name                  string
+		setupSituation        func()
+		ti                    TrafficInfo
+		expectValid           bool
+		expectAlarmLevel      uint8
+		expectPositionValid   bool
+		expectChecksumPresent bool
+	}{
+		{
+			name: "Valid position with ICAO address",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSFixQuality = 1
+				mySituation.BaroPressureAltitude = 1000.0 // Same level
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0xAABBCC,
+				Addr_type:      0, // ICAO
+				Lat:            47.005,
+				Lng:            -122.005,
+				Alt:            1000,
+				Track:          90.0,
+				Speed:          100,
+				Speed_valid:    true,
+				Vvel:           500,
+				Emitter_category: 1,
+				Position_valid: true,
+			},
+			expectValid:           true,
+			expectAlarmLevel:      3, // Close distance and vertical
+			expectPositionValid:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Valid position with non-ICAO address",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSFixQuality = 1
+				mySituation.BaroPressureAltitude = 2000.0 // Same level
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0x123456,
+				Addr_type:      1, // Non-ICAO
+				Lat:            47.01,
+				Lng:            -122.01,
+				Alt:            2000,
+				Track:          180.0,
+				Speed:          150,
+				Speed_valid:    true,
+				Vvel:           -200,
+				Emitter_category: 9,
+				Position_valid: true,
+			},
+			expectValid:           true,
+			expectAlarmLevel:      2, // Within level 2 alarm distance (< 1NM)
+			expectPositionValid:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Invalid position - bearingless traffic",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSFixQuality = 1
+			},
+			ti: TrafficInfo{
+				Icao_addr:         0xDEADBE,
+				Addr_type:         0,
+				Alt:               3000,
+				Vvel:              100,
+				Emitter_category:  7,
+				Position_valid:    false,
+				DistanceEstimated: 5000.0,
+			},
+			expectValid:           true,
+			expectAlarmLevel:      0,
+			expectPositionValid:   false,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Traffic with tail number",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSFixQuality = 1
+				mySituation.BaroPressureAltitude = 1500.0 // Same level
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Icao_addr:        0xABC123,
+				Addr_type:        0,
+				Tail:             "N12345",
+				Lat:              47.005,
+				Lng:              -122.005,
+				Alt:              1500,
+				Track:            270.0,
+				Speed:            120,
+				Speed_valid:      true,
+				Vvel:             0,
+				Emitter_category: 1,
+				Position_valid:   true,
+			},
+			expectValid:           true,
+			expectAlarmLevel:      3,
+			expectPositionValid:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Different aircraft types",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSFixQuality = 1
+				mySituation.BaroPressureAltitude = 2000.0 // Same level
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Icao_addr:        0x999999,
+				Addr_type:        0,
+				Lat:              47.005,
+				Lng:              -122.005,
+				Alt:              2000,
+				Track:            45.0,
+				Speed:            80,
+				Speed_valid:      true,
+				Vvel:             300,
+				Emitter_category: 12, // Paraglider
+				Position_valid:   true,
+			},
+			expectValid:           true,
+			expectAlarmLevel:      3,
+			expectPositionValid:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Far away traffic - no alarm",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSFixQuality = 1
+			},
+			ti: TrafficInfo{
+				Icao_addr:        0x555555,
+				Addr_type:        0,
+				Lat:              47.1, // ~11km away
+				Lng:              -122.0,
+				Alt:              5000,
+				Track:            0.0,
+				Speed:            200,
+				Speed_valid:      true,
+				Vvel:             1000,
+				Emitter_category: 3,
+				Position_valid:   true,
+			},
+			expectValid:           true,
+			expectAlarmLevel:      0,
+			expectPositionValid:   true,
+			expectChecksumPresent: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup
+			tc.setupSituation()
+			globalSettings.DEBUG = false
+
+			// Call function
+			msg, valid, alarmLevel := makeFlarmPFLAAString(tc.ti)
+
+			// Verify valid flag
+			if valid != tc.expectValid {
+				t.Errorf("Expected valid=%v, got %v", tc.expectValid, valid)
+			}
+
+			// Verify alarm level
+			if alarmLevel != tc.expectAlarmLevel {
+				t.Errorf("Expected alarmLevel=%d, got %d", tc.expectAlarmLevel, alarmLevel)
+			}
+
+			if valid {
+				// Verify basic structure
+				if !strings.HasPrefix(msg, "$PFLAA,") {
+					t.Errorf("Expected message to start with '$PFLAA,', got: %s", msg)
+				}
+
+				if !strings.HasSuffix(msg, "\r\n") {
+					t.Errorf("Expected message to end with \\r\\n")
+				}
+
+				// Verify checksum is present
+				if tc.expectChecksumPresent && !strings.Contains(msg, "*") {
+					t.Errorf("Expected checksum to be present")
+				}
+
+				// Verify ID is in message (6 hex digits)
+				if !strings.Contains(msg, strings.ToUpper(fmt.Sprintf("%.6X", tc.ti.Icao_addr&0xFFFFFF))) {
+					t.Logf("Expected ID %.6X to be in message: %s", tc.ti.Icao_addr&0xFFFFFF, msg)
+				}
+
+				// Verify tail is in message if provided
+				if len(tc.ti.Tail) > 0 && !strings.Contains(msg, tc.ti.Tail) {
+					t.Errorf("Expected tail %s to be in message", tc.ti.Tail)
+				}
+
+				t.Logf("Generated PFLAA: %s", strings.TrimSuffix(msg, "\r\n"))
+			}
+		})
+	}
+}
+
+// TestMakeGPRMCString tests GPRMC sentence generation
+func TestMakeGPRMCString(t *testing.T) {
+	// Save original state
+	origSituation := mySituation
+	origClock := stratuxClock
+	defer func() {
+		mySituation = origSituation
+		stratuxClock = origClock
+	}()
+
+	// Initialize stratuxClock
+	stratuxClock = NewMonotonic()
+
+	// Initialize mySituation mutexes
+	mySituation.muGPS = &sync.Mutex{}
+	mySituation.muGPSPerformance = &sync.Mutex{}
+	mySituation.muBaro = &sync.Mutex{}
+	mySituation.muSatellite = &sync.Mutex{}
+	mySituation.muAttitude = &sync.Mutex{}
+
+	testCases := []struct {
+		name                  string
+		setupSituation        func()
+		setupGlobalStatus     func()
+		expectStatus          string // "A" or "V"
+		expectValidPosition   bool
+		expectChecksumPresent bool
+	}{
+		{
+			name: "Valid GPS fix",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 47.12345
+				mySituation.GPSLongitude = -122.98765
+				mySituation.GPSGroundSpeed = 100.0
+				mySituation.GPSTrueCourse = 90.0
+				mySituation.GPSLastFixSinceMidnightUTC = 43519.5 // 12:05:19.5 UTC
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			expectStatus:          "A",
+			expectValidPosition:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Valid GPS fix at equator/prime meridian",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 0.0
+				mySituation.GPSLongitude = 0.0
+				mySituation.GPSGroundSpeed = 0.0
+				mySituation.GPSTrueCourse = 0.0
+				mySituation.GPSLastFixSinceMidnightUTC = 0.0
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			expectStatus:          "A",
+			expectValidPosition:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Valid GPS fix in southern/western hemisphere",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = -33.8688
+				mySituation.GPSLongitude = -151.2093
+				mySituation.GPSGroundSpeed = 250.0
+				mySituation.GPSTrueCourse = 180.0
+				mySituation.GPSLastFixSinceMidnightUTC = 3600.0 // 01:00:00 UTC
+				mySituation.GPSFixQuality = 2 // DGPS
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			expectStatus:          "A",
+			expectValidPosition:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "No GPS fix - invalid",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 0.0
+				mySituation.GPSLongitude = 0.0
+				mySituation.GPSGroundSpeed = 0.0
+				mySituation.GPSTrueCourse = 0.0
+				mySituation.GPSLastFixSinceMidnightUTC = 0.0
+				mySituation.GPSFixQuality = 0
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = false
+			},
+			expectStatus:          "V",
+			expectValidPosition:   false,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "High speed and extreme coordinates",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSLatitude = 89.9999
+				mySituation.GPSLongitude = 179.9999
+				mySituation.GPSGroundSpeed = 600.0
+				mySituation.GPSTrueCourse = 359.9
+				mySituation.GPSLastFixSinceMidnightUTC = 86399.0 // 23:59:59 UTC
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			expectStatus:          "A",
+			expectValidPosition:   true,
+			expectChecksumPresent: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup
+			tc.setupSituation()
+			tc.setupGlobalStatus()
+
+			// Call function
+			result := makeGPRMCString()
+
+			// Verify basic structure
+			if !strings.HasPrefix(result, "$GPRMC,") {
+				t.Errorf("Expected result to start with '$GPRMC,', got: %s", result)
+			}
+
+			if !strings.HasSuffix(result, "\r\n") {
+				t.Errorf("Expected result to end with \\r\\n")
+			}
+
+			// Verify checksum is present
+			if tc.expectChecksumPresent && !strings.Contains(result, "*") {
+				t.Errorf("Expected checksum to be present")
+			}
+
+			// Verify status is in message
+			if !strings.Contains(result, ","+tc.expectStatus+",") {
+				t.Logf("Result: %s", result)
+				t.Logf("Expected status %s to be in message", tc.expectStatus)
+			}
+
+			// For valid position, verify lat/lng are present
+			if tc.expectValidPosition {
+				// Should have numeric lat/lng
+				if strings.Contains(result, ",,,,") {
+					t.Errorf("Valid position should not have empty lat/lng fields")
+				}
+			} else {
+				// Invalid position should have empty lat/lng
+				if !strings.Contains(result, ",,,,") {
+					t.Logf("Invalid position should have empty lat/lng fields")
+				}
+			}
+
+			t.Logf("Generated GPRMC: %s", strings.TrimSuffix(result, "\r\n"))
+		})
+	}
+}
+
+// TestMakeGPGGAString tests GPGGA sentence generation
+func TestMakeGPGGAString(t *testing.T) {
+	// Save original state
+	origSituation := mySituation
+	origClock := stratuxClock
+	defer func() {
+		mySituation = origSituation
+		stratuxClock = origClock
+	}()
+
+	// Initialize stratuxClock
+	stratuxClock = NewMonotonic()
+
+	// Initialize mySituation mutexes
+	mySituation.muGPS = &sync.Mutex{}
+	mySituation.muGPSPerformance = &sync.Mutex{}
+	mySituation.muBaro = &sync.Mutex{}
+	mySituation.muSatellite = &sync.Mutex{}
+	mySituation.muAttitude = &sync.Mutex{}
+
+	testCases := []struct {
+		name                  string
+		setupSituation        func()
+		setupGlobalStatus     func()
+		expectFixQuality      int
+		expectValidPosition   bool
+		expectChecksumPresent bool
+	}{
+		{
+			name: "Valid GPS fix with satellites",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muSatellite.Lock()
+				defer mySituation.muSatellite.Unlock()
+				mySituation.GPSLatitude = 47.6062
+				mySituation.GPSLongitude = -122.3321
+				mySituation.GPSAltitudeMSL = 500.0
+				mySituation.GPSGeoidSep = 50.0
+				mySituation.GPSSatellites = 8
+				mySituation.GPSLastFixSinceMidnightUTC = 43200.0 // 12:00:00 UTC
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			expectFixQuality:      1,
+			expectValidPosition:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "DGPS fix",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muSatellite.Lock()
+				defer mySituation.muSatellite.Unlock()
+				mySituation.GPSLatitude = 40.7128
+				mySituation.GPSLongitude = -74.0060
+				mySituation.GPSAltitudeMSL = 100.0
+				mySituation.GPSGeoidSep = -100.0
+				mySituation.GPSSatellites = 12
+				mySituation.GPSLastFixSinceMidnightUTC = 0.0
+				mySituation.GPSFixQuality = 2
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			expectFixQuality:      2,
+			expectValidPosition:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Southern/western hemisphere with negative geoid sep",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muSatellite.Lock()
+				defer mySituation.muSatellite.Unlock()
+				mySituation.GPSLatitude = -34.6037
+				mySituation.GPSLongitude = -58.3816
+				mySituation.GPSAltitudeMSL = 82.0
+				mySituation.GPSGeoidSep = -30.0
+				mySituation.GPSSatellites = 10
+				mySituation.GPSLastFixSinceMidnightUTC = 50000.0
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			expectFixQuality:      1,
+			expectValidPosition:   true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "No GPS fix",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muSatellite.Lock()
+				defer mySituation.muSatellite.Unlock()
+				mySituation.GPSLatitude = 0.0
+				mySituation.GPSLongitude = 0.0
+				mySituation.GPSAltitudeMSL = 0.0
+				mySituation.GPSGeoidSep = 0.0
+				mySituation.GPSSatellites = 3
+				mySituation.GPSFixQuality = 0
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = false
+			},
+			expectFixQuality:      0,
+			expectValidPosition:   false,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "High altitude fix",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muSatellite.Lock()
+				defer mySituation.muSatellite.Unlock()
+				mySituation.GPSLatitude = 45.0
+				mySituation.GPSLongitude = 6.0
+				mySituation.GPSAltitudeMSL = 29000.0 // High altitude flight
+				mySituation.GPSGeoidSep = 150.0
+				mySituation.GPSSatellites = 9
+				mySituation.GPSLastFixSinceMidnightUTC = 7200.0
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			expectFixQuality:      1,
+			expectValidPosition:   true,
+			expectChecksumPresent: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup
+			tc.setupSituation()
+			tc.setupGlobalStatus()
+
+			// Call function
+			result := makeGPGGAString()
+
+			// Verify basic structure
+			if !strings.HasPrefix(result, "$GPGGA,") {
+				t.Errorf("Expected result to start with '$GPGGA,', got: %s", result)
+			}
+
+			if !strings.HasSuffix(result, "\r\n") {
+				t.Errorf("Expected result to end with \\r\\n")
+			}
+
+			// Verify checksum is present
+			if tc.expectChecksumPresent && !strings.Contains(result, "*") {
+				t.Errorf("Expected checksum to be present")
+			}
+
+			// For valid position, verify lat/lng are present
+			if tc.expectValidPosition {
+				// Should have numeric lat/lng
+				if strings.HasPrefix(result, "$GPGGA,,,,") {
+					t.Errorf("Valid position should not have empty time/lat/lng fields")
+				}
+			} else {
+				// Invalid position should start with empty fields
+				if !strings.HasPrefix(result, "$GPGGA,,,,") {
+					t.Logf("Invalid position should have empty time/lat/lng fields")
+				}
+			}
+
+			t.Logf("Generated GPGGA: %s", strings.TrimSuffix(result, "\r\n"))
+		})
+	}
+}
+
+// TestMakePGRMZString tests PGRMZ sentence generation
+func TestMakePGRMZString(t *testing.T) {
+	// Save original state
+	origSituation := mySituation
+	origClock := stratuxClock
+	defer func() {
+		mySituation = origSituation
+		stratuxClock = origClock
+	}()
+
+	// Initialize stratuxClock
+	stratuxClock = NewMonotonic()
+
+	// Initialize mySituation mutexes
+	mySituation.muGPS = &sync.Mutex{}
+	mySituation.muGPSPerformance = &sync.Mutex{}
+	mySituation.muBaro = &sync.Mutex{}
+	mySituation.muSatellite = &sync.Mutex{}
+	mySituation.muAttitude = &sync.Mutex{}
+
+	testCases := []struct {
+		name                  string
+		altitude              float32
+		expectChecksumPresent bool
+	}{
+		{
+			name:                  "Sea level altitude",
+			altitude:              0.0,
+			expectChecksumPresent: true,
+		},
+		{
+			name:                  "Typical cruise altitude",
+			altitude:              5500.0,
+			expectChecksumPresent: true,
+		},
+		{
+			name:                  "High altitude",
+			altitude:              41000.0,
+			expectChecksumPresent: true,
+		},
+		{
+			name:                  "Negative altitude (below sea level)",
+			altitude:              -282.0, // Death Valley
+			expectChecksumPresent: true,
+		},
+		{
+			name:                  "Fractional altitude (should be rounded)",
+			altitude:              1234.56,
+			expectChecksumPresent: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup
+			mySituation.muBaro.Lock()
+			mySituation.BaroPressureAltitude = tc.altitude
+			mySituation.muBaro.Unlock()
+
+			// Call function
+			result := makePGRMZString()
+
+			// Verify basic structure
+			if !strings.HasPrefix(result, "$PGRMZ,") {
+				t.Errorf("Expected result to start with '$PGRMZ,', got: %s", result)
+			}
+
+			if !strings.HasSuffix(result, "\r\n") {
+				t.Errorf("Expected result to end with \\r\\n")
+			}
+
+			// Verify checksum is present
+			if tc.expectChecksumPresent && !strings.Contains(result, "*") {
+				t.Errorf("Expected checksum to be present")
+			}
+
+			// Verify altitude units (should end with ",f,3*" before checksum)
+			if !strings.Contains(result, ",f,3*") {
+				t.Errorf("Expected altitude in feet with mode 3, got: %s", result)
+			}
+
+			t.Logf("Generated PGRMZ for altitude %.1f: %s", tc.altitude, strings.TrimSuffix(result, "\r\n"))
+		})
+	}
+}
+
+// TestMakeAHRSLevilReport tests AHRS Levil report generation
+func TestMakeAHRSLevilReport(t *testing.T) {
+	// Save original state
+	origSituation := mySituation
+	origGlobalStatus := globalStatus
+	origClock := stratuxClock
+	defer func() {
+		mySituation = origSituation
+		globalStatus = origGlobalStatus
+		stratuxClock = origClock
+	}()
+
+	// Initialize stratuxClock
+	stratuxClock = NewMonotonic()
+
+	// Initialize mySituation mutexes
+	mySituation.muGPS = &sync.Mutex{}
+	mySituation.muGPSPerformance = &sync.Mutex{}
+	mySituation.muBaro = &sync.Mutex{}
+	mySituation.muSatellite = &sync.Mutex{}
+	mySituation.muAttitude = &sync.Mutex{}
+
+	testCases := []struct {
+		name              string
+		setupSituation    func()
+		setupGlobalStatus func()
+		shouldReturn      bool // Whether function should return early without sending
+	}{
+		{
+			name: "No IMU connected - should return early",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+				globalStatus.IMUConnected = false
+			},
+			shouldReturn: true,
+		},
+		{
+			name: "No GPS fix - should return early",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muAttitude.Lock()
+				defer mySituation.muAttitude.Unlock()
+
+				mySituation.GPSFixQuality = 0
+				mySituation.AHRSRoll = 10.0
+				mySituation.AHRSPitch = 5.0
+				mySituation.AHRSGyroHeading = 90.0
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = false
+				globalStatus.IMUConnected = true
+			},
+			shouldReturn: true,
+		},
+		{
+			name: "AHRS data too old - should return early",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muAttitude.Lock()
+				defer mySituation.muAttitude.Unlock()
+
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.AHRSRoll = 10.0
+				mySituation.AHRSPitch = 5.0
+				mySituation.AHRSGyroHeading = 90.0
+				// AHRS data too old (> 1 second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-2 * time.Second)
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+				globalStatus.IMUConnected = true
+			},
+			shouldReturn: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup
+			tc.setupSituation()
+			tc.setupGlobalStatus()
+
+			// Note: makeAHRSLevilReport() doesn't return a value, it calls sendNetFLARM()
+			// We can only test that it returns early without panicking when conditions aren't met
+			defer func() {
+				if r := recover(); r != nil {
+					if !tc.shouldReturn {
+						t.Errorf("makeAHRSLevilReport() panicked unexpectedly: %v", r)
+					}
+					// If shouldReturn is true, a panic is expected because we don't have network initialized
+				}
+			}()
+
+			makeAHRSLevilReport()
+
+			// If we get here without panic, the function returned early as expected
+			if tc.shouldReturn {
+				t.Logf("makeAHRSLevilReport() returned early as expected (no valid data)")
+			}
+		})
+	}
+}
+
+// TestComputeRelativeVertical tests relative vertical calculation
+func TestComputeRelativeVertical(t *testing.T) {
+	// Save original state
+	origSituation := mySituation
+	origClock := stratuxClock
+	defer func() {
+		mySituation = origSituation
+		stratuxClock = origClock
+	}()
+
+	// Initialize stratuxClock
+	stratuxClock = NewMonotonic()
+
+	// Initialize mySituation mutexes
+	mySituation.muGPS = &sync.Mutex{}
+	mySituation.muGPSPerformance = &sync.Mutex{}
+	mySituation.muBaro = &sync.Mutex{}
+	mySituation.muSatellite = &sync.Mutex{}
+	mySituation.muAttitude = &sync.Mutex{}
+
+	testCases := []struct {
+		name           string
+		setupSituation func()
+		ti             TrafficInfo
+		expectedRange  [2]int32 // Min and max expected values (approximate)
+	}{
+		{
+			name: "Traffic higher with baro alt",
+			setupSituation: func() {
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.BaroPressureAltitude = 5000.0
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Alt:       6000,
+				AltIsGNSS: false,
+			},
+			expectedRange: [2]int32{300, 310}, // ~304m = 1000ft
+		},
+		{
+			name: "Traffic lower with baro alt",
+			setupSituation: func() {
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.BaroPressureAltitude = 5000.0
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Alt:       4000,
+				AltIsGNSS: false,
+			},
+			expectedRange: [2]int32{-310, -300}, // ~-304m = -1000ft
+		},
+		{
+			name: "Same altitude",
+			setupSituation: func() {
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.BaroPressureAltitude = 3000.0
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Alt:       3000,
+				AltIsGNSS: false,
+			},
+			expectedRange: [2]int32{-5, 5}, // Should be close to 0
+		},
+		{
+			name: "Traffic with GNSS altitude",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.GPSHeightAboveEllipsoid = 1000.0
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Alt:       1500,
+				AltIsGNSS: true,
+			},
+			expectedRange: [2]int32{150, 155}, // ~152m = 500ft
+		},
+		{
+			name: "Use GPS MSL when no baro available",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.GPSAltitudeMSL = 2000.0
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				// Make baro invalid by setting old time
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-20 * time.Second)
+			},
+			ti: TrafficInfo{
+				Alt:       3000,
+				AltIsGNSS: false,
+			},
+			expectedRange: [2]int32{300, 310}, // ~304m = 1000ft
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup
+			tc.setupSituation()
+			globalStatus.GPS_connected = true
+
+			// Call function
+			result := computeRelativeVertical(tc.ti)
+
+			// Verify result is in expected range
+			if result < tc.expectedRange[0] || result > tc.expectedRange[1] {
+				t.Errorf("computeRelativeVertical() = %d, expected in range [%d, %d]",
+					result, tc.expectedRange[0], tc.expectedRange[1])
+			}
+
+			t.Logf("Relative vertical: %d meters (%.0f feet)", result, float64(result)*3.28084)
 		})
 	}
 }
