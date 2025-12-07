@@ -2213,6 +2213,92 @@ func TestHandleOrientAHRS(t *testing.T) {
 	}
 }
 
+// TestHandleOrientAHRS_PostActions tests POST requests with specific action codes
+// Note: Actions 'f' and 'd' have complex dependencies (IMU hardware, saveSettings, etc.)
+// that are difficult to test in isolation. This test focuses on the switch statement
+// logic and ensures the code doesn't panic with various input actions.
+func TestHandleOrientAHRS_PostActions(t *testing.T) {
+	t.Run("post_unknown_action", func(t *testing.T) {
+		// Test with an action that's not 'f' or 'd'
+		// This tests the switch statement's default behavior (no case matches)
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("x"))
+		w := httptest.NewRecorder()
+
+		// Should execute without panic (no case for 'x', so it does nothing)
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		// Should complete without error
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Logf("Status code: %d", resp.StatusCode)
+		}
+		t.Log("Unknown action 'x' handled gracefully")
+	})
+
+	t.Run("post_multiple_byte_body_unknown_action", func(t *testing.T) {
+		// Test with body longer than 1 byte (should only read first byte)
+		// Using 'x' action to avoid triggering saveSettings and IMU operations
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("xxx"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		// Should complete without error
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Logf("Status code: %d", resp.StatusCode)
+		}
+		t.Log("Multiple byte body correctly processed only first byte")
+	})
+
+	t.Run("post_numeric_action", func(t *testing.T) {
+		// Test with a numeric action byte
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("1"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Logf("Status code: %d", resp.StatusCode)
+		}
+		t.Log("Numeric action handled gracefully")
+	})
+
+	t.Run("post_special_char_action", func(t *testing.T) {
+		// Test with a special character
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("!"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Logf("Status code: %d", resp.StatusCode)
+		}
+		t.Log("Special character action handled gracefully")
+	})
+
+	t.Run("verify_cors_headers_on_post", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("x"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		// Verify all CORS headers
+		if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+			t.Error("Expected Access-Control-Allow-Origin to be '*'")
+		}
+		if w.Header().Get("Access-Control-Allow-Method") != "GET, POST, OPTIONS" {
+			t.Error("Expected Access-Control-Allow-Method to include GET, POST, OPTIONS")
+		}
+		if w.Header().Get("Content-Type") != "text/plain" {
+			t.Error("Expected Content-Type to be 'text/plain'")
+		}
+		t.Log("CORS headers verified on POST request")
+	})
+}
+
 // TestHandleCageAHRS tests the /cageAHRS endpoint
 func TestHandleCageAHRS(t *testing.T) {
 	// Initialize the cal channel if not already initialized

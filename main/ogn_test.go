@@ -722,3 +722,115 @@ func TestLookupOgnTailNumber_EdgeCases(t *testing.T) {
 		}
 	})
 }
+
+// TestLookupOgnTailNumber_MultipleLookups tests multiple lookups after cache is loaded
+func TestLookupOgnTailNumber_MultipleLookups(t *testing.T) {
+	// Save original cache
+	origCache := ognTailNumberCache
+	defer func() {
+		ognTailNumberCache = origCache
+	}()
+
+	// Create ogn subdirectory in STRATUX_HOME
+	ognDir := STRATUX_HOME + "/ogn"
+	err := os.MkdirAll(ognDir, 0755)
+	if err != nil {
+		t.Skipf("Cannot create test directory in STRATUX_HOME: %v", err)
+	}
+
+	// Clean up test files after test
+	defer func() {
+		os.Remove(ognDir + "/ddb.json")
+	}()
+
+	t.Run("multiple_successful_lookups", func(t *testing.T) {
+		// Clear cache to force file load
+		ognTailNumberCache = make(map[string]string)
+
+		// Create comprehensive test ddb.json
+		testJSON := `{
+  "devices": [
+    {
+      "device_id": "DD1234",
+      "registration": "D-1234"
+    },
+    {
+      "device_id": "DD5678",
+      "registration": "D-5678"
+    },
+    {
+      "device_id": "DDABCD",
+      "registration": "D-ABCD"
+    },
+    {
+      "device_id": "3E1234",
+      "registration": "F-CGXY"
+    },
+    {
+      "device_id": "406789",
+      "registration": "G-GLID"
+    }
+  ]
+}`
+		err := os.WriteFile(ognDir+"/ddb.json", []byte(testJSON), 0644)
+		if err != nil {
+			t.Fatalf("Failed to write ddb.json: %v", err)
+		}
+
+		// First lookup should trigger file load
+		result := lookupOgnTailNumber("DD1234")
+		if result != "D-1234" {
+			t.Errorf("First lookup: expected 'D-1234', got '%s'", result)
+		}
+
+		// Subsequent lookups should use cache
+		result = lookupOgnTailNumber("DD5678")
+		if result != "D-5678" {
+			t.Errorf("Second lookup: expected 'D-5678', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("DDABCD")
+		if result != "D-ABCD" {
+			t.Errorf("Third lookup: expected 'D-ABCD', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("3E1234")
+		if result != "F-CGXY" {
+			t.Errorf("Fourth lookup: expected 'F-CGXY', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("406789")
+		if result != "G-GLID" {
+			t.Errorf("Fifth lookup: expected 'G-GLID', got '%s'", result)
+		}
+
+		// Test non-existent entry
+		result = lookupOgnTailNumber("FFFFFF")
+		if result != "" {
+			t.Errorf("Non-existent lookup: expected empty string, got '%s'", result)
+		}
+
+		// Verify cache was populated with all 5 devices
+		if len(ognTailNumberCache) != 5 {
+			t.Errorf("Expected cache to have 5 entries, got %d", len(ognTailNumberCache))
+		}
+
+		t.Logf("Successfully performed multiple lookups from cache of %d devices", len(ognTailNumberCache))
+	})
+
+	t.Run("lookup_same_id_multiple_times", func(t *testing.T) {
+		// Pre-populate cache
+		ognTailNumberCache = map[string]string{
+			"TEST99": "N-REPEAT",
+		}
+
+		// Look up same ID multiple times
+		for i := 0; i < 10; i++ {
+			result := lookupOgnTailNumber("TEST99")
+			if result != "N-REPEAT" {
+				t.Errorf("Lookup %d: expected 'N-REPEAT', got '%s'", i, result)
+			}
+		}
+		t.Log("Successfully performed same lookup 10 times")
+	})
+}
