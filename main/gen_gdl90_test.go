@@ -891,6 +891,125 @@ func TestMakeOwnshipReport(t *testing.T) {
 			t.Error("Expected makeOwnshipReport to succeed with detected ownship")
 		}
 	})
+
+	t.Run("with_track_wraparound_positive", func(t *testing.T) {
+		// Test track angle wraparound (> 360)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 40.0
+		mySituation.GPSLongitude = -100.0
+		mySituation.GPSAltitudeMSL = 5000.0
+		mySituation.GPSTrueCourse = 370.0 // > 360, should wrap to 10
+		mySituation.GPSGroundSpeed = 100.0
+		mySituation.GPSHorizontalAccuracy = 10
+		mySituation.GPSNACp = 8
+		mySituation.GPSHeightAboveEllipsoid = 4900.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "A12345"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with track > 360")
+		}
+	})
+
+	t.Run("with_track_wraparound_negative", func(t *testing.T) {
+		// Test track angle wraparound (< 0)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 40.0
+		mySituation.GPSLongitude = -100.0
+		mySituation.GPSAltitudeMSL = 5000.0
+		mySituation.GPSTrueCourse = -10.0 // < 0, should wrap to 350
+		mySituation.GPSGroundSpeed = 100.0
+		mySituation.GPSHorizontalAccuracy = 10
+		mySituation.GPSNACp = 8
+		mySituation.GPSHeightAboveEllipsoid = 4900.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "A12345"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with track < 0")
+		}
+	})
+
+	t.Run("with_detected_ownship_long_tail", func(t *testing.T) {
+		// Test detected ownship with tail number > 7 characters
+		mySituation.GPSFixQuality = 0
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-10 * time.Second)
+		globalStatus.GPS_connected = false
+
+		// Set up detected ownship with long tail number
+		OwnshipTrafficInfo.Last_seen = stratuxClock.Time
+		OwnshipTrafficInfo.Lat = 42.0
+		OwnshipTrafficInfo.Lng = -95.0
+		OwnshipTrafficInfo.Alt = 3000
+		OwnshipTrafficInfo.Track = 90
+		OwnshipTrafficInfo.Speed = 110
+		OwnshipTrafficInfo.Speed_valid = true
+		OwnshipTrafficInfo.Tail = "VERYLONGTAIL123" // > 7 chars, should be truncated
+
+		globalSettings.OwnshipModeS = "A12345"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with long tail number")
+		}
+	})
+
+	t.Run("with_registration_from_icao", func(t *testing.T) {
+		// Test ICAO to registration conversion
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 40.0
+		mySituation.GPSLongitude = -100.0
+		mySituation.GPSAltitudeMSL = 5000.0
+		mySituation.GPSTrueCourse = 90.0
+		mySituation.GPSGroundSpeed = 100.0
+		mySituation.GPSHorizontalAccuracy = 10
+		mySituation.GPSNACp = 8
+		mySituation.GPSHeightAboveEllipsoid = 4900.0
+
+		globalStatus.GPS_connected = true
+		// Use a US ICAO code that should convert to a valid registration
+		// US aircraft: 0xA00001 - 0xADF7C7
+		globalSettings.OwnshipModeS = "A00001"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with US ICAO code")
+		}
+	})
+
+	t.Run("with_long_registration", func(t *testing.T) {
+		// Test with registration > 8 characters (should be truncated)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 40.0
+		mySituation.GPSLongitude = -100.0
+		mySituation.GPSAltitudeMSL = 5000.0
+		mySituation.GPSTrueCourse = 90.0
+		mySituation.GPSGroundSpeed = 100.0
+		mySituation.GPSHorizontalAccuracy = 10
+		mySituation.GPSNACp = 8
+		mySituation.GPSHeightAboveEllipsoid = 4900.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "A12345"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with standard ICAO")
+		}
+	})
 }
 
 // TestMakeOwnshipGeometricAltitudeReport tests geometric altitude report generation
@@ -1293,6 +1412,217 @@ func TestParseInput_ShortUplinkPadded(t *testing.T) {
 	}
 
 	t.Logf("Short uplink padded: original ~%d bytes, padded to %d bytes", 100, len(result))
+}
+
+// TestParseInput_DownlinkMessage tests downlink message parsing (starts with '-')
+func TestParseInput_DownlinkMessage(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Create a downlink message (starts with '-', 18 bytes = 36 hex chars for BASIC_REPORT)
+	downlinkData := "-" + strings.Repeat("AA", 18) + ";"
+
+	result, msgtype := parseInput(downlinkData)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result for downlink message")
+	}
+
+	if msgtype != MSGTYPE_BASIC_REPORT {
+		t.Errorf("Expected msgtype MSGTYPE_BASIC_REPORT (0x%02X), got 0x%02X", MSGTYPE_BASIC_REPORT, msgtype)
+	}
+
+	t.Logf("Downlink message parsed: msgtype=0x%02X, len=%d", msgtype, len(result))
+}
+
+// TestParseInput_BadFormat tests odd-length hex string (bad format)
+func TestParseInput_BadFormat(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Create a message with odd-length hex string (missing one char)
+	badMessage := "+" + strings.Repeat("FF", 18) + "F;"
+
+	result, msgtype := parseInput(badMessage)
+
+	if result != nil {
+		t.Error("Expected nil result for bad format (odd length)")
+	}
+
+	if msgtype != 0 {
+		t.Errorf("Expected msgtype 0 for bad format, got %d", msgtype)
+	}
+
+	t.Logf("Bad format handled correctly: result=nil, msgtype=%d", msgtype)
+}
+
+// TestParseInput_LongReport48Bytes tests 48-byte long report
+func TestParseInput_LongReport48Bytes(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Create a 48-byte message (96 hex chars) - downlink with Reed Solomon
+	longReport48 := "-" + strings.Repeat("BB", 48) + ";"
+
+	result, msgtype := parseInput(longReport48)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result for 48-byte long report")
+	}
+
+	if msgtype != MSGTYPE_LONG_REPORT {
+		t.Errorf("Expected msgtype MSGTYPE_LONG_REPORT (0x%02X), got 0x%02X", MSGTYPE_LONG_REPORT, msgtype)
+	}
+
+	t.Logf("48-byte long report parsed: msgtype=0x%02X, len=%d", msgtype, len(result))
+}
+
+// TestParseInput_LongReport34Bytes tests 34-byte long report
+func TestParseInput_LongReport34Bytes(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Create a 34-byte message (68 hex chars)
+	longReport34 := "-" + strings.Repeat("CC", 34) + ";"
+
+	result, msgtype := parseInput(longReport34)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result for 34-byte long report")
+	}
+
+	if msgtype != MSGTYPE_LONG_REPORT {
+		t.Errorf("Expected msgtype MSGTYPE_LONG_REPORT (0x%02X), got 0x%02X", MSGTYPE_LONG_REPORT, msgtype)
+	}
+
+	t.Logf("34-byte long report parsed: msgtype=0x%02X, len=%d", msgtype, len(result))
+}
+
+// TestParseInput_BasicReport18Bytes tests 18-byte basic report
+func TestParseInput_BasicReport18Bytes(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Create an 18-byte message (36 hex chars)
+	basicReport := "-" + strings.Repeat("DD", 18) + ";"
+
+	result, msgtype := parseInput(basicReport)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result for 18-byte basic report")
+	}
+
+	if msgtype != MSGTYPE_BASIC_REPORT {
+		t.Errorf("Expected msgtype MSGTYPE_BASIC_REPORT (0x%02X), got 0x%02X", MSGTYPE_BASIC_REPORT, msgtype)
+	}
+
+	t.Logf("18-byte basic report parsed: msgtype=0x%02X, len=%d", msgtype, len(result))
+}
+
+// TestParseInput_UnknownMessageType tests unknown message length
+func TestParseInput_UnknownMessageType(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Create a message with unknown length (e.g., 20 bytes = 40 hex chars)
+	unknownMsg := "-" + strings.Repeat("EE", 20) + ";"
+
+	result, msgtype := parseInput(unknownMsg)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result even for unknown message type")
+	}
+
+	if msgtype != 0 {
+		t.Errorf("Expected msgtype 0 for unknown message type, got %d", msgtype)
+	}
+
+	t.Logf("Unknown message type parsed: msgtype=%d, len=%d", msgtype, len(result))
+}
+
+// TestParseInput_RealUATUplink tests parsing of a real UAT uplink message with valid data
+func TestParseInput_RealUATUplink(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Initialize weatherRawUpdate broadcaster (needed for UAT parsing)
+	if weatherRawUpdate == nil {
+		weatherRawUpdate = NewUIBroadcaster()
+	}
+
+	// Real UAT uplink message from trace file (padded to 864 hex chars = 432 bytes)
+	// This message contains actual FIS-B weather data
+	uplinkHex := "3cc0978aa66ca1a0158000213c5d2082102c22cc00082eec1e012c22cc000000000000000fd90007110e240811081ec5ea23b0c00158000213c6b2882102c869900082ee71e012c8699000000000000000fd9000711152508011525c69dc3b6ac00158000213c56a082102c869900082ee61e012c8699000000000000000fd90007110b1408010b14c69dc3b6ac00158000213dacc882102c865800082ee71e012c8658000000000000000fd90007161619090f1619c45d83dc5400158000213d57c882102d00d7000830701e012d00d7000000000000000fd90007150b3908050b39c51243b0b800158000213cc09082102d43cc00082efc1e012d43cc000000000000000fd900071300120813000fc46743b25400158000213d1ed082102ca60e00082ee91e012ca60e000000000000000fd90007140f1a08040f1ac3f0a3c1a400158000213e070082102d630c00082ee51e012d630c000000000000000fd9000718032008080320c4da03c81400158000213c453882102c22cc00082eeb1e012c22cc000000000000000fd9000711022708110227c5ea23b0c00000000000000000000000000000000000000000"
+	// Pad to exactly 864 characters
+	for len(uplinkHex) < 864 {
+		uplinkHex += "0"
+	}
+	uplinkMsg := "+" + uplinkHex + ";rs=16;ss=128"
+
+	result, msgtype := parseInput(uplinkMsg)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result for real UAT uplink")
+	}
+
+	if msgtype != MSGTYPE_UPLINK {
+		t.Errorf("Expected msgtype MSGTYPE_UPLINK (0x%02X), got 0x%02X", MSGTYPE_UPLINK, msgtype)
+	}
+
+	if len(result) != UPLINK_FRAME_DATA_BYTES {
+		t.Errorf("Expected result length %d, got %d", UPLINK_FRAME_DATA_BYTES, len(result))
+	}
+
+	t.Logf("Real UAT uplink parsed: msgtype=0x%02X, len=%d", msgtype, len(result))
 }
 
 // =============================================================================

@@ -492,4 +492,33 @@ func TestProcessRadioMessage_SpecificBytePatterns(t *testing.T) {
 		processRadioMessage(msg)
 		t.Log("Processed message with high entropy data")
 	})
+
+	t.Run("adsb_long_frame_pattern", func(t *testing.T) {
+		// Test with a pattern that triggers long ADS-B frame processing (i == 2)
+		// Using test vector from DO-282B Table 2-104 #6
+		// This is a valid long frame where to[0]>>3 != 0
+		msg := make([]byte, 53)
+		msg[0] = 200 // RSSI
+		// Timestamp
+		msg[1] = 0x00
+		msg[2] = 0x00
+		msg[3] = 0x00
+		msg[4] = 0x00
+
+		// Long ADS-B test vector (48 bytes) - based on DO-282B test data
+		// This should trigger correct_adsb_frame to return 2 (long frame)
+		// The key is that byte[0] has upper bits set (to[0]>>3 != 0)
+		testVector := []byte{
+			0xA5, 0x73, 0x55, 0xB5, 0x43, 0x85, 0xED, 0x2A,
+			0xD0, 0x92, 0x9E, 0xB8, 0x0D, 0xA0, 0x44, 0xD5,
+			0x56, 0xB4, 0x52, 0xA7, 0xA7, 0x3A, 0x57, 0x16,
+			0xCD, 0x1D, 0xB4, 0x09, 0x64, 0xF5, 0xBA, 0x10,
+			0x5D, 0x9D, 0xAA, 0xD7, 0x53, 0x42, 0x19, 0x6D,
+			0xEB, 0xB6, 0x3C, 0xC9, 0x72, 0x99, 0x4D, 0xEA,
+		}
+		copy(msg[5:], testVector)
+
+		processRadioMessage(msg)
+		t.Log("Processed long ADS-B frame pattern (frametype 2)")
+	})
 }

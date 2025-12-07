@@ -1,6 +1,8 @@
 package main
 
 import (
+	"math"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -345,6 +347,105 @@ func TestUpdateMessageStats(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("adsb_tower_signal_strength_calculation", func(t *testing.T) {
+		ADSBTowerMutex.Lock()
+		ADSBTowers = make(map[string]ADSBTower)
+		ADSBTowerMutex.Unlock()
+
+		// First call to updateMessageStats to create tower with messages
+		msgLogMutex.Lock()
+		msgLog = []msg{
+			{
+				TimeReceived:     stratuxClock.Time,
+				MessageClass:     MSGCLASS_UAT,
+				ADSBTowerID:      "TOWER2",
+				Signal_strength:  -25.0,
+				Signal_amplitude: 200,
+				uatMsg:           &uatparse.UATMsg{Lat: 41.0, Lon: -76.0},
+			},
+			{
+				TimeReceived:     stratuxClock.Time,
+				MessageClass:     MSGCLASS_UAT,
+				ADSBTowerID:      "TOWER2",
+				Signal_strength:  -30.0,
+				Signal_amplitude: 300,
+				uatMsg:           &uatparse.UATMsg{Lat: 41.0, Lon: -76.0},
+			},
+		}
+		msgLogMutex.Unlock()
+
+		updateMessageStats()
+
+		// Verify tower was created with stats
+		ADSBTowerMutex.Lock()
+		tower, exists := ADSBTowers["TOWER2"]
+		ADSBTowerMutex.Unlock()
+
+		if !exists {
+			t.Fatal("Expected tower TOWER2 to be created")
+		}
+
+		// Verify the signal strength calculation (else branch at line 964)
+		// Signal_strength_last_minute should be calculated as:
+		// 10 * (math.Log10(float64((Energy_last_minute / Messages_last_minute))) - 6)
+		expectedEnergy := uint64(200*200 + 300*300) // 40000 + 90000 = 130000
+		expectedMessages := uint64(2)
+		expectedAvgPower := float64(expectedEnergy / expectedMessages) // 65000
+		expectedSignalStrength := 10 * (math.Log10(expectedAvgPower) - 6)
+
+		if tower.Messages_last_minute != 2 {
+			t.Errorf("Expected tower Messages_last_minute=2, got %d", tower.Messages_last_minute)
+		}
+		if tower.Energy_last_minute != expectedEnergy {
+			t.Errorf("Expected tower Energy_last_minute=%d, got %d", expectedEnergy, tower.Energy_last_minute)
+		}
+		if tower.Signal_strength_last_minute != expectedSignalStrength {
+			t.Errorf("Expected tower Signal_strength_last_minute=%f, got %f", expectedSignalStrength, tower.Signal_strength_last_minute)
+		}
+	})
+
+	t.Run("adsb_tower_zero_messages_or_energy", func(t *testing.T) {
+		// Test the case where Messages_last_minute == 0 or Energy_last_minute == 0
+		// This should trigger the -999 signal strength (line 962)
+		ADSBTowerMutex.Lock()
+		ADSBTowers = map[string]ADSBTower{
+			"TOWER_ZERO": {
+				Lat:                         42.0,
+				Lng:                         -77.0,
+				Messages_last_minute:        5,
+				Energy_last_minute:          50000,
+				Signal_strength_last_minute: -20.0,
+			},
+		}
+		ADSBTowerMutex.Unlock()
+
+		// Clear message log so tower gets zero messages this minute
+		msgLogMutex.Lock()
+		msgLog = []msg{}
+		msgLogMutex.Unlock()
+
+		updateMessageStats()
+
+		ADSBTowerMutex.Lock()
+		tower, exists := ADSBTowers["TOWER_ZERO"]
+		ADSBTowerMutex.Unlock()
+
+		if !exists {
+			t.Fatal("Expected tower TOWER_ZERO to still exist")
+		}
+
+		// After updateMessageStats with no messages, the tower should have zero stats
+		if tower.Messages_last_minute != 0 {
+			t.Errorf("Expected tower Messages_last_minute=0, got %d", tower.Messages_last_minute)
+		}
+		if tower.Energy_last_minute != 0 {
+			t.Errorf("Expected tower Energy_last_minute=0, got %d", tower.Energy_last_minute)
+		}
+		if tower.Signal_strength_last_minute != -999 {
+			t.Errorf("Expected tower Signal_strength_last_minute=-999 (no data), got %f", tower.Signal_strength_last_minute)
+		}
+	})
 }
 
 // TestUpdateStatus tests the GPS status string generation
@@ -431,4 +532,137 @@ func TestUpdateStatus_Disconnected(t *testing.T) {
 	if globalStatus.GPS_solution != "Disconnected" {
 		t.Errorf("Expected GPS_solution='Disconnected' when GPS_connected=false, got %q", globalStatus.GPS_solution)
 	}
+}
+
+// TestUpdateStatus_AHRSLogFiles tests AHRS log file scanning with sensor files in /var/log
+// To achieve 100% coverage, run:
+//   sudo bash run_coverage_test.sh
+func TestUpdateStatus_AHRSLogFiles(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if Satellites == nil {
+		Satellites = make(map[string]SatelliteInfo)
+	}
+
+	// Set GPS as connected
+	globalStatus.GPS_connected = true
+	mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+	mySituation.GPSFixQuality = 1
+
+	// Create test sensor log files in /var/log
+	testFiles := []string{
+		"/var/log/sensors_test_coverage1.csv",
+		"/var/log/sensors_test_coverage2.csv",
+	}
+
+	filesCreatedByUs := false
+
+	// Try to create test files - skip test if we don't have permission
+	// But don't skip if files already exist (may have been created by setup script)
+	for _, fname := range testFiles {
+		content := []byte("timestamp,accel_x,accel_y,accel_z\n1234567890,0.1,0.2,0.3\n")
+		if err := os.WriteFile(fname, content, 0644); err != nil {
+			// Check if files exist anyway (created by external setup script)
+			if _, statErr := os.Stat(fname); statErr == nil {
+				t.Logf("Using pre-existing test file: %s", fname)
+				continue
+			}
+			// Can't write and files don't exist - skip this test
+			t.Skipf("Skipping test - cannot write to /var/log: %v (Hint: run 'sudo bash run_coverage_test.sh' for 100%% coverage)", err)
+			return
+		}
+		filesCreatedByUs = true
+	}
+
+	// Clean up test files when done (only if we created them)
+	if filesCreatedByUs {
+		defer func() {
+			for _, fname := range testFiles {
+				os.Remove(fname)
+			}
+		}()
+	}
+
+	// Record initial size
+	sizeBefore := globalStatus.AHRS_LogFiles_Size
+
+	// Call updateStatus - it will scan /var/log for sensors_*.csv files
+	updateStatus()
+
+	// Verify the size increased (our test files should be counted)
+	// The size should include our test files
+	expectedMinSize := int64(len("timestamp,accel_x,accel_y,accel_z\n1234567890,0.1,0.2,0.3\n") * 2)
+	if globalStatus.AHRS_LogFiles_Size < expectedMinSize {
+		t.Errorf("Expected AHRS_LogFiles_Size to be at least %d (our test files), got %d",
+			expectedMinSize, globalStatus.AHRS_LogFiles_Size)
+	}
+
+	t.Logf("AHRS_LogFiles_Size: before=%d, after=%d (expected at least %d from test files)",
+		sizeBefore, globalStatus.AHRS_LogFiles_Size, expectedMinSize)
+}
+
+// TestUpdateStatus_CompleteCoverage tests all remaining code paths in updateStatus
+func TestUpdateStatus_CompleteCoverage(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if Satellites == nil {
+		Satellites = make(map[string]SatelliteInfo)
+	}
+
+	t.Run("AHRS log files scanning without root", func(t *testing.T) {
+		// Set GPS as connected
+		globalStatus.GPS_connected = true
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+		mySituation.GPSFixQuality = 1
+
+		// This tests the AHRS log file scanning code (lines 1011-1021)
+		// Even without sensor files, the code should execute without error
+		// and set AHRS_LogFiles_Size to 0 or the sum of any existing files
+		sizeBefore := globalStatus.AHRS_LogFiles_Size
+
+		updateStatus()
+
+		// AHRS_LogFiles_Size should be set (even if to 0)
+		// The important thing is that the code path executes without panic
+		if globalStatus.AHRS_LogFiles_Size < 0 {
+			t.Errorf("AHRS_LogFiles_Size should not be negative, got %d", globalStatus.AHRS_LogFiles_Size)
+		}
+
+		// The value might be 0 or might include existing sensor files
+		t.Logf("AHRS_LogFiles_Size before=%d, after=%d", sizeBefore, globalStatus.AHRS_LogFiles_Size)
+	})
+
+	t.Run("isGPSConnected false path", func(t *testing.T) {
+		// Set GPS_connected to true but make isGPSConnected() return false
+		// by setting an old NMEA message time
+		globalStatus.GPS_connected = true
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time.Add(-10 * time.Minute)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSSatellites = 5
+		mySituation.GPSSatellitesSeen = 10
+		mySituation.GPSSatellitesTracked = 8
+
+		updateStatus()
+
+		// Should detect disconnection via isGPSConnected()
+		if globalStatus.GPS_solution != "Disconnected" {
+			t.Errorf("Expected GPS_solution='Disconnected' when isGPSConnected() returns false, got %q", globalStatus.GPS_solution)
+		}
+		if globalStatus.GPS_connected != false {
+			t.Errorf("Expected GPS_connected=false after disconnect detection")
+		}
+		if mySituation.GPSSatellites != 0 {
+			t.Errorf("Expected GPSSatellites reset to 0, got %d", mySituation.GPSSatellites)
+		}
+	})
 }

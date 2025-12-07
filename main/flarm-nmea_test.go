@@ -1181,13 +1181,50 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 			expectPositionValid:   true,
 			expectChecksumPresent: true,
 		},
+		{
+			name: "DEBUG mode enabled - logs traffic info",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				defer mySituation.muGPS.Unlock()
+				mySituation.muBaro.Lock()
+				defer mySituation.muBaro.Unlock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSFixQuality = 1
+				mySituation.BaroPressureAltitude = 1000.0
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			},
+			ti: TrafficInfo{
+				Icao_addr:        0xDEB001,
+				Addr_type:        0,
+				Tail:             "TESTAC",
+				Lat:              47.005,
+				Lng:              -122.005,
+				Alt:              1000,
+				Track:            180.0,
+				Speed:            100,
+				Speed_valid:      true,
+				Vvel:             0,
+				Emitter_category: 1,
+				Position_valid:   true,
+			},
+			expectValid:           true,
+			expectAlarmLevel:      3,
+			expectPositionValid:   true,
+			expectChecksumPresent: true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup
 			tc.setupSituation()
-			globalSettings.DEBUG = false
+			// Enable DEBUG mode for the specific test case
+			if tc.name == "DEBUG mode enabled - logs traffic info" {
+				globalSettings.DEBUG = true
+			} else {
+				globalSettings.DEBUG = false
+			}
 
 			// Call function
 			msg, valid, alarmLevel := makeFlarmPFLAAString(tc.ti)

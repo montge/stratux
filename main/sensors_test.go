@@ -10,12 +10,15 @@
 	- makeOrientationQuaternion: Tests quaternion generation
 	- ResetAHRSGLoad: Tests G-load reset functionality
 	- updateExtraLogging: Tests logging data map updates
+	- getMinAccelDirection: Tests accelerometer axis detection (100% coverage)
 */
 
 package main
 
 import (
+	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/stratux/goflying/ahrs"
@@ -512,6 +515,173 @@ func TestResetAHRSGLoadExtreme(t *testing.T) {
 		}
 		if mySituation.AHRSGLoadMin != 1.2345 {
 			t.Errorf("Expected AHRSGLoadMin = 1.2345, got %f", mySituation.AHRSGLoadMin)
+		}
+	})
+}
+
+// mockIMUReaderForGetMinAccel is a mock IMU reader for testing getMinAccelDirection
+type mockIMUReaderForGetMinAccel struct {
+	a1, a2, a3  float64
+	shouldError bool
+}
+
+func (m *mockIMUReaderForGetMinAccel) Read() (T int64, G1, G2, G3, A1, A2, A3, M1, M2, M3 float64, GAError, MagError error) {
+	return 0, 0, 0, 0, m.a1, m.a2, m.a3, 0, 0, 0, nil, nil
+}
+
+func (m *mockIMUReaderForGetMinAccel) ReadOne() (T int64, G1, G2, G3, A1, A2, A3, M1, M2, M3 float64, GAError, MagError error) {
+	if m.shouldError {
+		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("test error"), nil
+	}
+	return 0, 0, 0, 0, m.a1, m.a2, m.a3, 0, 0, 0, nil, nil
+}
+
+func (m *mockIMUReaderForGetMinAccel) Close() {
+	// No-op for mock
+}
+
+// TestGetMinAccelDirection tests the getMinAccelDirection function
+func TestGetMinAccelDirection(t *testing.T) {
+	// Save original IMU reader
+	origIMUReader := myIMUReader
+	defer func() {
+		myIMUReader = origIMUReader
+	}()
+
+	t.Run("all_values_equal", func(t *testing.T) {
+		// Test the default case where all accelerometer values are equal
+		// This should trigger the error path (line 485)
+		mockIMU := &mockIMUReaderForGetMinAccel{a1: 1.0, a2: 1.0, a3: 1.0}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err == nil {
+			t.Error("Expected error when all accelerometer values are equal")
+		}
+		if !strings.Contains(err.Error(), "couldn't determine biggest accel") {
+			t.Errorf("Expected error message about biggest accel, got: %v", err)
+		}
+		if i != 0 {
+			t.Errorf("Expected i = 0 on error, got %d", i)
+		}
+	})
+
+	t.Run("two_values_tied_for_largest", func(t *testing.T) {
+		// Test the default case where two values are tied for largest
+		// This should trigger the error path because no single axis is dominant
+		mockIMU := &mockIMUReaderForGetMinAccel{a1: 9.8, a2: 9.8, a3: 0.1}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err == nil {
+			t.Error("Expected error when two accelerometer values are tied")
+		}
+		if !strings.Contains(err.Error(), "couldn't determine biggest accel") {
+			t.Errorf("Expected error message about biggest accel, got: %v", err)
+		}
+		if i != 0 {
+			t.Errorf("Expected i = 0 on error, got %d", i)
+		}
+	})
+
+	t.Run("read_error", func(t *testing.T) {
+		// Test error from IMU reader
+		mockIMU := &mockIMUReaderForGetMinAccel{shouldError: true}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err == nil {
+			t.Error("Expected error when IMU read fails")
+		}
+		if i != 0 {
+			t.Errorf("Expected i = 0 on error, got %d", i)
+		}
+	})
+
+	t.Run("a1_dominant_positive", func(t *testing.T) {
+		mockIMU := &mockIMUReaderForGetMinAccel{a1: 9.8, a2: 0.1, a3: 0.2}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if i != 1 {
+			t.Errorf("Expected i = 1, got %d", i)
+		}
+	})
+
+	t.Run("a1_dominant_negative", func(t *testing.T) {
+		mockIMU := &mockIMUReaderForGetMinAccel{a1: -9.8, a2: 0.1, a3: 0.2}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if i != -1 {
+			t.Errorf("Expected i = -1, got %d", i)
+		}
+	})
+
+	t.Run("a2_dominant_positive", func(t *testing.T) {
+		mockIMU := &mockIMUReaderForGetMinAccel{a1: 0.1, a2: 9.8, a3: 0.2}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if i != 2 {
+			t.Errorf("Expected i = 2, got %d", i)
+		}
+	})
+
+	t.Run("a2_dominant_negative", func(t *testing.T) {
+		mockIMU := &mockIMUReaderForGetMinAccel{a1: 0.1, a2: -9.8, a3: 0.2}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if i != -2 {
+			t.Errorf("Expected i = -2, got %d", i)
+		}
+	})
+
+	t.Run("a3_dominant_positive", func(t *testing.T) {
+		mockIMU := &mockIMUReaderForGetMinAccel{a1: 0.1, a2: 0.2, a3: 9.8}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if i != 3 {
+			t.Errorf("Expected i = 3, got %d", i)
+		}
+	})
+
+	t.Run("a3_dominant_negative", func(t *testing.T) {
+		mockIMU := &mockIMUReaderForGetMinAccel{a1: 0.1, a2: 0.2, a3: -9.8}
+		myIMUReader = mockIMU
+
+		i, err := getMinAccelDirection()
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if i != -3 {
+			t.Errorf("Expected i = -3, got %d", i)
 		}
 	})
 }

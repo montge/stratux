@@ -456,3 +456,24 @@ func TestSetWifiClientNetworks(t *testing.T) {
 		}
 	})
 }
+// TestApplyNetworkSettings tests the applyNetworkSettings function
+func TestApplyNetworkSettings(t *testing.T) {
+	origIPAddress := globalSettings.WiFiIPAddress
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiIPAddress = origIPAddress
+		hasChanged = origHasChanged
+	}()
+
+	t.Run("ip_in_dhcp_range", func(t *testing.T) {
+		hasChanged = false
+		globalSettings.WiFiIPAddress = "192.168.1.25"
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("onlyWriteFiles_true", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		applyNetworkSettings(false, true)
+	})
+}

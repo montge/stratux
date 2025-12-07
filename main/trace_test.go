@@ -536,48 +536,113 @@ func TestTraceLoggerOnTimestamp_AlreadyHasProperFilename(t *testing.T) {
 	t.Log("OnTimestamp with proper filename already set completed")
 }
 
-// TestTraceLoggerOnTimestamp_RenameSuccess tests OnTimestamp with successful rename
-func TestTraceLoggerOnTimestamp_RenameSuccess(t *testing.T) {
+// TestTraceLoggerOnTimestamp_RenameSuccessPath tests OnTimestamp when rename succeeds
+// This test requires write access to /var/log/stratux and will be skipped if not available.
+// In production environments (e.g., Raspberry Pi), this directory typically exists and is writable.
+// To run this test locally: sudo mkdir -p /var/log/stratux && sudo chmod 777 /var/log/stratux
+func TestTraceLoggerOnTimestamp_RenameSuccessPath(t *testing.T) {
 	// Save original state
 	origTraceLog := saveTraceLogState()
 
-	// Create temp directory for test files
-	tmpDir := t.TempDir()
-	originalFile := filepath.Join(tmpDir, "temp_trace.txt.gz")
+	// Try to create /var/log/stratux directory
+	// This test may be skipped if running without appropriate permissions
+	stratuxLogDir := "/var/log/stratux"
+	dirExistedBefore := false
+	if _, err := os.Stat(stratuxLogDir); err == nil {
+		dirExistedBefore = true
+		// Check if directory is writable
+		testFile := filepath.Join(stratuxLogDir, ".test_write")
+		if f, err := os.Create(testFile); err != nil {
+			t.Skipf("Directory %s exists but is not writable: %v", stratuxLogDir, err)
+		} else {
+			f.Close()
+			os.Remove(testFile)
+		}
+	} else {
+		// Try to create it
+		err := os.MkdirAll(stratuxLogDir, 0777)
+		if err != nil {
+			t.Skipf("Cannot create %s directory: %v (test requires write permissions to /var/log)", stratuxLogDir, err)
+		}
+		// Verify we can actually write to it
+		testFile := filepath.Join(stratuxLogDir, ".test_write")
+		if f, err := os.Create(testFile); err != nil {
+			os.RemoveAll(stratuxLogDir)
+			t.Skipf("Created %s but cannot write to it: %v", stratuxLogDir, err)
+		} else {
+			f.Close()
+			os.Remove(testFile)
+		}
+	}
+
+	// Only remove directory if we created it
+	if !dirExistedBefore {
+		defer os.RemoveAll(stratuxLogDir)
+	}
+
+	// Create a temp file in /var/log/stratux with a unique name
+	originalFile := filepath.Join(stratuxLogDir, "temp_test_trace_"+time.Now().Format("20060102150405")+".txt.gz")
 
 	// Create the original file
 	fh, err := os.Create(originalFile)
 	if err != nil {
-		t.Fatalf("Failed to create original file: %v", err)
+		if !dirExistedBefore {
+			os.RemoveAll(stratuxLogDir)
+		}
+		t.Fatalf("Cannot create test file in %s: %v", stratuxLogDir, err)
 	}
+
+	// Close the file so it can be renamed
 	fh.Close()
 
-	// Create a TraceLogger with a file handle
-	// We need to reopen the file for the test
+	// Reopen for the test
 	fh, err = os.OpenFile(originalFile, os.O_RDWR, 0644)
 	if err != nil {
-		t.Fatalf("Failed to open original file: %v", err)
+		os.Remove(originalFile)
+		if !dirExistedBefore {
+			os.RemoveAll(stratuxLogDir)
+		}
+		t.Fatalf("Failed to reopen original file: %v", err)
 	}
 
 	setTraceLogForTest(fh, nil, nil, originalFile, false)
 	TraceLog.hasProperFilename = false
 
 	ts := time.Date(2024, 1, 15, 12, 30, 0, 0, time.UTC)
+	expectedNewName := filepath.Join(stratuxLogDir, ts.Format(time.RFC3339)+"_trace.txt.gz")
+
 	TraceLog.OnTimestamp(ts)
 
-	// hasProperFilename should be set to true regardless of rename outcome
+	// Close file handle before checking results
+	fh.Close()
+
+	// hasProperFilename should be set to true
 	if !TraceLog.hasProperFilename {
 		t.Error("hasProperFilename should be true after OnTimestamp")
 	}
 
-	// The rename will fail because the target directory /var/log/stratux doesn't exist,
-	// but the function should still complete
-	fh.Close()
+	// Check if rename succeeded
+	if TraceLog.fileName == expectedNewName {
+		// Rename succeeded - verify the file exists at new location
+		if _, err := os.Stat(expectedNewName); err == nil {
+			t.Log("OnTimestamp successfully renamed file (err == nil path covered)")
+			os.Remove(expectedNewName)
+		} else {
+			t.Errorf("fileName was updated but renamed file doesn't exist: %v", err)
+		}
+		// Original file should not exist anymore
+		if _, err := os.Stat(originalFile); err == nil {
+			t.Error("Original file still exists after successful rename")
+			os.Remove(originalFile)
+		}
+	} else {
+		// Rename failed - file should still be at original location
+		t.Logf("OnTimestamp attempted rename but kept original filename (rename failed): %s", TraceLog.fileName)
+		os.Remove(originalFile)
+	}
 
 	// Restore original
 	restoreTraceLogState(origTraceLog)
-
-	t.Log("OnTimestamp with file handle completed (rename attempted)")
 }
 
 // TestTraceLoggerOnTimestamp_RenameFail tests OnTimestamp when rename fails
@@ -987,4 +1052,21 @@ func TestTraceLoggerFlush_AfterClose(t *testing.T) {
 	restoreTraceLogState(origTraceLog)
 
 	t.Log("Flush after close completed without panic")
+}
+
+// TestOnTimestamp is a comprehensive test suite for the OnTimestamp function
+// It runs all test cases to achieve maximum coverage
+func TestOnTimestamp(t *testing.T) {
+	t.Run("NoFileHandle", func(t *testing.T) {
+		TestTraceLoggerOnTimestamp_NoFileHandle(t)
+	})
+	t.Run("AlreadyHasProperFilename", func(t *testing.T) {
+		TestTraceLoggerOnTimestamp_AlreadyHasProperFilename(t)
+	})
+	t.Run("RenameSuccessPath", func(t *testing.T) {
+		TestTraceLoggerOnTimestamp_RenameSuccessPath(t)
+	})
+	t.Run("RenameFail", func(t *testing.T) {
+		TestTraceLoggerOnTimestamp_RenameFail(t)
+	})
 }

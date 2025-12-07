@@ -709,3 +709,182 @@ func TestParseFlarmPFLAA_NonICAOType(t *testing.T) {
 
 	t.Log("PFLAA non-ICAO ID type test complete")
 }
+
+// TestParseFlarmPFLAU_ShortMessage tests PFLAU with fewer than 11 fields
+func TestParseFlarmPFLAU_ShortMessage(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTrueCourse = 90.0
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+	initialCount := len(traffic)
+	trafficMutex.Unlock()
+
+	// Test with only 10 fields (missing ID) - should be ignored
+	pflauMsg := []string{"$PFLAU", "1", "1", "2", "1", "0", "45", "0", "100", "500"}
+	parseFlarmPFLAU(pflauMsg)
+
+	// Verify no traffic was added
+	trafficMutex.Lock()
+	if len(traffic) != initialCount {
+		t.Error("Traffic should not be added for PFLAU with fewer than 11 fields")
+	}
+	trafficMutex.Unlock()
+
+	t.Log("PFLAU short message test complete")
+}
+
+// TestParseFlarmPFLAU_EmptyFields tests PFLAU with empty required fields
+func TestParseFlarmPFLAU_EmptyFields(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTrueCourse = 90.0
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+	trafficMutex.Unlock()
+
+	// Test with empty ID field (message[10])
+	pflauMsg1 := []string{"$PFLAU", "1", "1", "2", "1", "0", "45", "0", "100", "500", ""}
+	parseFlarmPFLAU(pflauMsg1)
+
+	trafficMutex.Lock()
+	if len(traffic) > 0 {
+		t.Error("Traffic should not be added for PFLAU with empty ID field")
+	}
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// Test with empty RelativeDistance field (message[9])
+	pflauMsg2 := []string{"$PFLAU", "1", "1", "2", "1", "0", "45", "0", "100", "", "ABCDEF"}
+	parseFlarmPFLAU(pflauMsg2)
+
+	trafficMutex.Lock()
+	if len(traffic) > 0 {
+		t.Error("Traffic should not be added for PFLAU with empty RelativeDistance field")
+	}
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// Test with empty RelativeVertical field (message[8])
+	pflauMsg3 := []string{"$PFLAU", "1", "1", "2", "1", "0", "45", "0", "", "500", "ABCDEF"}
+	parseFlarmPFLAU(pflauMsg3)
+
+	trafficMutex.Lock()
+	if len(traffic) > 0 {
+		t.Error("Traffic should not be added for PFLAU with empty RelativeVertical field")
+	}
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// Test with empty RelativeBearing field (message[6])
+	pflauMsg4 := []string{"$PFLAU", "1", "1", "2", "1", "0", "", "0", "100", "500", "ABCDEF"}
+	parseFlarmPFLAU(pflauMsg4)
+
+	trafficMutex.Lock()
+	if len(traffic) > 0 {
+		t.Error("Traffic should not be added for PFLAU with empty RelativeBearing field")
+	}
+	trafficMutex.Unlock()
+
+	t.Log("PFLAU empty fields test complete")
+}
+
+// TestParseFlarmPFLAU_NoGPS tests PFLAU processing when GPS is invalid
+func TestParseFlarmPFLAU_NoGPS(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup INVALID GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 0
+	mySituation.GPSLongitude = 0
+	mySituation.GPSFixQuality = 0 // No fix
+	mySituation.GPSLastFixLocalTime = time.Time{} // Zero time
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = false
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+	trafficMutex.Unlock()
+
+	// Valid PFLAU message but no GPS - should return early
+	pflauMsg := []string{"$PFLAU", "1", "1", "2", "1", "0", "45", "0", "100", "500", "ABCDEF"}
+	parseFlarmPFLAU(pflauMsg)
+
+	// Verify no traffic was added
+	trafficMutex.Lock()
+	if len(traffic) > 0 {
+		t.Error("Traffic should not be added for PFLAU when GPS is invalid")
+	}
+	trafficMutex.Unlock()
+
+	t.Log("PFLAU no GPS test complete")
+}
+
+// TestParseFlarmPFLAU_TailFromMessage tests PFLAU with tail in ID field
+func TestParseFlarmPFLAU_TailFromMessage(t *testing.T) {
+	resetFlarmEdgeCaseState()
+
+	// Setup valid GPS
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 47.5
+	mySituation.GPSLongitude = 8.5
+	mySituation.GPSAltitudeMSL = 1000
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = time.Now()
+	mySituation.GPSTrueCourse = 90.0
+	mySituation.muGPS.Unlock()
+	globalStatus.GPS_connected = true
+
+	// Initialize traffic map
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+	trafficMutex.Unlock()
+
+	// Parse PFLAU message with tail in ID field (IDIDID!TAIL syntax)
+	pflauMsg := []string{"$PFLAU", "1", "1", "2", "1", "0", "45", "0", "100", "500", "ABCDEF!N12345"}
+	parseFlarmPFLAU(pflauMsg)
+
+	// Verify tail was set
+	trafficMutex.Lock()
+	found := false
+	for _, ti := range traffic {
+		if ti.Tail == "N12345" {
+			found = true
+			t.Logf("Traffic tail set from message: %s", ti.Tail)
+		}
+	}
+	trafficMutex.Unlock()
+
+	if !found {
+		t.Error("Expected to find traffic with tail from PFLAU message")
+	}
+
+	t.Log("PFLAU tail from message test complete")
+}

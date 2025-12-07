@@ -2279,3 +2279,145 @@ func TestParseDownlinkReport_ExistingTraffic(t *testing.T) {
 		t.Error("Existing traffic not found after update")
 	}
 }
+
+// TestParseDownlinkReport_DisplayTrafficSourceEmptyTail tests DisplayTrafficSource with empty tail
+// This covers the first branch in DisplayTrafficSource logic (traffic.go:861-863)
+func TestParseDownlinkReport_DisplayTrafficSourceEmptyTail(t *testing.T) {
+	resetUATDownlinkState()
+
+	origDisplayTrafficSource := globalSettings.DisplayTrafficSource
+	defer func() {
+		globalSettings.DisplayTrafficSource = origDisplayTrafficSource
+	}()
+
+	globalSettings.DisplayTrafficSource = true
+
+	// Build a UAT message without setting callsign (CSID=0, no squawk in v1)
+	// This will result in an empty tail
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0 // msg_type=1, addr_type=0 (ADS-B)
+	frame[1] = 0x12
+	frame[2] = 0x34
+	frame[3] = 0x56
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(80)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x07
+
+	frame[12] = 0x00
+	// UAT version 1, CSID=0 (no callsign), so tail will be empty
+	frame[23] = (0 << 5) | (1 << 2) | 0x02 // version 1
+	frame[25] = 9 << 4
+	frame[26] = 0x00 // CSID=0
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0x123456]; ok {
+		// With DisplayTrafficSource and empty tail, should be "u" + type_code
+		// For addr_type=0 (ADS-B), type_code should be "a"
+		if ti.Tail != "ua" {
+			t.Errorf("Expected tail 'ua' for empty tail with DisplayTrafficSource, got '%s'", ti.Tail)
+		}
+		t.Logf("DisplayTrafficSource with empty tail: Tail='%s'", ti.Tail)
+	} else {
+		t.Error("Traffic not found for empty tail test")
+	}
+}
+
+// TestParseDownlinkReport_DisplayTrafficSourceWithPrefixedLongTail tests the final else-if branch
+// in DisplayTrafficSource logic (traffic.go:867-868). This targets tails that start with 'e' or 'u'
+// and are longer than 7 characters, which triggers the bounds checking fallback: ti.Tail[2:]
+func TestParseDownlinkReport_DisplayTrafficSourceWithPrefixedLongTail(t *testing.T) {
+	resetUATDownlinkState()
+
+	origDisplayTrafficSource := globalSettings.DisplayTrafficSource
+	defer func() {
+		globalSettings.DisplayTrafficSource = origDisplayTrafficSource
+	}()
+
+	globalSettings.DisplayTrafficSource = true
+
+	// Create traffic entry with tail longer than 7 characters that starts with 'e' or 'u'
+	// This is the key: tail must start with 'e' or 'u' AND be > 7 chars to hit line 868
+	trafficMutex.Lock()
+	traffic[0xABCDEF] = TrafficInfo{
+		Icao_addr: 0xABCDEF,
+		Tail:      "ea12345678", // 10 characters, starts with 'e'
+	}
+	trafficMutex.Unlock()
+
+	// Build a minimal UAT message for this ICAO
+	frame := make([]byte, 34)
+	frame[0] = (1 << 3) | 0 // msg_type=1, addr_type=0
+	frame[1] = 0xAB
+	frame[2] = 0xCD
+	frame[3] = 0xEF
+
+	// Valid position
+	raw_lat := uint32(4194304)
+	frame[4] = byte((raw_lat >> 15) & 0xFF)
+	frame[5] = byte((raw_lat >> 7) & 0xFF)
+	frame[6] = byte((raw_lat << 1) & 0xFE)
+
+	raw_lon := uint32(4194304)
+	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
+	frame[7] = byte((raw_lon >> 15) & 0xFF)
+	frame[8] = byte((raw_lon >> 7) & 0xFF)
+	frame[9] = byte((raw_lon << 1) & 0xFE)
+
+	raw_alt := uint16(80)
+	frame[10] = byte((raw_alt >> 4) & 0xFF)
+	frame[11] = byte((raw_alt&0x0F)<<4) | 0x07
+
+	frame[12] = 0x00
+	frame[23] = (0 << 5) | (2 << 2) | 0x02
+	frame[25] = 9 << 4
+
+	hexStr := "+"
+	for _, b := range frame {
+		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
+		hexStr += string("0123456789ABCDEF"[b&0x0F])
+	}
+
+	parseDownlinkReport(hexStr, 500)
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	if ti, ok := traffic[0xABCDEF]; ok {
+		// With DisplayTrafficSource, tail starting with 'e', and len > 7,
+		// should use the final else-if: "u" + type_code + tail[2:]
+		// Original: "ea12345678" (10 chars)
+		// Result: "ua" + "12345678" = "ua12345678" (10 chars)
+		if ti.Tail[0] != 'u' {
+			t.Errorf("Expected tail to start with 'u', got '%s'", ti.Tail)
+		}
+		if len(ti.Tail) < 3 {
+			t.Errorf("Expected tail to preserve characters after [2:], got '%s'", ti.Tail)
+		}
+		t.Logf("DisplayTrafficSource with prefixed long tail: original='ea12345678', result='%s'", ti.Tail)
+	} else {
+		t.Error("Traffic not found for prefixed long tail test")
+	}
+}

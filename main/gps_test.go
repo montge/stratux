@@ -815,9 +815,9 @@ func TestProcessNMEALine_GPGGA(t *testing.T) {
 			name:         "Valid GPGGA with GPS fix",
 			input:        "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*59",
 			expectUsed:   true,
-			expectLat:    48.1173,   // 48° 07.038' = 48 + 7.038/60
-			expectLon:    11.51667,  // 11° 31.000' = 11 + 31/60
-			expectAlt:    1789.37,   // 545.4m * 3.28084 ft/m (MSL altitude, includes geoid sep)
+			expectLat:    48.1173,  // 48° 07.038' = 48 + 7.038/60
+			expectLon:    11.51667, // 11° 31.000' = 11 + 31/60
+			expectAlt:    1789.37,  // 545.4m * 3.28084 ft/m (MSL altitude, includes geoid sep)
 			expectFixQty: 1,
 		},
 		{
@@ -826,7 +826,7 @@ func TestProcessNMEALine_GPGGA(t *testing.T) {
 			expectUsed:   true,
 			expectLat:    48.1173,
 			expectLon:    11.51667,
-			expectAlt:    1789.37,   // includes geoid separation
+			expectAlt:    1789.37, // includes geoid separation
 			expectFixQty: 1,
 		},
 		{
@@ -953,12 +953,12 @@ func TestProcessNMEALine_GPRMC(t *testing.T) {
 			expectCourse: 84.4,
 		},
 		{
-			name:         "Valid GNRMC variant",
-			input:        "$GNRMC,081836.0,A,3751.65,S,14507.36,E,000.0,360.0,130998,011.3,E*62",
-			expectUsed:   true,
-			expectLat:    -37.86083, // South is negative
-			expectLon:    145.1227,
-			expectSpeed:  0.0,
+			name:        "Valid GNRMC variant",
+			input:       "$GNRMC,081836.0,A,3751.65,S,14507.36,E,000.0,360.0,130998,011.3,E*62",
+			expectUsed:  true,
+			expectLat:   -37.86083, // South is negative
+			expectLon:   145.1227,
+			expectSpeed: 0.0,
 			// Course not updated when speed < 3
 		},
 		{
@@ -1017,6 +1017,260 @@ func TestProcessNMEALine_GPRMC(t *testing.T) {
 					mySituation.GPSGroundSpeed, mySituation.GPSTrueCourse)
 			}
 		})
+	}
+}
+
+// TestProcessNMEALine_AdditionalBranches tests additional branches for improved coverage
+func TestProcessNMEALine_AdditionalBranches(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	// Save original state
+	origGPSType := globalStatus.GPS_detected_type
+	origSatellites := Satellites
+	origDebug := globalSettings.DEBUG
+	defer func() {
+		globalStatus.GPS_detected_type = origGPSType
+		Satellites = origSatellites
+		globalSettings.DEBUG = origDebug
+	}()
+
+	// Test GSA with UBX9 and SBAS fix for specific accuracy calculation
+	globalStatus.GPS_detected_type = GPS_TYPE_UBX9
+	mySituation.GPSFixQuality = 2
+	mySituation.GPSLastAccuracyTime = time.Time{}
+	Satellites = make(map[string]SatelliteInfo)
+	result := processNMEALine("$GPGSA,A,3,04,05,09,12,,,,,,,,,2.5,1.3,2.1*3F")
+	if !result {
+		t.Error("Expected GPGSA with UBX9 SBAS to be processed")
+	}
+
+	// Test GSA with UBX10 and non-SBAS fix
+	globalStatus.GPS_detected_type = GPS_TYPE_UBX10
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastAccuracyTime = time.Time{}
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSA,A,3,04,05,09,12,,,,,,,,,2.5,1.4,2.2*3B")
+	if !result {
+		t.Error("Expected GPGSA with UBX10 non-SBAS to be processed")
+	}
+
+	// Test PGRMZ with meters
+	globalStatus.GPS_detected_type = GPS_TYPE_SOFTRF
+	mySituation.BaroPressureAltitude = 0
+	mySituation.BaroSourceType = 0
+	result = processNMEALine("$PGRMZ,500,m,3*15")
+	if !result {
+		t.Error("Expected PGRMZ with meters to be processed")
+	}
+
+	// Test POGNB message
+	mySituation.BaroPressureAltitude = 0
+	mySituation.BaroSourceType = 0
+	result = processNMEALine("$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,-0.04,+32.6,*6B")
+	if !result {
+		t.Error("Expected POGNB to be processed")
+	}
+
+	// Test GSV with SBAS satellite with high signal
+	Satellites = make(map[string]SatelliteInfo)
+	mySituation.GPSFixQuality = 2
+	result = processNMEALine("$GPGSV,1,1,01,33,45,123,25*4E")
+	if !result {
+		t.Error("Expected GPGSV with SBAS to be processed")
+	}
+
+	// Test GSV with signal > 0 for TimeLastSeen update
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSV,1,1,01,15,45,123,35*4B")
+	if !result {
+		t.Error("Expected GPGSV with signal > 0 to be processed")
+	}
+
+	// Test GSV with Beidou satellite
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSV,1,1,01,410,30,090,22*77")
+	if !result {
+		t.Error("Expected GPGSV with Beidou to be processed")
+	}
+
+	// Test GSV with Galileo satellite
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSV,1,1,01,315,40,180,28*78")
+	if !result {
+		t.Error("Expected GPGSV with Galileo to be processed")
+	}
+
+	// Test GPRMC with short date field
+	result = processNMEALine("$GPRMC,123519.0,A,4807.038,N,01131.000,E,022.4,084.4,2303,003.1,W*79")
+	if !result {
+		t.Error("Expected GPRMC with short date to be processed")
+	}
+
+	// Test GSA with pre-existing satellite
+	globalStatus.GPS_detected_type = GPS_TYPE_UBX8
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastAccuracyTime = time.Time{}
+	Satellites = make(map[string]SatelliteInfo)
+	Satellites["G4"] = SatelliteInfo{
+		SatelliteID:   "G4",
+		SatelliteNMEA: 4,
+		Type:          SAT_TYPE_GPS,
+	}
+	result = processNMEALine("$GPGSA,A,3,04,05,09,12,,,,,,,,,2.5,1.5,2.2*3A")
+	if !result {
+		t.Error("Expected GPGSA with existing satellite to be processed")
+	}
+
+	// Test GSV with pre-existing satellite
+	Satellites = make(map[string]SatelliteInfo)
+	Satellites["G20"] = SatelliteInfo{
+		SatelliteID:   "G20",
+		SatelliteNMEA: 20,
+		Type:          SAT_TYPE_GPS,
+	}
+	result = processNMEALine("$GPGSV,1,1,01,20,50,200,30*4E")
+	if !result {
+		t.Error("Expected GPGSV with existing satellite to be processed")
+	}
+
+	// Test GSV with DEBUG mode
+	globalSettings.DEBUG = true
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSV,1,1,01,25,60,270,40*48")
+	if !result {
+		t.Error("Expected GPGSV with DEBUG to be processed")
+	}
+	globalSettings.DEBUG = false
+
+	// Test all other GPS types for GSA accuracy calculations
+	globalStatus.GPS_detected_type = GPS_TYPE_UBX8
+	mySituation.GPSFixQuality = 2
+	mySituation.GPSLastAccuracyTime = time.Time{}
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSA,A,3,04,05,09,12,,,,,,,,,2.5,1.6,2.4*3F")
+	if !result {
+		t.Error("Expected GPGSA with UBX8 SBAS to be processed")
+	}
+
+	globalStatus.GPS_detected_type = GPS_TYPE_UBX9
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastAccuracyTime = time.Time{}
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSA,A,3,04,05,09,12,,,,,,,,,2.5,1.2,2.0*3F")
+	if !result {
+		t.Error("Expected GPGSA with UBX9 non-SBAS to be processed")
+	}
+
+	globalStatus.GPS_detected_type = GPS_TYPE_UBX8
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastAccuracyTime = time.Time{}
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSA,A,3,04,05,09,12,,,,,,,,,2.5,1.8,2.6*33")
+	if !result {
+		t.Error("Expected GPGSA with UBX8 non-SBAS to be processed")
+	}
+
+	// Test PGRMZ with different GPS types
+	globalStatus.GPS_detected_type = GPS_TYPE_SOFTRF_DONGLE
+	mySituation.BaroPressureAltitude = 0
+	mySituation.BaroSourceType = 0
+	result = processNMEALine("$PGRMZ,2500,f,3*2C")
+	if !result {
+		t.Error("Expected PGRMZ with SoftRF Dongle to be processed")
+	}
+
+	globalStatus.GPS_detected_type = GPS_TYPE_SERIAL
+	mySituation.BaroPressureAltitude = 0
+	mySituation.BaroSourceType = 0
+	result = processNMEALine("$PGRMZ,3000,f,3*28")
+	if !result {
+		t.Error("Expected PGRMZ with Serial GPS to be processed")
+	}
+
+	// Test GSV with various satellite types and conditions
+	Satellites = make(map[string]SatelliteInfo)
+	mySituation.GPSFixQuality = 2
+	result = processNMEALine("$GPGSV,1,1,01,152,40,180,28*79")
+	if !result {
+		t.Error("Expected GPGSV with SBAS 152-158 range to be processed")
+	}
+
+	Satellites = make(map[string]SatelliteInfo)
+	mySituation.GPSFixQuality = 2
+	result = processNMEALine("$GPGSV,1,1,01,193,50,090,30*7C")
+	if !result {
+		t.Error("Expected GPGSV with QZSS to be processed")
+	}
+
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GLGSV,1,1,01,70,45,123,25*55")
+	if !result {
+		t.Error("Expected GLGSV with GLONASS to be processed")
+	}
+
+	// Test GSV with low signal SBAS satellite
+	Satellites = make(map[string]SatelliteInfo)
+	mySituation.GPSFixQuality = 2
+	result = processNMEALine("$GPGSV,1,1,01,33,45,123,15*4D")
+	if !result {
+		t.Error("Expected GPGSV with low signal SBAS to be processed")
+	}
+
+	// Test GSV with SBAS and non-SBAS fix
+	Satellites = make(map[string]SatelliteInfo)
+	mySituation.GPSFixQuality = 1
+	result = processNMEALine("$GPGSV,1,1,01,33,45,123,25*4E")
+	if !result {
+		t.Error("Expected GPGSV with SBAS and non-SBAS fix to be processed")
+	}
+
+	// Test GSV with SBAS and fix quality 0
+	Satellites = make(map[string]SatelliteInfo)
+	mySituation.GPSFixQuality = 0
+	result = processNMEALine("$GPGSV,1,1,01,33,45,123,25*4E")
+	if !result {
+		t.Error("Expected GPGSV with SBAS and quality 0 to be processed")
+	}
+
+	// Test GSV with blank fields
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSV,1,1,01,05,45,123,*4C")
+	if !result {
+		t.Error("Expected GPGSV with blank signal to be processed")
+	}
+
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSV,1,1,01,10,,123,20*4B")
+	if !result {
+		t.Error("Expected GPGSV with blank elevation to be processed")
+	}
+
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSV,1,1,01,12,45,,22*7A")
+	if !result {
+		t.Error("Expected GPGSV with blank azimuth to be processed")
+	}
+
+	// Test GSV with unknown satellite type
+	Satellites = make(map[string]SatelliteInfo)
+	result = processNMEALine("$GPGSV,1,1,01,500,45,123,20*7E")
+	if !result {
+		t.Error("Expected GPGSV with unknown satellite type to be processed")
 	}
 }
 
@@ -1474,7 +1728,7 @@ func TestCalcGPSAttitude(t *testing.T) {
 		myGPSPerfStats = []gpsPerfStats{
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 0, coursef: 90.0, alt: 0},
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0}, // Same time
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 0, coursef: 90.0, alt: 0},       // Same time
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 0, coursef: 90.0, alt: 0},      // Same time
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0}, // Same time
 		}
 		result := calcGPSAttitude()
@@ -1502,7 +1756,7 @@ func TestCalcGPSAttitude(t *testing.T) {
 		myGPSPerfStats = []gpsPerfStats{
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // Same time
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},       // Same heading/time
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},      // Same heading/time
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
@@ -1805,6 +2059,7 @@ func TestCalcGPSAttitude(t *testing.T) {
 			myGPSPerfStats[idx].gpsTurnRate, myGPSPerfStats[idx].gpsLoadFactor)
 	})
 }
+
 // New tests at end of gps_test.go
 
 // TestProcessNMEALine_GPGSA tests GSA (satellite active) message parsing
@@ -1828,13 +2083,13 @@ func TestProcessNMEALine_GPGSA(t *testing.T) {
 	defer func() { Satellites = origSatellites }()
 
 	testCases := []struct {
-		name             string
-		input            string
-		expectUsed       bool
-		expectSatCount   uint16
-		setupFixQuality  uint8
-		expectHAccuracy  bool
-		expectVAccuracy  bool
+		name            string
+		input           string
+		expectUsed      bool
+		expectSatCount  uint16
+		setupFixQuality uint8
+		expectHAccuracy bool
+		expectVAccuracy bool
 	}{
 		{
 			name:            "Valid GPGSA with 3D fix",
@@ -2091,13 +2346,13 @@ func TestProcessNMEALine_GPGSV(t *testing.T) {
 	defer func() { Satellites = origSatellites }()
 
 	testCases := []struct {
-		name           string
-		input          string
-		expectUsed     bool
-		expectSatID    string
-		expectSignal   int8
+		name            string
+		input           string
+		expectUsed      bool
+		expectSatID     string
+		expectSignal    int8
 		expectElevation int16
-		expectAzimuth  int16
+		expectAzimuth   int16
 	}{
 		{
 			name:            "Valid GPGSV with GPS satellites",
@@ -2782,10 +3037,10 @@ func TestProcessNMEALineLow_GPSTypeDetection(t *testing.T) {
 	defer func() { globalStatus.GPS_detected_type = origGPSType }()
 
 	testCases := []struct {
-		name            string
-		input           string
-		initialGPSType  uint
-		expectProtocol  uint
+		name           string
+		input          string
+		initialGPSType uint
+		expectProtocol uint
 	}{
 		{
 			name:           "GPGGA sets NMEA protocol when type is unset",
