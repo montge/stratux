@@ -1842,3 +1842,511 @@ func TestComputeRelativeVertical(t *testing.T) {
 		})
 	}
 }
+
+// TestParseFlarmNmeaMessage tests the parseFlarmNmeaMessage dispatcher function
+func TestParseFlarmNmeaMessage(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muGPSPerformance = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	// Save original state
+	origTraffic := traffic
+	origSeenTraffic := seenTraffic
+	defer func() {
+		traffic = origTraffic
+		seenTraffic = origSeenTraffic
+	}()
+
+	t.Run("valid_PFLAU_message", func(t *testing.T) {
+		// Setup valid GPS
+		mySituation.muGPS.Lock()
+		mySituation.GPSLatitude = 47.5
+		mySituation.GPSLongitude = -122.3
+		mySituation.GPSAltitudeMSL = 500
+		mySituation.GPSTrueCourse = 90.0
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.muGPS.Unlock()
+		globalStatus.GPS_connected = true
+
+		// Initialize traffic map
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// $PFLAU,<RX>,<TX>,<GPS>,<Power>,<AlarmLevel>,<RelativeBearing>,<AlarmType>,<RelativeVertical>,<RelativeDistance>,<ID>
+		message := []string{"PFLAU", "1", "1", "2", "1", "0", "45", "2", "100", "5000", "ABC123"}
+
+		// Should not panic
+		parseFlarmNmeaMessage(message)
+
+		// Check that traffic was added
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+		if len(traffic) == 0 {
+			t.Error("Expected traffic to be added from PFLAU message")
+		}
+		t.Logf("PFLAU message processed, %d traffic targets", len(traffic))
+	})
+
+	t.Run("valid_PFLAA_message", func(t *testing.T) {
+		// Setup valid GPS
+		mySituation.muGPS.Lock()
+		mySituation.GPSLatitude = 47.5
+		mySituation.GPSLongitude = -122.3
+		mySituation.GPSAltitudeMSL = 500
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.muGPS.Unlock()
+		globalStatus.GPS_connected = true
+
+		// Initialize traffic map
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// $PFLAA,<AlarmLevel>,<RelativeNorth>,<RelativeEast>,<RelativeVertical>,<IDType>,<ID>,<Track>,<TurnRate>,<GroundSpeed>,<ClimbRate>,<AcftType>
+		message := []string{"PFLAA", "0", "1000", "500", "100", "1", "ABCDEF", "90", "0", "50", "2.5", "1"}
+
+		// Should not panic
+		parseFlarmNmeaMessage(message)
+
+		// Check that traffic was added
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+		if len(traffic) == 0 {
+			t.Error("Expected traffic to be added from PFLAA message")
+		}
+
+		// Find the traffic entry
+		var ti TrafficInfo
+		var found bool
+		for _, v := range traffic {
+			ti = v
+			found = true
+			break
+		}
+
+		if !found {
+			t.Fatal("No traffic found")
+		}
+
+		// Check some basic fields
+		if ti.Track != 90 {
+			t.Errorf("Expected Track=90, got %f", ti.Track)
+		}
+		if ti.Emitter_category != 9 { // Type "1" = glider = category 9
+			t.Errorf("Expected Emitter_category=9 (glider), got %d", ti.Emitter_category)
+		}
+
+		t.Logf("PFLAA message processed: Track=%.0f, Speed=%d kts, Category=%d",
+			ti.Track, ti.Speed, ti.Emitter_category)
+	})
+
+	t.Run("PFLAA_with_different_aircraft_types", func(t *testing.T) {
+		testCases := []struct {
+			name             string
+			acType           string
+			expectedCategory uint8
+		}{
+			{"Glider", "1", 9},
+			{"Tow plane", "2", 1},
+			{"Helicopter", "3", 7},
+			{"Skydiver", "4", 11},
+			{"Drop plane", "5", 1},
+			{"Hang glider", "6", 12},
+			{"Paraglider", "7", 12},
+			{"Piston", "8", 1},
+			{"Jet", "9", 3},
+			{"Balloon", "B", 10},
+			{"Airship", "C", 10},
+			{"UAV", "D", 14},
+			{"Ground vehicle", "E", 18},
+			{"Static object", "F", 19},
+			{"Unknown", "0", 0},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				// Setup valid GPS
+				mySituation.muGPS.Lock()
+				mySituation.GPSLatitude = 47.5
+				mySituation.GPSLongitude = -122.3
+				mySituation.GPSAltitudeMSL = 500
+				mySituation.GPSFixQuality = 2
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.muGPS.Unlock()
+				globalStatus.GPS_connected = true
+
+				// Initialize traffic map
+				traffic = make(map[uint32]TrafficInfo)
+				seenTraffic = make(map[uint32]bool)
+
+				// Create PFLAA message with specific aircraft type
+				message := []string{"PFLAA", "0", "1000", "500", "100", "1", "TEST01", "90", "0", "50", "2.5", tc.acType}
+
+				parseFlarmNmeaMessage(message)
+
+				// Check that traffic was added with correct category
+				trafficMutex.Lock()
+				defer trafficMutex.Unlock()
+
+				if len(traffic) == 0 {
+					t.Error("Expected traffic to be added")
+					return
+				}
+
+				var ti TrafficInfo
+				for _, v := range traffic {
+					ti = v
+					break
+				}
+
+				if ti.Emitter_category != tc.expectedCategory {
+					t.Errorf("Expected category %d, got %d", tc.expectedCategory, ti.Emitter_category)
+				}
+
+				t.Logf("Aircraft type %s -> Category %d", tc.acType, ti.Emitter_category)
+			})
+		}
+	})
+
+	t.Run("PFLAU_without_valid_GPS", func(t *testing.T) {
+		// Setup invalid GPS
+		mySituation.muGPS.Lock()
+		mySituation.GPSFixQuality = 0
+		mySituation.GPSLastFixLocalTime = time.Time{}
+		mySituation.muGPS.Unlock()
+		globalStatus.GPS_connected = false
+
+		// Initialize traffic map
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		message := []string{"PFLAU", "1", "1", "2", "1", "0", "45", "2", "100", "5000", "ABC123"}
+
+		// Should not panic, but should not add traffic
+		parseFlarmNmeaMessage(message)
+
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+		if len(traffic) != 0 {
+			t.Error("Expected no traffic to be added without valid GPS")
+		}
+		t.Log("PFLAU correctly ignored without valid GPS")
+	})
+
+	t.Run("PFLAU_with_empty_fields", func(t *testing.T) {
+		// Message with empty required fields should be ignored
+		message := []string{"PFLAU", "1", "1", "2", "1", "0", "", "2", "", "", ""}
+
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// Should not panic
+		parseFlarmNmeaMessage(message)
+
+		// Should not add traffic due to empty fields
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+		if len(traffic) != 0 {
+			t.Error("Expected no traffic from PFLAU with empty fields")
+		}
+		t.Log("PFLAU with empty fields correctly ignored")
+	})
+
+	t.Run("PFLAU_too_short", func(t *testing.T) {
+		// Message too short (< 11 fields) should be ignored
+		message := []string{"PFLAU", "1", "1", "2", "1"}
+
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// Should not panic
+		parseFlarmNmeaMessage(message)
+
+		// Should not add traffic
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+		if len(traffic) != 0 {
+			t.Error("Expected no traffic from short PFLAU message")
+		}
+		t.Log("Short PFLAU message correctly ignored")
+	})
+
+	t.Run("PFLAA_too_short", func(t *testing.T) {
+		// Message too short (< 12 fields) should be ignored
+		message := []string{"PFLAA", "0", "1000", "500", "100"}
+
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// Should not panic
+		parseFlarmNmeaMessage(message)
+
+		// Should not add traffic
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+		if len(traffic) != 0 {
+			t.Error("Expected no traffic from short PFLAA message")
+		}
+		t.Log("Short PFLAA message correctly ignored")
+	})
+
+	t.Run("PFLAA_with_tail_number", func(t *testing.T) {
+		// Setup valid GPS
+		mySituation.muGPS.Lock()
+		mySituation.GPSLatitude = 47.5
+		mySituation.GPSLongitude = -122.3
+		mySituation.GPSAltitudeMSL = 500
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.muGPS.Unlock()
+		globalStatus.GPS_connected = true
+
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// ID with tail number using ! separator: ID!TAIL
+		message := []string{"PFLAA", "0", "1000", "500", "100", "1", "ABCDEF!N12345", "90", "0", "50", "2.5", "1"}
+
+		parseFlarmNmeaMessage(message)
+
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+
+		if len(traffic) == 0 {
+			t.Error("Expected traffic to be added")
+			return
+		}
+
+		var ti TrafficInfo
+		for _, v := range traffic {
+			ti = v
+			break
+		}
+
+		// Check that tail was extracted
+		if ti.Tail != "N12345" {
+			t.Errorf("Expected Tail='N12345', got '%s'", ti.Tail)
+		}
+
+		t.Logf("PFLAA with tail: ID=0x%X, Tail=%s", ti.Icao_addr, ti.Tail)
+	})
+
+	t.Run("PFLAA_with_ICAO_and_NonICAO_idType", func(t *testing.T) {
+		// Setup valid GPS
+		mySituation.muGPS.Lock()
+		mySituation.GPSLatitude = 47.5
+		mySituation.GPSLongitude = -122.3
+		mySituation.GPSAltitudeMSL = 500
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.muGPS.Unlock()
+		globalStatus.GPS_connected = true
+
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// IDType=1 should map to Addr_type=0 (ICAO)
+		message := []string{"PFLAA", "0", "1000", "500", "100", "1", "ABC123", "90", "0", "50", "2.5", "1"}
+		parseFlarmNmeaMessage(message)
+
+		trafficMutex.Lock()
+		if len(traffic) == 0 {
+			t.Fatal("Expected traffic from ICAO message")
+		}
+		var ti TrafficInfo
+		for _, v := range traffic {
+			ti = v
+			break
+		}
+		if ti.Addr_type != 0 {
+			t.Errorf("Expected Addr_type=0 for IDType=1, got %d", ti.Addr_type)
+		}
+		trafficMutex.Unlock()
+
+		// IDType=2 should map to Addr_type=1 (Non-ICAO)
+		traffic = make(map[uint32]TrafficInfo)
+		message2 := []string{"PFLAA", "0", "1000", "500", "100", "2", "DEF456", "90", "0", "50", "2.5", "1"}
+		parseFlarmNmeaMessage(message2)
+
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+		if len(traffic) == 0 {
+			t.Fatal("Expected traffic from non-ICAO message")
+		}
+		for _, v := range traffic {
+			ti = v
+			break
+		}
+		if ti.Addr_type != 1 {
+			t.Errorf("Expected Addr_type=1 for IDType=2, got %d", ti.Addr_type)
+		}
+
+		t.Logf("IDType mapping: 1->%d, 2->%d", 0, 1)
+	})
+
+	t.Run("unknown_message_type", func(t *testing.T) {
+		// Unknown message types should be ignored without panic
+		message := []string{"PFLXX", "some", "data"}
+
+		// Should not panic
+		parseFlarmNmeaMessage(message)
+
+		t.Log("Unknown message type correctly ignored")
+	})
+
+	t.Run("PFLAA_with_negative_coordinates", func(t *testing.T) {
+		// Setup valid GPS
+		mySituation.muGPS.Lock()
+		mySituation.GPSLatitude = 47.5
+		mySituation.GPSLongitude = -122.3
+		mySituation.GPSAltitudeMSL = 500
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.muGPS.Unlock()
+		globalStatus.GPS_connected = true
+
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// Negative relative north and east (target is SW of ownship)
+		message := []string{"PFLAA", "0", "-2000", "-1500", "-50", "1", "SW1234", "270", "0", "60", "-1.5", "1"}
+
+		parseFlarmNmeaMessage(message)
+
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+
+		if len(traffic) == 0 {
+			t.Error("Expected traffic to be added with negative coordinates")
+			return
+		}
+
+		var ti TrafficInfo
+		for _, v := range traffic {
+			ti = v
+			break
+		}
+
+		// Check that position was calculated (should be SW of ownship)
+		if ti.Lat >= mySituation.GPSLatitude {
+			t.Errorf("Expected Lat < ownship lat for negative north, got %.5f vs %.5f",
+				ti.Lat, mySituation.GPSLatitude)
+		}
+		if ti.Lng >= mySituation.GPSLongitude {
+			t.Errorf("Expected Lng < ownship lng for negative east, got %.5f vs %.5f",
+				ti.Lng, mySituation.GPSLongitude)
+		}
+
+		// Check negative vertical velocity
+		if ti.Vvel >= 0 {
+			t.Errorf("Expected negative Vvel, got %d", ti.Vvel)
+		}
+
+		t.Logf("Negative coordinates: RelN=-2000m, RelE=-1500m -> Lat=%.5f, Lng=%.5f",
+			ti.Lat, ti.Lng)
+	})
+
+	t.Run("panic_recovery", func(t *testing.T) {
+		// Test that malformed data doesn't crash the function
+		// The defer/recover in parseFlarmNmeaMessage should handle this
+
+		testCases := []struct {
+			name    string
+			message []string
+		}{
+			{
+				name:    "nil_message",
+				message: nil,
+			},
+			{
+				name:    "empty_message",
+				message: []string{},
+			},
+			{
+				name:    "PFLAA_with_invalid_numbers",
+				message: []string{"PFLAA", "x", "y", "z", "w", "1", "ABC", "90", "0", "50", "2.5", "1"},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				// Should not panic
+				defer func() {
+					if r := recover(); r != nil {
+						t.Errorf("parseFlarmNmeaMessage panicked: %v", r)
+					}
+				}()
+
+				parseFlarmNmeaMessage(tc.message)
+				t.Logf("Malformed message handled gracefully: %v", tc.message)
+			})
+		}
+	})
+
+	t.Run("PFLAA_speed_and_climb_rate_conversion", func(t *testing.T) {
+		// Setup valid GPS
+		mySituation.muGPS.Lock()
+		mySituation.GPSLatitude = 47.5
+		mySituation.GPSLongitude = -122.3
+		mySituation.GPSAltitudeMSL = 500
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.muGPS.Unlock()
+		globalStatus.GPS_connected = true
+
+		traffic = make(map[uint32]TrafficInfo)
+		seenTraffic = make(map[uint32]bool)
+
+		// GroundSpeed in m/s should be converted to knots (multiply by 1.94384)
+		// ClimbRate in m/s should be converted to ft/min (multiply by 196.85)
+		// Speed=25 m/s = ~48.6 knots
+		// Climb=5 m/s = ~984 ft/min
+		message := []string{"PFLAA", "0", "1000", "500", "100", "1", "SPD001", "90", "0", "25", "5.0", "1"}
+
+		parseFlarmNmeaMessage(message)
+
+		trafficMutex.Lock()
+		defer trafficMutex.Unlock()
+
+		if len(traffic) == 0 {
+			t.Error("Expected traffic to be added")
+			return
+		}
+
+		var ti TrafficInfo
+		for _, v := range traffic {
+			ti = v
+			break
+		}
+
+		// Speed should be ~48-49 knots
+		expectedSpeed := uint16(48)
+		if ti.Speed < expectedSpeed-2 || ti.Speed > expectedSpeed+2 {
+			t.Errorf("Expected Speed~%d knots, got %d", expectedSpeed, ti.Speed)
+		}
+
+		// Vvel should be ~984 ft/min
+		expectedVvel := int16(984)
+		if ti.Vvel < expectedVvel-50 || ti.Vvel > expectedVvel+50 {
+			t.Errorf("Expected Vvel~%d ft/min, got %d", expectedVvel, ti.Vvel)
+		}
+
+		t.Logf("Conversion: 25 m/s -> %d kts, 5.0 m/s -> %d ft/min",
+			ti.Speed, ti.Vvel)
+	})
+}

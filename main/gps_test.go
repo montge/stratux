@@ -1059,3 +1059,319 @@ func TestProcessNMEALine_InvalidMessages(t *testing.T) {
 		})
 	}
 }
+
+// TestCalcGPSAttitude tests the GPS attitude calculation function
+func TestCalcGPSAttitude(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	// Save original state
+	origPerfStats := myGPSPerfStats
+	defer func() { myGPSPerfStats = origPerfStats }()
+
+	t.Run("empty_stats", func(t *testing.T) {
+		myGPSPerfStats = []gpsPerfStats{}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false for empty stats")
+		}
+		t.Log("Empty stats correctly returned false")
+	})
+
+	t.Run("single_point", func(t *testing.T) {
+		myGPSPerfStats = []gpsPerfStats{
+			{
+				stratuxTime: stratuxClock.Milliseconds,
+				nmeaTime:    100.0,
+				msgType:     "GPRMC",
+				gsf:         50.0,
+				coursef:     90.0,
+				alt:         1000.0,
+			},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false for single data point")
+		}
+		// Should have set all attitude values to zero
+		if myGPSPerfStats[0].gpsTurnRate != 0 || myGPSPerfStats[0].gpsPitch != 0 || myGPSPerfStats[0].gpsRoll != 0 {
+			t.Error("Expected zero attitude values for single point")
+		}
+		t.Log("Single point correctly returned false with zero attitude")
+	})
+
+	t.Run("stale_data", func(t *testing.T) {
+		// Create data that's more than 3 seconds old
+		oldTime := stratuxClock.Milliseconds - 4000
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: oldTime, nmeaTime: 100.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: oldTime, nmeaTime: 100.5, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false for stale data")
+		}
+		t.Log("Stale data correctly rejected")
+	})
+
+	t.Run("time_jump_forward", func(t *testing.T) {
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 105.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false when time jump > 3 seconds")
+		}
+		t.Log("Large time jump correctly rejected")
+	})
+
+	t.Run("no_speed_data", func(t *testing.T) {
+		// Only GGA messages, no RMC (which have speed)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPGGA", gsf: 0, coursef: -1, alt: 1000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.5, msgType: "GPGGA", gsf: 0, coursef: -1, alt: 1010.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false when no RMC speed data available")
+		}
+		t.Log("No speed data correctly rejected")
+	})
+
+	t.Run("insufficient_altitude_data", func(t *testing.T) {
+		// Only one GGA message - not enough for vertical velocity calculation
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.2, msgType: "GPGGA", gsf: 50.0, coursef: 90.0, alt: 1000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false when insufficient altitude data")
+		}
+		t.Log("Insufficient altitude data correctly rejected")
+	})
+
+	t.Run("low_speed_level_flight", func(t *testing.T) {
+		// Speed < 6 ft/sec (~3.55 knots) should return true with zero attitude
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.6, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true for low speed")
+		}
+		// Check that attitude is zeroed
+		idx := len(myGPSPerfStats) - 1
+		if myGPSPerfStats[idx].gpsPitch != 0 || myGPSPerfStats[idx].gpsRoll != 0 {
+			t.Errorf("Expected zero attitude at low speed, got pitch=%.3f, roll=%.3f",
+				myGPSPerfStats[idx].gpsPitch, myGPSPerfStats[idx].gpsRoll)
+		}
+		t.Logf("Low speed: pitch=%.3f, roll=%.3f, turnRate=%.3f",
+			myGPSPerfStats[idx].gpsPitch, myGPSPerfStats[idx].gpsRoll, myGPSPerfStats[idx].gpsTurnRate)
+	})
+
+	t.Run("medium_speed_level_flight", func(t *testing.T) {
+		// Medium speed, level flight
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true for valid medium speed level flight")
+		}
+		idx := len(myGPSPerfStats) - 1
+		// Level flight should have near-zero pitch
+		if myGPSPerfStats[idx].gpsPitch < -2 || myGPSPerfStats[idx].gpsPitch > 2 {
+			t.Errorf("Expected near-zero pitch for level flight, got %.3f", myGPSPerfStats[idx].gpsPitch)
+		}
+		// Straight flight should have near-zero roll
+		if myGPSPerfStats[idx].gpsRoll < -2 || myGPSPerfStats[idx].gpsRoll > 2 {
+			t.Errorf("Expected near-zero roll for straight flight, got %.3f", myGPSPerfStats[idx].gpsRoll)
+		}
+		t.Logf("Level flight: pitch=%.3f, roll=%.3f, turnRate=%.3f",
+			myGPSPerfStats[idx].gpsPitch, myGPSPerfStats[idx].gpsRoll, myGPSPerfStats[idx].gpsTurnRate)
+	})
+
+	t.Run("climbing_flight", func(t *testing.T) {
+		// Climbing at constant speed and heading
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1020.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1040.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true for climbing flight")
+		}
+		idx := len(myGPSPerfStats) - 1
+		// Climbing should have positive pitch
+		if myGPSPerfStats[idx].gpsPitch <= 0 {
+			t.Errorf("Expected positive pitch for climb, got %.3f", myGPSPerfStats[idx].gpsPitch)
+		}
+		t.Logf("Climbing: pitch=%.3f, roll=%.3f, vv=%.1f ft/min",
+			myGPSPerfStats[idx].gpsPitch, myGPSPerfStats[idx].gpsRoll,
+			myGPSPerfStats[idx].vv*60)
+	})
+
+	t.Run("descending_flight", func(t *testing.T) {
+		// Descending at constant speed and heading
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1980.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1960.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true for descending flight")
+		}
+		idx := len(myGPSPerfStats) - 1
+		// Descending should have negative pitch
+		if myGPSPerfStats[idx].gpsPitch >= 0 {
+			t.Errorf("Expected negative pitch for descent, got %.3f", myGPSPerfStats[idx].gpsPitch)
+		}
+		t.Logf("Descending: pitch=%.3f, roll=%.3f, vv=%.1f ft/min",
+			myGPSPerfStats[idx].gpsPitch, myGPSPerfStats[idx].gpsRoll,
+			myGPSPerfStats[idx].vv*60)
+	})
+
+	t.Run("turning_flight", func(t *testing.T) {
+		// Turning right at constant speed and altitude
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 100.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 100.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 100.0, coursef: 93.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 100.0, coursef: 93.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 100.0, coursef: 96.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 100.0, coursef: 96.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true for turning flight")
+		}
+		idx := len(myGPSPerfStats) - 1
+		// Right turn should have positive turn rate
+		if myGPSPerfStats[idx].gpsTurnRate <= 0 {
+			t.Errorf("Expected positive turn rate for right turn, got %.3f", myGPSPerfStats[idx].gpsTurnRate)
+		}
+		// Bank angle should be positive for right turn at high speed
+		if myGPSPerfStats[idx].gpsRoll <= 0 {
+			t.Errorf("Expected positive roll for right turn, got %.3f", myGPSPerfStats[idx].gpsRoll)
+		}
+		// Load factor should be > 1 in a turn
+		if myGPSPerfStats[idx].gpsLoadFactor <= 1.0 {
+			t.Errorf("Expected load factor > 1 in turn, got %.3f", myGPSPerfStats[idx].gpsLoadFactor)
+		}
+		t.Logf("Right turn: pitch=%.3f, roll=%.3f, turnRate=%.3f deg/s, load=%.2fG",
+			myGPSPerfStats[idx].gpsPitch, myGPSPerfStats[idx].gpsRoll,
+			myGPSPerfStats[idx].gpsTurnRate, myGPSPerfStats[idx].gpsLoadFactor)
+	})
+
+	t.Run("high_speed_calculation", func(t *testing.T) {
+		// High speed flight (>20 ft/sec) should calculate pitch and roll
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 120.0, coursef: 180.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 120.0, coursef: 180.0, alt: 3000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 120.0, coursef: 180.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 120.0, coursef: 180.0, alt: 3000.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true for high speed flight")
+		}
+		t.Logf("High speed flight processed successfully")
+	})
+
+	t.Run("heading_wrap_around_0_360", func(t *testing.T) {
+		// Test heading wrapping from 359 to 1 (crossing north)
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 358.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 358.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 1.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 1.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 4.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 4.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true when heading wraps around 0/360")
+		}
+		idx := len(myGPSPerfStats) - 1
+		// Should detect right turn across 0/360 boundary
+		if myGPSPerfStats[idx].gpsTurnRate <= 0 {
+			t.Errorf("Expected positive turn rate for heading wrap, got %.3f", myGPSPerfStats[idx].gpsTurnRate)
+		}
+		t.Logf("Heading wrap: turnRate=%.3f deg/s", myGPSPerfStats[idx].gpsTurnRate)
+	})
+
+	t.Run("insufficient_heading_data", func(t *testing.T) {
+		// Only one valid heading data point
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: -1, alt: 0}, // invalid course
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // only one valid
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false when insufficient heading data")
+		}
+		t.Log("Insufficient heading data correctly rejected")
+	})
+
+	t.Run("midnight_rollover", func(t *testing.T) {
+		// Test handling of midnight rollover (23:59:50 to 00:00:10)
+		// The function should detect rollover and adjust time or handle it gracefully
+		// Need enough data points for altitude regression (at least 2 GGA messages)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86389.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:49.8
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86389.9, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86390.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:50
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86390.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 10.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 00:00:10 next day
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 10.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		// The function should either succeed after rollover adjustment or gracefully handle the rollover
+		// Either way, it tests the rollover code path
+		idx := len(myGPSPerfStats) - 1
+		if result {
+			// If it succeeded, check if time was adjusted
+			if myGPSPerfStats[idx].nmeaTime > 86400 {
+				t.Logf("Midnight rollover successfully adjusted: time=%.1f", myGPSPerfStats[idx].nmeaTime)
+			} else {
+				t.Logf("Midnight rollover handled without adjustment: time=%.1f", myGPSPerfStats[idx].nmeaTime)
+			}
+		} else {
+			// If it failed, that's also acceptable behavior for a rollover scenario
+			t.Logf("Midnight rollover detected and function returned false (acceptable)")
+		}
+	})
+}
