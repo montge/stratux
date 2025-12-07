@@ -635,9 +635,404 @@ func TestGetProductNameFromIdEdgeCases(t *testing.T) {
 // Ownship Report Tests
 // =============================================================================
 
-// Note: makeOwnshipReport and makeOwnshipGeometricAltitudeReport call sendGDL90()
-// and sendXPlane() which require network initialization. They are tested via
-// integration tests (TestE2E*) rather than unit tests.
+// setupMySituationForTests initializes mySituation with mutexes and default values
+func setupMySituationForTests() {
+	mySituation.muGPS = &sync.Mutex{}
+	mySituation.muGPSPerformance = &sync.Mutex{}
+	mySituation.muBaro = &sync.Mutex{}
+	mySituation.muSatellite = &sync.Mutex{}
+	mySituation.muAttitude = &sync.Mutex{}
+}
+
+// setupNetworkForTests initializes network channels needed for ownship tests
+func setupNetworkForTests() {
+	if networkGDL90Chan == nil {
+		networkGDL90Chan = make(chan []byte, 10)
+		// Start a goroutine to drain the channel to prevent blocking
+		go func() {
+			for range networkGDL90Chan {
+				// Discard messages - we're just testing that functions don't panic
+			}
+		}()
+	}
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+}
+
+// TestMakeOwnshipReport tests ownship report message generation
+// Verifies: FR-603 (GDL90 Ownship Report)
+func TestMakeOwnshipReport(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	crcInit()
+	setupMySituationForTests()
+	setupNetworkForTests()
+
+	// Save original values
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origSituation := mySituation
+	defer func() {
+		globalSettings = origSettings
+		globalStatus = origStatus
+		mySituation = origSituation
+	}()
+
+	t.Run("with_valid_GPS", func(t *testing.T) {
+		// Set up valid GPS data
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 43.99       // Oshkosh area
+		mySituation.GPSLongitude = -88.56     // Oshkosh area
+		mySituation.GPSAltitudeMSL = 1000.0   // feet
+		mySituation.GPSTrueCourse = 90.0      // heading east
+		mySituation.GPSGroundSpeed = 120.0    // knots
+		mySituation.GPSHorizontalAccuracy = 5 // meters
+		mySituation.GPSNACp = 10
+		mySituation.GPSHeightAboveEllipsoid = 950.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "A12345" // Valid ICAO code
+
+		// Mock network functions by capturing what would be sent
+		// We can't actually test sendGDL90/sendXPlane without full network setup,
+		// but we can verify the function completes without panic
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to return true with valid GPS")
+		}
+	})
+
+	t.Run("without_GPS_fix", func(t *testing.T) {
+		// Set GPS as invalid
+		mySituation.GPSFixQuality = 0
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-10 * time.Second)
+		globalStatus.GPS_connected = false
+
+		// Also set detected ownship as invalid
+		OwnshipTrafficInfo.Last_seen = stratuxClock.Time.Add(-15 * time.Second)
+
+		result := makeOwnshipReport()
+
+		if result {
+			t.Error("Expected makeOwnshipReport to return false without valid GPS or detected ownship")
+		}
+	})
+
+	t.Run("with_zero_coordinates", func(t *testing.T) {
+		// Valid GPS but at 0,0
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 0.0
+		mySituation.GPSLongitude = 0.0
+		mySituation.GPSAltitudeMSL = 0.0
+		mySituation.GPSTrueCourse = 0.0
+		mySituation.GPSGroundSpeed = 0.0
+		mySituation.GPSHorizontalAccuracy = 5
+		mySituation.GPSNACp = 10
+		mySituation.GPSHeightAboveEllipsoid = 0.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "F00000" // Self-assigned code
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with zero coordinates")
+		}
+	})
+
+	t.Run("with_high_altitude", func(t *testing.T) {
+		// Test with high altitude (near max)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 45.0
+		mySituation.GPSLongitude = -90.0
+		mySituation.GPSAltitudeMSL = 50000.0 // Very high altitude
+		mySituation.GPSTrueCourse = 180.0
+		mySituation.GPSGroundSpeed = 500.0 // Fast ground speed
+		mySituation.GPSHorizontalAccuracy = 10
+		mySituation.GPSNACp = 8
+		mySituation.GPSHeightAboveEllipsoid = 49900.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "ABCDEF"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with high altitude")
+		}
+	})
+
+	t.Run("with_max_speed", func(t *testing.T) {
+		// Test with maximum speed
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 40.0
+		mySituation.GPSLongitude = -100.0
+		mySituation.GPSAltitudeMSL = 10000.0
+		mySituation.GPSTrueCourse = 270.0
+		mySituation.GPSGroundSpeed = 4095.0 // Near max for 12-bit encoding
+		mySituation.GPSHorizontalAccuracy = 20
+		mySituation.GPSNACp = 6
+		mySituation.GPSHeightAboveEllipsoid = 9900.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "123456"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with max speed")
+		}
+	})
+
+	t.Run("with_negative_coordinates", func(t *testing.T) {
+		// Test with negative lat/lng (southern hemisphere, western longitude)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = -33.86  // Sydney area
+		mySituation.GPSLongitude = 151.21 // Sydney area (positive longitude)
+		mySituation.GPSAltitudeMSL = 500.0
+		mySituation.GPSTrueCourse = 45.0
+		mySituation.GPSGroundSpeed = 80.0
+		mySituation.GPSHorizontalAccuracy = 8
+		mySituation.GPSNACp = 9
+		mySituation.GPSHeightAboveEllipsoid = 450.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "7C1234"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with negative latitude")
+		}
+	})
+
+	t.Run("with_baro_altitude", func(t *testing.T) {
+		// Test with barometric pressure altitude (no GPS altitude)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 44.0
+		mySituation.GPSLongitude = -92.0
+		mySituation.GPSAltitudeMSL = 0.0 // No GPS altitude
+		mySituation.BaroPressureAltitude = 5000.0
+		mySituation.BaroLastMeasurementTime = stratuxClock.Time
+		mySituation.GPSTrueCourse = 120.0
+		mySituation.GPSGroundSpeed = 150.0
+		mySituation.GPSHorizontalAccuracy = 5
+		mySituation.GPSNACp = 10
+		mySituation.GPSHeightAboveEllipsoid = 4900.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "A00001"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with baro altitude")
+		}
+	})
+
+	t.Run("with_self_assigned_code", func(t *testing.T) {
+		// Test with self-assigned ICAO code (0xF00000)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLatitude = 35.0
+		mySituation.GPSLongitude = -110.0
+		mySituation.GPSAltitudeMSL = 7000.0
+		mySituation.GPSTrueCourse = 200.0
+		mySituation.GPSGroundSpeed = 95.0
+		mySituation.GPSHorizontalAccuracy = 12
+		mySituation.GPSNACp = 7
+		mySituation.GPSHeightAboveEllipsoid = 6900.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "F00000" // Self-assigned
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with self-assigned code")
+		}
+	})
+
+	t.Run("with_detected_ownship", func(t *testing.T) {
+		// Test with detected ownship (no GPS) - this uses received ADS-B ownship data
+		mySituation.GPSFixQuality = 0
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-10 * time.Second)
+		globalStatus.GPS_connected = false
+
+		// Set up detected ownship as valid
+		OwnshipTrafficInfo.Last_seen = stratuxClock.Time
+		OwnshipTrafficInfo.Lat = 42.0
+		OwnshipTrafficInfo.Lng = -95.0
+		OwnshipTrafficInfo.Alt = 3000
+		OwnshipTrafficInfo.Track = 90
+		OwnshipTrafficInfo.Speed = 110
+		OwnshipTrafficInfo.Speed_valid = true
+		OwnshipTrafficInfo.Tail = "N12345"
+
+		globalSettings.OwnshipModeS = "A12345"
+
+		result := makeOwnshipReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipReport to succeed with detected ownship")
+		}
+	})
+}
+
+// TestMakeOwnshipGeometricAltitudeReport tests geometric altitude report generation
+// Verifies: FR-605 (GDL90 Ownship Geometric Altitude)
+func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	crcInit()
+	setupMySituationForTests()
+	setupNetworkForTests()
+
+	// Save original values
+	origStatus := globalStatus
+	origSituation := mySituation
+	defer func() {
+		globalStatus = origStatus
+		mySituation = origSituation
+	}()
+
+	t.Run("with_valid_GPS", func(t *testing.T) {
+		// Set up valid GPS data
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSHeightAboveEllipsoid = 1000.0 // feet HAE
+
+		globalStatus.GPS_connected = true
+
+		result := makeOwnshipGeometricAltitudeReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipGeometricAltitudeReport to return true with valid GPS")
+		}
+	})
+
+	t.Run("without_GPS_fix", func(t *testing.T) {
+		// Set GPS as invalid
+		mySituation.GPSFixQuality = 0
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-10 * time.Second)
+		globalStatus.GPS_connected = false
+
+		result := makeOwnshipGeometricAltitudeReport()
+
+		if result {
+			t.Error("Expected makeOwnshipGeometricAltitudeReport to return false without valid GPS")
+		}
+	})
+
+	t.Run("with_zero_altitude", func(t *testing.T) {
+		// Valid GPS at zero altitude (sea level)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSHeightAboveEllipsoid = 0.0
+
+		globalStatus.GPS_connected = true
+
+		result := makeOwnshipGeometricAltitudeReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipGeometricAltitudeReport to succeed with zero altitude")
+		}
+	})
+
+	t.Run("with_high_altitude", func(t *testing.T) {
+		// Test with very high altitude
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSHeightAboveEllipsoid = 50000.0 // Very high
+
+		globalStatus.GPS_connected = true
+
+		result := makeOwnshipGeometricAltitudeReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipGeometricAltitudeReport to succeed with high altitude")
+		}
+	})
+
+	t.Run("with_negative_altitude", func(t *testing.T) {
+		// Test with negative altitude (below ellipsoid)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSHeightAboveEllipsoid = -100.0 // Below ellipsoid
+
+		globalStatus.GPS_connected = true
+
+		result := makeOwnshipGeometricAltitudeReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipGeometricAltitudeReport to succeed with negative altitude")
+		}
+	})
+
+	t.Run("with_typical_cruising_altitude", func(t *testing.T) {
+		// Test with typical cruising altitude
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSHeightAboveEllipsoid = 8500.0 // Typical GA cruising altitude
+
+		globalStatus.GPS_connected = true
+
+		result := makeOwnshipGeometricAltitudeReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipGeometricAltitudeReport to succeed with cruising altitude")
+		}
+	})
+
+	t.Run("with_maximum_altitude", func(t *testing.T) {
+		// Test near the maximum altitude that fits in 16-bit signed int with 5-foot resolution
+		// Max value: 32767 * 5 = 163,835 feet
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSHeightAboveEllipsoid = 160000.0 // Near max
+
+		globalStatus.GPS_connected = true
+
+		result := makeOwnshipGeometricAltitudeReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipGeometricAltitudeReport to succeed with maximum altitude")
+		}
+	})
+
+	t.Run("with_minimum_altitude", func(t *testing.T) {
+		// Test near the minimum altitude that fits in 16-bit signed int with 5-foot resolution
+		// Min value: -32768 * 5 = -163,840 feet
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSHeightAboveEllipsoid = -160000.0 // Near min
+
+		globalStatus.GPS_connected = true
+
+		result := makeOwnshipGeometricAltitudeReport()
+
+		if !result {
+			t.Error("Expected makeOwnshipGeometricAltitudeReport to succeed with minimum altitude")
+		}
+	})
+}
 
 // TestIsDetectedOwnshipValidEdgeCases tests additional edge cases for ownship validity
 func TestIsDetectedOwnshipValidEdgeCases(t *testing.T) {

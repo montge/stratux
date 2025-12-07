@@ -1245,8 +1245,11 @@ func TestSendGDL90(t *testing.T) {
 		netMutex = &sync.Mutex{}
 	}
 	clientConnections = make(map[string]connection)
-	if networkGDL90Chan == nil {
-		networkGDL90Chan = make(chan []byte, 10)
+	// Always recreate the channel to avoid test pollution from other tests
+	networkGDL90Chan = make(chan []byte, 10)
+	// Initialize stratuxClock for MessageQueue timestamp calculations
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
 	}
 
 	// Create a GDL90-capable connection
@@ -1291,6 +1294,10 @@ func TestSendXPlane(t *testing.T) {
 		netMutex = &sync.Mutex{}
 	}
 	clientConnections = make(map[string]connection)
+	// Initialize stratuxClock for MessageQueue timestamp calculations
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
 
 	// Create an X-Plane capable connection
 	conn := &networkConnection{
@@ -1324,6 +1331,10 @@ func TestSendNetFLARM(t *testing.T) {
 		netMutex = &sync.Mutex{}
 	}
 	clientConnections = make(map[string]connection)
+	// Initialize stratuxClock for MessageQueue timestamp calculations
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
 
 	// Create a FLARM/NMEA capable connection
 	conn := &networkConnection{
