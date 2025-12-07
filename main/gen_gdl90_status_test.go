@@ -1359,6 +1359,35 @@ func TestReadSettings_InvalidJSON(t *testing.T) {
 	t.Log("readSettings handled invalid JSON gracefully")
 }
 
+// TestReadSettings_ReadError tests readSettings when file read fails
+func TestReadSettings_ReadError(t *testing.T) {
+	// Save and restore original config location and settings
+	origConfigLocation := configLocation
+	origSettings := globalSettings
+	defer func() {
+		configLocation = origConfigLocation
+		globalSettings = origSettings
+	}()
+
+	// Create a temp directory and use it as the config location
+	// On Unix systems, opening a directory succeeds, but reading from it fails
+	tmpDir := t.TempDir()
+	configLocation = tmpDir
+
+	// Call readSettings - should handle read error gracefully
+	readSettings()
+
+	// Function should complete without panic, settings will have defaults
+	// Verify defaults were applied
+	if !globalSettings.UAT_Enabled {
+		t.Error("Expected UAT_Enabled=true (default after read error)")
+	}
+	if !globalSettings.ES_Enabled {
+		t.Error("Expected ES_Enabled=true (default after read error)")
+	}
+	t.Log("readSettings handled file read error gracefully")
+}
+
 // TestGetProductNameFromId_KnownProducts tests known product IDs from product_name_map
 func TestGetProductNameFromId_KnownProducts(t *testing.T) {
 	testCases := []struct {
