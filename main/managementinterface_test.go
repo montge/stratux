@@ -2300,6 +2300,380 @@ func TestHandleOrientAHRS_PostActions(t *testing.T) {
 	})
 }
 
+// mockIMUReaderWithAccel is a mock implementation that returns specific accelerometer values
+type mockIMUReaderWithAccel struct {
+	closed bool
+	a1, a2, a3 float64
+	shouldError bool
+}
+
+func (m *mockIMUReaderWithAccel) Read() (T int64, G1, G2, G3, A1, A2, A3, M1, M2, M3 float64, GAError, MagError error) {
+	return 0, 0, 0, 0, m.a1, m.a2, m.a3, 0, 0, 0, nil, nil
+}
+
+func (m *mockIMUReaderWithAccel) ReadOne() (T int64, G1, G2, G3, A1, A2, A3, M1, M2, M3 float64, GAError, MagError error) {
+	if m.shouldError {
+		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, io.EOF, nil
+	}
+	return 0, 0, 0, 0, m.a1, m.a2, m.a3, 0, 0, 0, nil, nil
+}
+
+func (m *mockIMUReaderWithAccel) Close() {
+	m.closed = true
+}
+
+// TestHandleOrientAHRS_ActionF tests the 'f' action (set forward direction)
+func TestHandleOrientAHRS_ActionF(t *testing.T) {
+	t.Run("action_f_success_axis1_positive", func(t *testing.T) {
+		// Save original state
+		origSettings := globalSettings
+		origIMUReader := myIMUReader
+		defer func() {
+			globalSettings = origSettings
+			myIMUReader = origIMUReader
+		}()
+
+		// Set up mock IMU reader with a1 as largest positive value
+		mockIMU := &mockIMUReaderWithAccel{a1: 9.8, a2: 0.1, a3: 0.2}
+		myIMUReader = mockIMU
+
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("f"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status OK or 0, got %d", resp.StatusCode)
+		}
+
+		// Verify IMUMapping was set correctly (forward axis should be 1 for positive a1)
+		if globalSettings.IMUMapping[0] != 1 {
+			t.Errorf("Expected IMUMapping[0] to be 1, got %d", globalSettings.IMUMapping[0])
+		}
+	})
+
+	t.Run("action_f_success_axis1_negative", func(t *testing.T) {
+		// Save original state
+		origSettings := globalSettings
+		origIMUReader := myIMUReader
+		defer func() {
+			globalSettings = origSettings
+			myIMUReader = origIMUReader
+		}()
+
+		// Set up mock IMU reader with a1 as largest negative value
+		mockIMU := &mockIMUReaderWithAccel{a1: -9.8, a2: 0.1, a3: 0.2}
+		myIMUReader = mockIMU
+
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("f"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status OK or 0, got %d", resp.StatusCode)
+		}
+
+		// Verify IMUMapping was set correctly (forward axis should be -1 for negative a1)
+		if globalSettings.IMUMapping[0] != -1 {
+			t.Errorf("Expected IMUMapping[0] to be -1, got %d", globalSettings.IMUMapping[0])
+		}
+	})
+
+	t.Run("action_f_success_axis2_positive", func(t *testing.T) {
+		// Save original state
+		origSettings := globalSettings
+		origIMUReader := myIMUReader
+		defer func() {
+			globalSettings = origSettings
+			myIMUReader = origIMUReader
+		}()
+
+		// Set up mock IMU reader with a2 as largest positive value
+		mockIMU := &mockIMUReaderWithAccel{a1: 0.1, a2: 9.8, a3: 0.2}
+		myIMUReader = mockIMU
+
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("f"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status OK or 0, got %d", resp.StatusCode)
+		}
+
+		// Verify IMUMapping was set correctly (forward axis should be 2 for positive a2)
+		if globalSettings.IMUMapping[0] != 2 {
+			t.Errorf("Expected IMUMapping[0] to be 2, got %d", globalSettings.IMUMapping[0])
+		}
+	})
+
+	t.Run("action_f_success_axis2_negative", func(t *testing.T) {
+		// Save original state
+		origSettings := globalSettings
+		origIMUReader := myIMUReader
+		defer func() {
+			globalSettings = origSettings
+			myIMUReader = origIMUReader
+		}()
+
+		// Set up mock IMU reader with a2 as largest negative value
+		mockIMU := &mockIMUReaderWithAccel{a1: 0.1, a2: -9.8, a3: 0.2}
+		myIMUReader = mockIMU
+
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("f"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status OK or 0, got %d", resp.StatusCode)
+		}
+
+		// Verify IMUMapping was set correctly (forward axis should be -2 for negative a2)
+		if globalSettings.IMUMapping[0] != -2 {
+			t.Errorf("Expected IMUMapping[0] to be -2, got %d", globalSettings.IMUMapping[0])
+		}
+	})
+
+	t.Run("action_f_success_axis3_positive", func(t *testing.T) {
+		// Save original state
+		origSettings := globalSettings
+		origIMUReader := myIMUReader
+		defer func() {
+			globalSettings = origSettings
+			myIMUReader = origIMUReader
+		}()
+
+		// Set up mock IMU reader with a3 as largest positive value
+		mockIMU := &mockIMUReaderWithAccel{a1: 0.1, a2: 0.2, a3: 9.8}
+		myIMUReader = mockIMU
+
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("f"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status OK or 0, got %d", resp.StatusCode)
+		}
+
+		// Verify IMUMapping was set correctly (forward axis should be 3 for positive a3)
+		if globalSettings.IMUMapping[0] != 3 {
+			t.Errorf("Expected IMUMapping[0] to be 3, got %d", globalSettings.IMUMapping[0])
+		}
+	})
+
+	t.Run("action_f_success_axis3_negative", func(t *testing.T) {
+		// Save original state
+		origSettings := globalSettings
+		origIMUReader := myIMUReader
+		defer func() {
+			globalSettings = origSettings
+			myIMUReader = origIMUReader
+		}()
+
+		// Set up mock IMU reader with a3 as largest negative value
+		mockIMU := &mockIMUReaderWithAccel{a1: 0.1, a2: 0.2, a3: -9.8}
+		myIMUReader = mockIMU
+
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("f"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status OK or 0, got %d", resp.StatusCode)
+		}
+
+		// Verify IMUMapping was set correctly (forward axis should be -3 for negative a3)
+		if globalSettings.IMUMapping[0] != -3 {
+			t.Errorf("Expected IMUMapping[0] to be -3, got %d", globalSettings.IMUMapping[0])
+		}
+	})
+
+	t.Run("action_f_error_reading_accelerometer", func(t *testing.T) {
+		// Save original state
+		origSettings := globalSettings
+		origIMUReader := myIMUReader
+		defer func() {
+			globalSettings = origSettings
+			myIMUReader = origIMUReader
+		}()
+
+		// Set up mock IMU reader that returns an error
+		mockIMU := &mockIMUReaderWithAccel{shouldError: true}
+		myIMUReader = mockIMU
+
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("f"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+		}
+
+		// Read response body to verify error message
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(string(body), "couldn't read accelerometer") {
+			t.Errorf("Expected error message about accelerometer, got: %s", string(body))
+		}
+	})
+}
+
+// TestHandleOrientAHRS_ActionD tests the 'd' action (set up direction)
+func TestHandleOrientAHRS_ActionD(t *testing.T) {
+	t.Run("action_d_success", func(t *testing.T) {
+		// Save original state
+		origSettings := globalSettings
+		origStatus := globalStatus
+		origIMUReader := myIMUReader
+		origConfigLocation := configLocation
+		defer func() {
+			globalSettings = origSettings
+			globalStatus = origStatus
+			myIMUReader = origIMUReader
+			configLocation = origConfigLocation
+		}()
+
+		// Set up temp config file
+		tmpDir := t.TempDir()
+		configLocation = tmpDir + "/test_stratux.conf"
+
+		// Initialize mutexes if needed
+		if systemErrsMutex == nil {
+			systemErrsMutex = &sync.Mutex{}
+		}
+		if systemErrs == nil {
+			systemErrs = make(map[string]string)
+		}
+
+		// Set up mock IMU reader
+		mockIMU := &mockIMUReaderWithAccel{}
+		myIMUReader = mockIMU
+
+		// Set initial SensorQuaternion to non-zero values
+		globalSettings.SensorQuaternion = [4]float64{1.0, 2.0, 3.0, 4.0}
+		globalStatus.IMUConnected = true
+
+		// Save initial mySituation state
+		origGLoad := mySituation.AHRSGLoad
+		origGLoadMax := mySituation.AHRSGLoadMax
+		origGLoadMin := mySituation.AHRSGLoadMin
+		defer func() {
+			mySituation.AHRSGLoad = origGLoad
+			mySituation.AHRSGLoadMax = origGLoadMax
+			mySituation.AHRSGLoadMin = origGLoadMin
+		}()
+
+		mySituation.AHRSGLoad = 5.5
+		mySituation.AHRSGLoadMax = 10.0
+		mySituation.AHRSGLoadMin = 1.0
+
+		req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("d"))
+		w := httptest.NewRecorder()
+
+		handleOrientAHRS(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status OK or 0, got %d", resp.StatusCode)
+		}
+
+		// Verify SensorQuaternion was reset to zeros
+		expectedQuaternion := [4]float64{0, 0, 0, 0}
+		if globalSettings.SensorQuaternion != expectedQuaternion {
+			t.Errorf("Expected SensorQuaternion to be %v, got %v", expectedQuaternion, globalSettings.SensorQuaternion)
+		}
+
+		// Verify IMU was closed
+		if !mockIMU.closed {
+			t.Error("Expected IMU to be closed")
+		}
+
+		// Verify IMUConnected was set to false
+		if globalStatus.IMUConnected {
+			t.Error("Expected IMUConnected to be false")
+		}
+
+		// Verify ResetAHRSGLoad was called (GLoadMax and GLoadMin should equal GLoad)
+		if mySituation.AHRSGLoadMax != mySituation.AHRSGLoad {
+			t.Errorf("Expected AHRSGLoadMax to equal AHRSGLoad (%f), got %f", mySituation.AHRSGLoad, mySituation.AHRSGLoadMax)
+		}
+		if mySituation.AHRSGLoadMin != mySituation.AHRSGLoad {
+			t.Errorf("Expected AHRSGLoadMin to equal AHRSGLoad (%f), got %f", mySituation.AHRSGLoad, mySituation.AHRSGLoadMin)
+		}
+
+		// Verify settings were saved
+		if _, err := os.Stat(configLocation); os.IsNotExist(err) {
+			t.Error("Expected settings file to be saved")
+		}
+	})
+
+	t.Run("action_d_multiple_times", func(t *testing.T) {
+		// Test calling 'd' action multiple times
+		origSettings := globalSettings
+		origStatus := globalStatus
+		origIMUReader := myIMUReader
+		origConfigLocation := configLocation
+		defer func() {
+			globalSettings = origSettings
+			globalStatus = origStatus
+			myIMUReader = origIMUReader
+			configLocation = origConfigLocation
+		}()
+
+		tmpDir := t.TempDir()
+		configLocation = tmpDir + "/test_stratux.conf"
+
+		if systemErrsMutex == nil {
+			systemErrsMutex = &sync.Mutex{}
+		}
+		if systemErrs == nil {
+			systemErrs = make(map[string]string)
+		}
+
+		mockIMU := &mockIMUReaderWithAccel{}
+		myIMUReader = mockIMU
+
+		// Call 'd' action twice
+		for i := 0; i < 2; i++ {
+			globalSettings.SensorQuaternion = [4]float64{1.0, 2.0, 3.0, 4.0}
+			globalStatus.IMUConnected = true
+
+			// Need fresh mock for each call since Close() is called
+			if i > 0 {
+				mockIMU = &mockIMUReaderWithAccel{}
+				myIMUReader = mockIMU
+			}
+
+			req := httptest.NewRequest("POST", "/orientAHRS", strings.NewReader("d"))
+			w := httptest.NewRecorder()
+
+			handleOrientAHRS(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+				t.Errorf("Call %d: Expected status OK or 0, got %d", i+1, resp.StatusCode)
+			}
+
+			// Verify state after each call
+			expectedQuaternion := [4]float64{0, 0, 0, 0}
+			if globalSettings.SensorQuaternion != expectedQuaternion {
+				t.Errorf("Call %d: Expected SensorQuaternion to be %v, got %v", i+1, expectedQuaternion, globalSettings.SensorQuaternion)
+			}
+		}
+	})
+}
+
 // TestHandleCageAHRS tests the /cageAHRS endpoint
 func TestHandleCageAHRS(t *testing.T) {
 	// Initialize the cal channel if not already initialized
