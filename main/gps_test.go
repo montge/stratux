@@ -2941,3 +2941,532 @@ func TestProcessNMEALineLow_SatelliteTypes(t *testing.T) {
 		})
 	}
 }
+
+// TestProcessNMEALineLow_Comprehensive tests additional code paths in processNMEALineLow
+func TestProcessNMEALineLow_Comprehensive(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	// Save original state
+	origGPSType := globalStatus.GPS_detected_type
+	origSatellites := Satellites
+	defer func() {
+		globalStatus.GPS_detected_type = origGPSType
+		Satellites = origSatellites
+	}()
+
+	t.Run("Valid GPVTG with speed > 3", func(t *testing.T) {
+		mySituation.GPSGroundSpeed = 0
+		mySituation.GPSTrueCourse = 0
+		result := processNMEALineLow("$GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*48", false)
+		if !result {
+			t.Error("Expected GPVTG to be processed")
+		}
+		if mySituation.GPSGroundSpeed != 5.5 {
+			t.Errorf("Expected speed 5.5, got %.2f", mySituation.GPSGroundSpeed)
+		}
+		if mySituation.GPSTrueCourse != 54.7 {
+			t.Errorf("Expected course 54.7, got %.2f", mySituation.GPSTrueCourse)
+		}
+	})
+
+	t.Run("Valid GNVTG variant", func(t *testing.T) {
+		mySituation.GPSGroundSpeed = 0
+		mySituation.GPSTrueCourse = 0
+		result := processNMEALineLow("$GNVTG,120.5,T,110.2,M,025.0,N,046.3,K*52", false)
+		if !result {
+			t.Error("Expected GNVTG to be processed")
+		}
+		if mySituation.GPSGroundSpeed != 25.0 {
+			t.Errorf("Expected speed 25.0, got %.2f", mySituation.GPSGroundSpeed)
+		}
+	})
+
+	t.Run("GPVTG with low speed (< 3 knots)", func(t *testing.T) {
+		mySituation.GPSGroundSpeed = 0
+		mySituation.GPSTrueCourse = 0
+		result := processNMEALineLow("$GPVTG,054.7,T,034.4,M,001.5,N,002.8,K*45", false)
+		if !result {
+			t.Error("Expected GPVTG to be processed")
+		}
+		if mySituation.GPSGroundSpeed != 1.5 {
+			t.Errorf("Expected speed 1.5, got %.2f", mySituation.GPSGroundSpeed)
+		}
+		// Course should not be updated when speed < 3
+		if mySituation.GPSTrueCourse != 0 {
+			t.Errorf("Expected course not to be updated, got %.2f", mySituation.GPSTrueCourse)
+		}
+	})
+
+	t.Run("Valid GPGGA with GPS fix", func(t *testing.T) {
+		globalStatus.GPS_detected_type = 0
+		mySituation.GPSLatitude = 0
+		mySituation.GPSLongitude = 0
+		mySituation.GPSAltitudeMSL = 0
+		mySituation.GPSFixQuality = 0
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*59", false)
+		if !result {
+			t.Error("Expected GPGGA to be processed")
+		}
+		if globalStatus.GPS_detected_type&0xf0 != GPS_PROTOCOL_NMEA {
+			t.Error("Expected GPS protocol to be set to NMEA")
+		}
+		if mySituation.GPSFixQuality != 1 {
+			t.Errorf("Expected fix quality 1, got %d", mySituation.GPSFixQuality)
+		}
+		// Latitude should be 48 + 7.038/60 = 48.1173
+		expectedLat := float32(48 + 7.038/60.0)
+		if diff := mySituation.GPSLatitude - expectedLat; diff < -0.001 || diff > 0.001 {
+			t.Errorf("Expected lat %.5f, got %.5f", expectedLat, mySituation.GPSLatitude)
+		}
+	})
+
+	t.Run("Valid GNGGA variant", func(t *testing.T) {
+		globalStatus.GPS_detected_type = 0
+		mySituation.GPSLatitude = 0
+		mySituation.GPSLongitude = 0
+		result := processNMEALineLow("$GNGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47", false)
+		if !result {
+			t.Error("Expected GNGGA to be processed")
+		}
+	})
+
+	t.Run("GPGGA with South latitude", func(t *testing.T) {
+		mySituation.GPSLatitude = 0
+		result := processNMEALineLow("$GPGGA,123519.0,3345.123,S,15112.456,E,1,08,0.9,100.0,M,10.0,M,,*4D", false)
+		if !result {
+			t.Error("Expected GPGGA to be processed")
+		}
+		if mySituation.GPSLatitude >= 0 {
+			t.Errorf("Expected negative latitude for South, got %.5f", mySituation.GPSLatitude)
+		}
+	})
+
+	t.Run("GPGGA with West longitude", func(t *testing.T) {
+		mySituation.GPSLongitude = 0
+		result := processNMEALineLow("$GPGGA,123519.0,4045.678,N,07359.123,W,1,08,0.9,50.0,M,5.0,M,,*46", false)
+		if !result {
+			t.Error("Expected GPGGA to be processed")
+		}
+		if mySituation.GPSLongitude >= 0 {
+			t.Errorf("Expected negative longitude for West, got %.5f", mySituation.GPSLongitude)
+		}
+	})
+
+	t.Run("Valid GPRMC with date and time", func(t *testing.T) {
+		globalStatus.GPS_detected_type = 0
+		mySituation.GPSLatitude = 0
+		mySituation.GPSLongitude = 0
+		mySituation.GPSGroundSpeed = 0
+		result := processNMEALineLow("$GPRMC,123519.0,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*74", false)
+		if !result {
+			t.Error("Expected GPRMC to be processed")
+		}
+		if globalStatus.GPS_detected_type&0xf0 != GPS_PROTOCOL_NMEA {
+			t.Error("Expected GPS protocol to be set to NMEA")
+		}
+		// Speed should be set (allow small floating point differences)
+		if mySituation.GPSGroundSpeed < 22.3 || mySituation.GPSGroundSpeed > 22.5 {
+			t.Errorf("Expected speed ~22.4, got %.2f", mySituation.GPSGroundSpeed)
+		}
+	})
+
+	t.Run("Valid GNRMC variant", func(t *testing.T) {
+		globalStatus.GPS_detected_type = 0
+		result := processNMEALineLow("$GNRMC,081836.0,A,3751.65,S,14507.36,E,000.0,360.0,130998,011.3,E*62", false)
+		if !result {
+			t.Error("Expected GNRMC to be processed")
+		}
+	})
+
+	t.Run("GPRMC with low speed and null course", func(t *testing.T) {
+		mySituation.GPSGroundSpeed = 0
+		mySituation.GPSTrueCourse = 0
+		// Low speed with empty course field - should not fail
+		result := processNMEALineLow("$GPRMC,123519.0,A,4807.038,N,01131.000,E,001.5,,230394,003.1,W*52", false)
+		if !result {
+			t.Error("Expected GPRMC with low speed and null course to be processed")
+		}
+	})
+
+	t.Run("Valid GPGSA with 3D fix", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 2 // SBAS fix
+		globalStatus.GPS_detected_type = GPS_TYPE_UBX8
+		mySituation.GPSLastAccuracyTime = time.Time{} // Force HDOP/VDOP based accuracy
+		result := processNMEALineLow("$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*39", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		// Check that satellites were added
+		if len(Satellites) == 0 {
+			t.Error("Expected satellites to be tracked")
+		}
+	})
+
+	t.Run("Valid GNGSA variant", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		result := processNMEALineLow("$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.5,1.0,1.1*2A", false)
+		if !result {
+			t.Error("Expected GNGSA to be processed")
+		}
+	})
+
+	t.Run("GPGSA with UBX9 accuracy calculation", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 2
+		globalStatus.GPS_detected_type = GPS_TYPE_UBX9
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		mySituation.GPSHorizontalAccuracy = 0
+		result := processNMEALineLow("$GPGSA,A,3,01,02,03,04,,,,,,,,,2.0,1.5,1.3*32", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		// UBX9 with SBAS should use hdop * 3.0
+		expectedAcc := float32(1.5 * 3.0)
+		if diff := mySituation.GPSHorizontalAccuracy - expectedAcc; diff < -0.1 || diff > 0.1 {
+			t.Errorf("Expected accuracy %.2f, got %.2f", expectedAcc, mySituation.GPSHorizontalAccuracy)
+		}
+	})
+
+	t.Run("GPGSA with UBX10 accuracy calculation", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 1 // Non-SBAS
+		globalStatus.GPS_detected_type = GPS_TYPE_UBX10
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		mySituation.GPSHorizontalAccuracy = 0
+		result := processNMEALineLow("$GPGSA,A,3,01,02,03,04,,,,,,,,,2.0,1.5,1.3*32", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		// UBX10 without SBAS should use hdop * 4.0
+		expectedAcc := float32(1.5 * 4.0)
+		if diff := mySituation.GPSHorizontalAccuracy - expectedAcc; diff < -0.1 || diff > 0.1 {
+			t.Errorf("Expected accuracy %.2f, got %.2f", expectedAcc, mySituation.GPSHorizontalAccuracy)
+		}
+	})
+
+	t.Run("GPGSA with non-UBX SBAS accuracy", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 2
+		globalStatus.GPS_detected_type = GPS_TYPE_UBX8
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		mySituation.GPSHorizontalAccuracy = 0
+		result := processNMEALineLow("$GPGSA,A,3,01,02,03,04,,,,,,,,,2.0,1.5,1.3*32", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		// Non-UBX9/10 with SBAS should use hdop * 4.0
+		expectedAcc := float32(1.5 * 4.0)
+		if diff := mySituation.GPSHorizontalAccuracy - expectedAcc; diff < -0.1 || diff > 0.1 {
+			t.Errorf("Expected accuracy %.2f, got %.2f", expectedAcc, mySituation.GPSHorizontalAccuracy)
+		}
+	})
+
+	t.Run("GPGSA with non-UBX non-SBAS accuracy", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 1
+		globalStatus.GPS_detected_type = GPS_TYPE_UBX8
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		mySituation.GPSHorizontalAccuracy = 0
+		result := processNMEALineLow("$GPGSA,A,3,01,02,03,04,,,,,,,,,2.0,1.5,1.3*32", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		// Non-UBX9/10 without SBAS should use hdop * 5.0
+		expectedAcc := float32(1.5 * 5.0)
+		if diff := mySituation.GPSHorizontalAccuracy - expectedAcc; diff < -0.1 || diff > 0.1 {
+			t.Errorf("Expected accuracy %.2f, got %.2f", expectedAcc, mySituation.GPSHorizontalAccuracy)
+		}
+	})
+
+	t.Run("GPGSA skips accuracy when GST recent", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSLastAccuracyTime = stratuxClock.Time // Recent GST
+		mySituation.GPSHorizontalAccuracy = 99.0
+		result := processNMEALineLow("$GPGSA,A,3,01,02,03,04,,,,,,,,,2.0,1.5,1.3*32", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		// Accuracy should not be updated
+		if mySituation.GPSHorizontalAccuracy != 99.0 {
+			t.Error("Expected accuracy to remain unchanged when GST is recent")
+		}
+	})
+
+	t.Run("GPGSA with SBAS satellite (33-64)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		result := processNMEALineLow("$GPGSA,A,3,01,02,33,04,,,,,,,,,2.0,1.5,1.3*31", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		// Check SBAS satellite was properly identified
+		if sat, ok := Satellites["S120"]; !ok {
+			t.Error("Expected SBAS satellite S120 to be tracked")
+		} else if sat.Type != SAT_TYPE_SBAS {
+			t.Errorf("Expected SAT_TYPE_SBAS, got %d", sat.Type)
+		}
+	})
+
+	t.Run("GPGSA with GLONASS satellite (65-96)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		result := processNMEALineLow("$GPGSA,A,3,65,66,67,68,,,,,,,,,2.0,1.5,1.3*3A", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		if sat, ok := Satellites["R1"]; !ok {
+			t.Error("Expected GLONASS satellite R1 to be tracked")
+		} else if sat.Type != SAT_TYPE_GLONASS {
+			t.Errorf("Expected SAT_TYPE_GLONASS, got %d", sat.Type)
+		}
+	})
+
+	t.Run("GPGSA with QZSS satellite (193-202)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		result := processNMEALineLow("$GPGSA,A,3,193,194,,,,,,,,,,,2.0,1.5,1.3*31", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		if sat, ok := Satellites["Q1"]; !ok {
+			t.Error("Expected QZSS satellite Q1 to be tracked")
+		} else if sat.Type != SAT_TYPE_QZSS {
+			t.Errorf("Expected SAT_TYPE_QZSS, got %d", sat.Type)
+		}
+	})
+
+	t.Run("GPGSA with Galileo satellite (301-336)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		result := processNMEALineLow("$GPGSA,A,3,301,302,,,,,,,,,,,2.0,1.5,1.3*35", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		if sat, ok := Satellites["E1"]; !ok {
+			t.Error("Expected Galileo satellite E1 to be tracked")
+		} else if sat.Type != SAT_TYPE_GALILEO {
+			t.Errorf("Expected SAT_TYPE_GALILEO, got %d", sat.Type)
+		}
+	})
+
+	t.Run("GPGSA with Beidou satellite (401-463)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		result := processNMEALineLow("$GPGSA,A,3,401,402,,,,,,,,,,,2.0,1.5,1.3*35", false)
+		if !result {
+			t.Error("Expected GPGSA to be processed")
+		}
+		if sat, ok := Satellites["B1"]; !ok {
+			t.Error("Expected Beidou satellite B1 to be tracked")
+		} else if sat.Type != SAT_TYPE_BEIDOU {
+			t.Errorf("Expected SAT_TYPE_BEIDOU, got %d", sat.Type)
+		}
+	})
+
+	t.Run("Valid GPGST message", func(t *testing.T) {
+		mySituation.GPSHorizontalAccuracy = 0
+		mySituation.GPSVerticalAccuracy = 0
+		result := processNMEALineLow("$GPGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,0.01,0.03*45", false)
+		if !result {
+			t.Error("Expected GPGST to be processed")
+		}
+		if mySituation.GPSHorizontalAccuracy == 0 {
+			t.Error("Expected horizontal accuracy to be set")
+		}
+		if mySituation.GPSVerticalAccuracy == 0 {
+			t.Error("Expected vertical accuracy to be set")
+		}
+	})
+
+	t.Run("Valid GNGST variant", func(t *testing.T) {
+		mySituation.GPSHorizontalAccuracy = 0
+		result := processNMEALineLow("$GNGST,082356.00,1.4,1.3,0.52,267.747,1.2,1.1,2.2*77", false)
+		if !result {
+			t.Error("Expected GNGST to be processed")
+		}
+		if mySituation.GPSHorizontalAccuracy == 0 {
+			t.Error("Expected accuracy to be set")
+		}
+	})
+
+	t.Run("Valid GPGSV message", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GPGSV,3,1,12,01,45,045,47,02,30,110,45,03,15,175,43,04,60,290,48*7C", false)
+		if !result {
+			t.Error("Expected GPGSV to be processed")
+		}
+		if len(Satellites) != 4 {
+			t.Errorf("Expected 4 satellites, got %d", len(Satellites))
+		}
+	})
+
+	t.Run("GPGSV with blank elevation/azimuth", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GPGSV,1,1,04,01,,,47,02,,,45,03,,,43,04,,,48*70", false)
+		if !result {
+			t.Error("Expected GPGSV to be processed")
+		}
+		// Check that satellites with blank elev/az are handled
+		if sat, ok := Satellites["G1"]; !ok {
+			t.Error("Expected satellite G1 to be tracked")
+		} else if sat.Elevation != -999 {
+			t.Errorf("Expected elevation -999 for blank, got %d", sat.Elevation)
+		}
+	})
+
+	t.Run("GPGSV with blank signal", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GPGSV,1,1,01,01,45,045,*49", false)
+		if !result {
+			t.Error("Expected GPGSV to be processed")
+		}
+		if sat, ok := Satellites["G1"]; !ok {
+			t.Error("Expected satellite G1 to be tracked")
+		} else if sat.Signal != -99 {
+			t.Errorf("Expected signal -99 for blank, got %d", sat.Signal)
+		}
+	})
+
+	t.Run("GLGSV message (GLONASS)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GLGSV,2,1,08,65,45,045,47,66,30,110,45,67,15,175,43,68,60,290,48*62", false)
+		if !result {
+			t.Error("Expected GLGSV to be processed")
+		}
+		if _, ok := Satellites["R1"]; !ok {
+			t.Error("Expected GLONASS satellite R1 to be tracked")
+		}
+	})
+
+	t.Run("GAGSV message (Galileo)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GAGSV,1,1,04,301,45,045,47,302,30,110,45,303,15,175,43,304,60,290,48*68", false)
+		if !result {
+			t.Error("Expected GAGSV to be processed")
+		}
+		if _, ok := Satellites["E1"]; !ok {
+			t.Error("Expected Galileo satellite E1 to be tracked")
+		}
+	})
+
+	t.Run("GBGSV message (Beidou)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GBGSV,1,1,04,401,45,045,47,402,30,110,45,403,15,175,43,404,60,290,48*6B", false)
+		if !result {
+			t.Error("Expected GBGSV to be processed")
+		}
+		if _, ok := Satellites["B1"]; !ok {
+			t.Error("Expected Beidou satellite B1 to be tracked")
+		}
+	})
+
+	t.Run("GPGSV with SBAS satellite in solution", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 2 // SBAS fix
+		result := processNMEALineLow("$GPGSV,1,1,01,33,45,045,25*4F", false)
+		if !result {
+			t.Error("Expected GPGSV to be processed")
+		}
+		// SBAS with good signal and SBAS fix should be marked InSolution
+		if sat, ok := Satellites["S120"]; !ok {
+			t.Error("Expected SBAS satellite S120")
+		} else if !sat.InSolution {
+			t.Error("Expected SBAS satellite to be in solution with good signal")
+		}
+	})
+
+	t.Run("GPGSV with SBAS not in solution (low signal)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 2
+		result := processNMEALineLow("$GPGSV,1,1,01,33,45,045,10*49", false)
+		if !result {
+			t.Error("Expected GPGSV to be processed")
+		}
+		// Low signal should not mark as in solution
+		if sat, ok := Satellites["S120"]; ok && sat.InSolution {
+			t.Error("Expected SBAS satellite not to be in solution with weak signal")
+		}
+	})
+
+	t.Run("GPGSV with SBAS not in solution (no SBAS fix)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 1 // GPS fix, not SBAS
+		result := processNMEALineLow("$GPGSV,1,1,01,33,45,045,25*4F", false)
+		if !result {
+			t.Error("Expected GPGSV to be processed")
+		}
+		if sat, ok := Satellites["S120"]; ok && sat.InSolution {
+			t.Error("Expected SBAS satellite not to be in solution without SBAS fix")
+		}
+	})
+
+	t.Run("Valid POGNB message", func(t *testing.T) {
+		mySituation.BaroPressureAltitude = 0
+		mySituation.BaroSourceType = BARO_TYPE_NONE
+		mySituation.BaroLastMeasurementTime = time.Time{}
+		result := processNMEALineLow("$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,-0.04,+32.6*47", false)
+		if !result {
+			t.Error("Expected POGNB to be processed")
+		}
+		if mySituation.BaroSourceType != BARO_TYPE_OGNTRACKER {
+			t.Errorf("Expected BARO_TYPE_OGNTRACKER, got %d", mySituation.BaroSourceType)
+		}
+		// Field 5 is pressure alt in meters, should be converted to feet
+		expectedAlt := float32(29.4 * 3.28084)
+		if diff := mySituation.BaroPressureAltitude - expectedAlt; diff < -1.0 || diff > 1.0 {
+			t.Errorf("Expected altitude %.2f, got %.2f", expectedAlt, mySituation.BaroPressureAltitude)
+		}
+	})
+
+	t.Run("POGNB ignored when BMP280 present", func(t *testing.T) {
+		origAlt := mySituation.BaroPressureAltitude
+		mySituation.BaroSourceType = BARO_TYPE_BMP280
+		mySituation.BaroLastMeasurementTime = stratuxClock.Time
+		result := processNMEALineLow("$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,-0.04,+32.6*47", false)
+		if !result {
+			t.Error("Expected POGNB to be processed but ignored")
+		}
+		if mySituation.BaroPressureAltitude != origAlt {
+			t.Error("Expected altitude to remain unchanged when BMP280 present")
+		}
+	})
+
+	t.Run("Empty NMEA line", func(t *testing.T) {
+		result := processNMEALineLow("", false)
+		if result {
+			t.Error("Expected empty line to return false")
+		}
+	})
+
+	t.Run("NMEA line without checksum", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519,4807.038,N,01131.000,E", false)
+		if result {
+			t.Error("Expected line without checksum to return false")
+		}
+	})
+
+	t.Run("Unknown NMEA sentence", func(t *testing.T) {
+		result := processNMEALineLow("$GPXYZ,1,2,3*3C", false)
+		if result {
+			t.Error("Expected unknown sentence to return false")
+		}
+	})
+}
