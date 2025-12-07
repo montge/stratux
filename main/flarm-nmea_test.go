@@ -800,12 +800,17 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 			name: "Traffic with tail number",
 			setupSituation: func() {
 				mySituation.muGPS.Lock()
-				defer mySituation.muGPS.Unlock()
 				mySituation.GPSLatitude = 47.0
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSTrueCourse = 45.0
 				mySituation.GPSFixQuality = 1
 				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.muGPS.Unlock()
+
+				mySituation.muBaro.Lock()
+				mySituation.BaroPressureAltitude = 1500.0
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.muBaro.Unlock()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -816,9 +821,9 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 			ti: TrafficInfo{
 				Icao_addr:      0xABC123,
 				Tail:           "N12345",
-				Lat:            47.004,
+				Lat:            47.002,  // ~222m away
 				Lng:            -122.0,
-				Alt:            1500,
+				Alt:            1550,    // 50 feet above = 15.24m vertical difference
 				Position_valid: true,
 			},
 			expectGPSStatus:       "2",
@@ -848,6 +853,74 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 				Lat:            47.004,
 				Lng:            -122.0,
 				Alt:            1000,
+				Position_valid: true,
+			},
+			expectGPSStatus:       "2",
+			expectRX:              "0",
+			expectAlarmLevel:      true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Bearing adjustment - bearing > 180 degrees",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSTrueCourse = 10.0 // Heading nearly north
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.muGPS.Unlock()
+
+				mySituation.muBaro.Lock()
+				mySituation.BaroPressureAltitude = 1000.0
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.muBaro.Unlock()
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			setupTraffic: func() {
+				traffic = make(map[uint32]TrafficInfo)
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0x222222,
+				Lat:            46.991,  // South of our position
+				Lng:            -121.99, // East of our position, creates bearing ~200 degrees
+				Alt:            1050,    // 50 feet above
+				Position_valid: true,
+			},
+			expectGPSStatus:       "2",
+			expectRX:              "0",
+			expectAlarmLevel:      true,
+			expectChecksumPresent: true,
+		},
+		{
+			name: "Bearing adjustment - bearing < -180 degrees",
+			setupSituation: func() {
+				mySituation.muGPS.Lock()
+				mySituation.GPSLatitude = 47.0
+				mySituation.GPSLongitude = -122.0
+				mySituation.GPSTrueCourse = 200.0 // Heading nearly south
+				mySituation.GPSFixQuality = 1
+				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.muGPS.Unlock()
+
+				mySituation.muBaro.Lock()
+				mySituation.BaroPressureAltitude = 1000.0
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.muBaro.Unlock()
+			},
+			setupGlobalStatus: func() {
+				globalStatus.GPS_connected = true
+			},
+			setupTraffic: func() {
+				traffic = make(map[uint32]TrafficInfo)
+			},
+			ti: TrafficInfo{
+				Icao_addr:      0x333333,
+				Lat:            47.009,  // North of our position
+				Lng:            -122.01, // West of our position, creates bearing ~10 degrees
+				Alt:            1050,    // 50 feet above
 				Position_valid: true,
 			},
 			expectGPSStatus:       "2",
