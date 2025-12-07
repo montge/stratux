@@ -10,6 +10,59 @@ import (
 	"time"
 )
 
+// traceLogState holds the non-mutex fields of TraceLogger for save/restore in tests
+// This avoids copying sync.Mutex which causes go vet warnings
+type traceLogState struct {
+	fileHandle        *os.File
+	gzWriter          *gzip.Writer
+	csvWriter         *csv.Writer
+	fileName          string
+	hasProperFilename bool
+	isReplaying       bool
+}
+
+// saveTraceLogState saves the current TraceLog state without copying the mutex
+func saveTraceLogState() traceLogState {
+	return traceLogState{
+		fileHandle:        TraceLog.fileHandle,
+		gzWriter:          TraceLog.gzWriter,
+		csvWriter:         TraceLog.csvWriter,
+		fileName:          TraceLog.fileName,
+		hasProperFilename: TraceLog.hasProperFilename,
+		isReplaying:       TraceLog.isReplaying,
+	}
+}
+
+// restoreTraceLogState restores TraceLog state without affecting the mutex
+func restoreTraceLogState(state traceLogState) {
+	TraceLog.fileHandle = state.fileHandle
+	TraceLog.gzWriter = state.gzWriter
+	TraceLog.csvWriter = state.csvWriter
+	TraceLog.fileName = state.fileName
+	TraceLog.hasProperFilename = state.hasProperFilename
+	TraceLog.isReplaying = state.isReplaying
+}
+
+// resetTraceLog resets TraceLog fields to zero values without replacing the mutex
+func resetTraceLog() {
+	TraceLog.fileHandle = nil
+	TraceLog.gzWriter = nil
+	TraceLog.csvWriter = nil
+	TraceLog.fileName = ""
+	TraceLog.hasProperFilename = false
+	TraceLog.isReplaying = false
+}
+
+// setTraceLogForTest sets TraceLog fields for testing without replacing the mutex
+func setTraceLogForTest(fh *os.File, gzw *gzip.Writer, csvw *csv.Writer, fileName string, isReplaying bool) {
+	TraceLog.fileHandle = fh
+	TraceLog.gzWriter = gzw
+	TraceLog.csvWriter = csvw
+	TraceLog.fileName = fileName
+	TraceLog.hasProperFilename = fileName != ""
+	TraceLog.isReplaying = isReplaying
+}
+
 // TestTraceLoggerRecordAndRead tests recording and reading trace files
 func TestTraceLoggerRecordAndRead(t *testing.T) {
 	// Create temporary directory for test files
@@ -339,10 +392,10 @@ func TestTraceTimestampOrdering(t *testing.T) {
 // TestTraceLoggerRecord_NoFileHandle tests Record with no active file
 func TestTraceLoggerRecord_NoFileHandle(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create a fresh TraceLogger with no file handle
-	TraceLog = TraceLogger{}
+	resetTraceLog()
 
 	// Record should not panic when fileHandle is nil
 	TraceLog.Record(CONTEXT_DUMP1090, []byte("test data"))
@@ -351,7 +404,7 @@ func TestTraceLoggerRecord_NoFileHandle(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("Record with no file handle completed without panic")
 }
@@ -359,7 +412,7 @@ func TestTraceLoggerRecord_NoFileHandle(t *testing.T) {
 // TestTraceLoggerRecord_WithFileHandle tests Record with actual file writing
 func TestTraceLoggerRecord_WithFileHandle(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 	origStratuxClock := stratuxClock
 
 	// Initialize stratuxClock if needed
@@ -381,13 +434,7 @@ func TestTraceLoggerRecord_WithFileHandle(t *testing.T) {
 	gzw := gzip.NewWriter(fh)
 	csvw := csv.NewWriter(gzw)
 
-	TraceLog = TraceLogger{
-		fileHandle:  fh,
-		gzWriter:    gzw,
-		csvWriter:   csvw,
-		fileName:    traceFile,
-		isReplaying: false,
-	}
+	setTraceLogForTest(fh, gzw, csvw, traceFile, false)
 
 	// Record some data
 	TraceLog.Record(CONTEXT_DUMP1090, []byte(`{"hex":"A12345"}`))
@@ -413,7 +460,7 @@ func TestTraceLoggerRecord_WithFileHandle(t *testing.T) {
 	}
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 	stratuxClock = origStratuxClock
 
 	t.Logf("Record with file handle wrote %d bytes", info.Size())
@@ -422,12 +469,11 @@ func TestTraceLoggerRecord_WithFileHandle(t *testing.T) {
 // TestTraceLoggerRecord_IsReplaying tests Record when replaying
 func TestTraceLoggerRecord_IsReplaying(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create a TraceLogger that is replaying
-	TraceLog = TraceLogger{
-		isReplaying: true,
-	}
+	resetTraceLog()
+	TraceLog.isReplaying = true
 
 	// Record should return early when replaying
 	TraceLog.Record(CONTEXT_NMEA, []byte("test NMEA data"))
@@ -436,7 +482,7 @@ func TestTraceLoggerRecord_IsReplaying(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("Record when replaying completed without action")
 }
@@ -444,10 +490,10 @@ func TestTraceLoggerRecord_IsReplaying(t *testing.T) {
 // TestTraceLoggerOnTimestamp_NoFileHandle tests OnTimestamp with no file
 func TestTraceLoggerOnTimestamp_NoFileHandle(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create a fresh TraceLogger
-	TraceLog = TraceLogger{}
+	resetTraceLog()
 
 	ts := time.Date(2024, 1, 15, 12, 30, 0, 0, time.UTC)
 
@@ -459,7 +505,7 @@ func TestTraceLoggerOnTimestamp_NoFileHandle(t *testing.T) {
 	}
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("OnTimestamp with no file handle completed")
 }
@@ -467,13 +513,12 @@ func TestTraceLoggerOnTimestamp_NoFileHandle(t *testing.T) {
 // TestTraceLoggerOnTimestamp_AlreadyHasProperFilename tests OnTimestamp when already named
 func TestTraceLoggerOnTimestamp_AlreadyHasProperFilename(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create a TraceLogger that already has proper filename
-	TraceLog = TraceLogger{
-		hasProperFilename: true,
-		fileName:          "/var/log/stratux/test_trace.txt.gz",
-	}
+	resetTraceLog()
+	TraceLog.hasProperFilename = true
+	TraceLog.fileName = "/var/log/stratux/test_trace.txt.gz"
 
 	ts := time.Date(2024, 1, 15, 12, 30, 0, 0, time.UTC)
 	origFilename := TraceLog.fileName
@@ -486,7 +531,7 @@ func TestTraceLoggerOnTimestamp_AlreadyHasProperFilename(t *testing.T) {
 	}
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("OnTimestamp with proper filename already set completed")
 }
@@ -494,7 +539,7 @@ func TestTraceLoggerOnTimestamp_AlreadyHasProperFilename(t *testing.T) {
 // TestTraceLoggerOnTimestamp_RenameSuccess tests OnTimestamp with successful rename
 func TestTraceLoggerOnTimestamp_RenameSuccess(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create temp directory for test files
 	tmpDir := t.TempDir()
@@ -514,11 +559,8 @@ func TestTraceLoggerOnTimestamp_RenameSuccess(t *testing.T) {
 		t.Fatalf("Failed to open original file: %v", err)
 	}
 
-	TraceLog = TraceLogger{
-		fileHandle:        fh,
-		fileName:          originalFile,
-		hasProperFilename: false,
-	}
+	setTraceLogForTest(fh, nil, nil, originalFile, false)
+	TraceLog.hasProperFilename = false
 
 	ts := time.Date(2024, 1, 15, 12, 30, 0, 0, time.UTC)
 	TraceLog.OnTimestamp(ts)
@@ -533,7 +575,7 @@ func TestTraceLoggerOnTimestamp_RenameSuccess(t *testing.T) {
 	fh.Close()
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("OnTimestamp with file handle completed (rename attempted)")
 }
@@ -541,7 +583,7 @@ func TestTraceLoggerOnTimestamp_RenameSuccess(t *testing.T) {
 // TestTraceLoggerOnTimestamp_RenameFail tests OnTimestamp when rename fails
 func TestTraceLoggerOnTimestamp_RenameFail(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create temp directory for test files
 	tmpDir := t.TempDir()
@@ -553,11 +595,8 @@ func TestTraceLoggerOnTimestamp_RenameFail(t *testing.T) {
 		t.Fatalf("Failed to create original file: %v", err)
 	}
 
-	TraceLog = TraceLogger{
-		fileHandle:        fh,
-		fileName:          originalFile,
-		hasProperFilename: false,
-	}
+	setTraceLogForTest(fh, nil, nil, originalFile, false)
+	TraceLog.hasProperFilename = false
 
 	ts := time.Date(2024, 1, 15, 12, 30, 0, 0, time.UTC)
 	TraceLog.OnTimestamp(ts)
@@ -577,7 +616,7 @@ func TestTraceLoggerOnTimestamp_RenameFail(t *testing.T) {
 	fh.Close()
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("OnTimestamp with rename failure completed (filename unchanged)")
 }
@@ -585,10 +624,10 @@ func TestTraceLoggerOnTimestamp_RenameFail(t *testing.T) {
 // TestTraceLoggerIsActive tests IsActive method
 func TestTraceLoggerIsActive(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create a fresh TraceLogger
-	TraceLog = TraceLogger{}
+	resetTraceLog()
 
 	// Should be inactive with no file handle
 	if TraceLog.IsActive() {
@@ -596,7 +635,7 @@ func TestTraceLoggerIsActive(t *testing.T) {
 	}
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("IsActive returns correct state")
 }
@@ -604,10 +643,10 @@ func TestTraceLoggerIsActive(t *testing.T) {
 // TestTraceLoggerIsReplaying tests IsReplaying method
 func TestTraceLoggerIsReplaying(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create a fresh TraceLogger
-	TraceLog = TraceLogger{}
+	resetTraceLog()
 
 	// Should not be replaying by default
 	if TraceLog.IsReplaying() {
@@ -622,7 +661,7 @@ func TestTraceLoggerIsReplaying(t *testing.T) {
 	}
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("IsReplaying returns correct state")
 }
@@ -630,16 +669,16 @@ func TestTraceLoggerIsReplaying(t *testing.T) {
 // TestTraceLoggerFlush_NoFileHandle tests Flush with no file
 func TestTraceLoggerFlush_NoFileHandle(t *testing.T) {
 	// Save original state
-	origTraceLog := TraceLog
+	origTraceLog := saveTraceLogState()
 
 	// Create a fresh TraceLogger
-	TraceLog = TraceLogger{}
+	resetTraceLog()
 
 	// Flush should not panic when fileHandle is nil
 	TraceLog.Flush()
 
 	// Restore original
-	TraceLog = origTraceLog
+	restoreTraceLogState(origTraceLog)
 
 	t.Log("Flush with no file handle completed without panic")
 }

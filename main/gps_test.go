@@ -692,3 +692,370 @@ func TestCalculateNavRate(t *testing.T) {
 		}
 	})
 }
+
+// TestProcessNMEALine_GPVTG tests VTG (velocity/track) message parsing
+func TestProcessNMEALine_GPVTG(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name          string
+		input         string
+		expectUsed    bool
+		expectSpeed   float64
+		expectCourse  float32
+		speedMatters  bool
+		courseMatters bool
+	}{
+		{
+			name:          "Valid VTG with speed > 3 knots",
+			input:         "$GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*48",
+			expectUsed:    true,
+			expectSpeed:   5.5,
+			expectCourse:  54.7,
+			speedMatters:  true,
+			courseMatters: true,
+		},
+		{
+			name:          "Valid GNVTG variant",
+			input:         "$GNVTG,120.5,T,110.2,M,025.0,N,046.3,K*52",
+			expectUsed:    true,
+			expectSpeed:   25.0,
+			expectCourse:  120.5,
+			speedMatters:  true,
+			courseMatters: true,
+		},
+		{
+			name:         "VTG with low speed (< 3 knots, no course update)",
+			input:        "$GPVTG,054.7,T,034.4,M,001.5,N,002.8,K*45",
+			expectUsed:   true,
+			expectSpeed:  1.5,
+			speedMatters: true,
+			// Course should not be updated when speed < 3
+			courseMatters: false,
+		},
+		{
+			name:       "VTG with too few fields",
+			input:      "$GPVTG,054.7,T,034.4,M*60",
+			expectUsed: false,
+		},
+		{
+			name:       "VTG with invalid checksum",
+			input:      "$GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*FF",
+			expectUsed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset state
+			mySituation.GPSGroundSpeed = 0
+			mySituation.GPSTrueCourse = 0
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			if tc.expectUsed {
+				if tc.speedMatters {
+					speedDiff := mySituation.GPSGroundSpeed - tc.expectSpeed
+					if speedDiff < -0.01 || speedDiff > 0.01 {
+						t.Errorf("Expected GPSGroundSpeed=%.2f, got %.2f",
+							tc.expectSpeed, mySituation.GPSGroundSpeed)
+					}
+				}
+				if tc.courseMatters {
+					courseDiff := mySituation.GPSTrueCourse - tc.expectCourse
+					if courseDiff < -0.01 || courseDiff > 0.01 {
+						t.Errorf("Expected GPSTrueCourse=%.2f, got %.2f",
+							tc.expectCourse, mySituation.GPSTrueCourse)
+					}
+				}
+				t.Logf("Parsed VTG: speed=%.2f kts, course=%.2f°",
+					mySituation.GPSGroundSpeed, mySituation.GPSTrueCourse)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_GPGGA tests GGA (position fix) message parsing
+func TestProcessNMEALine_GPGGA(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name         string
+		input        string
+		expectUsed   bool
+		expectLat    float32
+		expectLon    float32
+		expectAlt    float32
+		expectFixQty uint8
+	}{
+		{
+			name:         "Valid GPGGA with GPS fix",
+			input:        "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*59",
+			expectUsed:   true,
+			expectLat:    48.1173,   // 48° 07.038' = 48 + 7.038/60
+			expectLon:    11.51667,  // 11° 31.000' = 11 + 31/60
+			expectAlt:    1789.37,   // 545.4m * 3.28084 ft/m (MSL altitude, includes geoid sep)
+			expectFixQty: 1,
+		},
+		{
+			name:         "Valid GNGGA variant",
+			input:        "$GNGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47",
+			expectUsed:   true,
+			expectLat:    48.1173,
+			expectLon:    11.51667,
+			expectAlt:    1789.37,   // includes geoid separation
+			expectFixQty: 1,
+		},
+		{
+			name:         "Southern hemisphere latitude",
+			input:        "$GPGGA,123519.0,3345.123,S,15112.456,E,1,08,0.9,100.0,M,10.0,M,,*4D",
+			expectUsed:   true,
+			expectLat:    -33.75205, // Negative for South
+			expectLon:    151.2076,
+			expectAlt:    328.084, // 100m * 3.28084
+			expectFixQty: 1,
+		},
+		{
+			name:         "Western hemisphere longitude",
+			input:        "$GPGGA,123519.0,4045.678,N,07359.123,W,1,08,0.9,50.0,M,5.0,M,,*46",
+			expectUsed:   true,
+			expectLat:    40.7613,
+			expectLon:    -73.98538, // Negative for West
+			expectAlt:    164.042,
+			expectFixQty: 1,
+		},
+		{
+			name:         "GGA with no fix (quality=0)",
+			input:        "$GPGGA,123519.0,4807.038,N,01131.000,E,0,08,0.9,545.4,M,46.9,M,,*58",
+			expectUsed:   true,     // GGA is still processed even with quality=0
+			expectLat:    48.1173,  // Position is still parsed
+			expectLon:    11.51667, // Position is still parsed
+			expectAlt:    1789.37,
+			expectFixQty: 0, // But fix quality is set to 0
+		},
+		{
+			name:       "GGA with too few fields",
+			input:      "$GPGGA,123519,4807.038,N,01131.000,E*36",
+			expectUsed: false,
+		},
+		{
+			name:       "GGA with invalid checksum",
+			input:      "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*FF",
+			expectUsed: false,
+		},
+		{
+			name:       "GGA with invalid latitude format",
+			input:      "$GPGGA,123519,ABC,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*21",
+			expectUsed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset state
+			mySituation.GPSLatitude = 0
+			mySituation.GPSLongitude = 0
+			mySituation.GPSAltitudeMSL = 0
+			mySituation.GPSFixQuality = 0
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			if tc.expectUsed {
+				// Allow small floating point differences
+				latDiff := mySituation.GPSLatitude - tc.expectLat
+				if latDiff < -0.0001 || latDiff > 0.0001 {
+					t.Errorf("Expected Latitude=%.5f, got %.5f",
+						tc.expectLat, mySituation.GPSLatitude)
+				}
+
+				lonDiff := mySituation.GPSLongitude - tc.expectLon
+				if lonDiff < -0.0001 || lonDiff > 0.0001 {
+					t.Errorf("Expected Longitude=%.5f, got %.5f",
+						tc.expectLon, mySituation.GPSLongitude)
+				}
+
+				altDiff := mySituation.GPSAltitudeMSL - tc.expectAlt
+				if altDiff < -0.1 || altDiff > 0.1 {
+					t.Errorf("Expected Altitude=%.2f ft, got %.2f ft",
+						tc.expectAlt, mySituation.GPSAltitudeMSL)
+				}
+
+				if mySituation.GPSFixQuality != tc.expectFixQty {
+					t.Errorf("Expected GPSFixQuality=%d, got %d",
+						tc.expectFixQty, mySituation.GPSFixQuality)
+				}
+
+				t.Logf("Parsed GGA: lat=%.5f, lon=%.5f, alt=%.2f ft, fixQ=%d",
+					mySituation.GPSLatitude, mySituation.GPSLongitude,
+					mySituation.GPSAltitudeMSL, mySituation.GPSFixQuality)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_GPRMC tests RMC (recommended minimum) message parsing
+func TestProcessNMEALine_GPRMC(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name         string
+		input        string
+		expectUsed   bool
+		expectLat    float32
+		expectLon    float32
+		expectSpeed  float64
+		expectCourse float32
+	}{
+		{
+			name:         "Valid GPRMC with active status",
+			input:        "$GPRMC,123519.0,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*74",
+			expectUsed:   true,
+			expectLat:    48.1173,
+			expectLon:    11.51667,
+			expectSpeed:  22.4,
+			expectCourse: 84.4,
+		},
+		{
+			name:         "Valid GNRMC variant",
+			input:        "$GNRMC,081836.0,A,3751.65,S,14507.36,E,000.0,360.0,130998,011.3,E*62",
+			expectUsed:   true,
+			expectLat:    -37.86083, // South is negative
+			expectLon:    145.1227,
+			expectSpeed:  0.0,
+			// Course not updated when speed < 3
+		},
+		{
+			name:       "RMC with void status",
+			input:      "$GPRMC,123519,V,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*7D",
+			expectUsed: false, // V = void, should reject
+		},
+		{
+			name:       "RMC with too few fields",
+			input:      "$GPRMC,123519,A,4807.038,N*2C",
+			expectUsed: false,
+		},
+		{
+			name:       "RMC with invalid checksum",
+			input:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*FF",
+			expectUsed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset state
+			mySituation.GPSLatitude = 0
+			mySituation.GPSLongitude = 0
+			mySituation.GPSGroundSpeed = 0
+			mySituation.GPSTrueCourse = 0
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			if tc.expectUsed {
+				latDiff := mySituation.GPSLatitude - tc.expectLat
+				if latDiff < -0.0001 || latDiff > 0.0001 {
+					t.Errorf("Expected Latitude=%.5f, got %.5f",
+						tc.expectLat, mySituation.GPSLatitude)
+				}
+
+				lonDiff := mySituation.GPSLongitude - tc.expectLon
+				if lonDiff < -0.0001 || lonDiff > 0.0001 {
+					t.Errorf("Expected Longitude=%.5f, got %.5f",
+						tc.expectLon, mySituation.GPSLongitude)
+				}
+
+				speedDiff := mySituation.GPSGroundSpeed - tc.expectSpeed
+				if speedDiff < -0.01 || speedDiff > 0.01 {
+					t.Errorf("Expected Speed=%.2f, got %.2f",
+						tc.expectSpeed, mySituation.GPSGroundSpeed)
+				}
+
+				t.Logf("Parsed RMC: lat=%.5f, lon=%.5f, speed=%.2f kts, course=%.2f°",
+					mySituation.GPSLatitude, mySituation.GPSLongitude,
+					mySituation.GPSGroundSpeed, mySituation.GPSTrueCourse)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_InvalidMessages tests handling of malformed NMEA messages
+func TestProcessNMEALine_InvalidMessages(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"No dollar sign", "GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A"},
+		{"No asterisk", "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W"},
+		{"Empty string", ""},
+		{"Only dollar sign", "$"},
+		{"Only asterisk", "*"},
+		{"Dollar and asterisk only", "$*"},
+		{"Invalid checksum chars", "$GPRMC,test*ZZ"},
+		{"Short checksum", "$GPRMC,test*1"},
+		{"Corrupted message", "$GP\x00RMC,test*2A"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := processNMEALine(tc.input)
+			if result {
+				t.Errorf("processNMEALine(%q) returned true, expected false for invalid message",
+					tc.input)
+			}
+			t.Logf("Correctly rejected: %q", tc.input)
+		})
+	}
+}

@@ -492,7 +492,7 @@ func atof32(val string) float32 {
 func parseFlarmNmeaMessage(message []string) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Error parsing NMEA " + strings.Join(message, ","))
+			log.Printf("Error parsing NMEA %s", strings.Join(message, ","))
 		}
 	}()
 
@@ -629,7 +629,7 @@ func parseFlarmPFLAA(message []string) {
 	// $PFLAA,<AlarmLevel>,<RelativeNorth>,<RelativeEast>,<RelativeVertical>,<IDType>,<ID>,<Track>,<TurnRate>,<GroundSpeed>, <ClimbRate>,<AcftType>
 	// Append flarm message to message log
 	if len(message) < 12 {
-		log.Printf("Discarding invalid NMEA: " + strings.Join(message, ","))
+		log.Printf("Discarding invalid NMEA: %s", strings.Join(message, ","))
 		return
 	}
 	var thisMsg msg

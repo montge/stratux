@@ -14,6 +14,10 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
+	"os"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -692,4 +696,546 @@ func TestIsDetectedOwnshipValidEdgeCases(t *testing.T) {
 // The function is indirectly tested through integration tests.
 func TestRelayMessage(t *testing.T) {
 	t.Skip("Skipped: relayMessage requires full network infrastructure (sendGDL90 blocks on nil channels)")
+}
+
+// =============================================================================
+// parseInput Tests
+// =============================================================================
+
+// TestParseInput_BasicCases tests parseInput with various message types
+func TestParseInput_BasicCases(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system (needed by parseDownlinkReport)
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	testCases := []struct {
+		name         string
+		input        string
+		expectedType uint16
+		expectNil    bool
+		description  string
+	}{
+		{
+			name:         "Empty string",
+			input:        "",
+			expectedType: 0,
+			expectNil:    true,
+			description:  "Empty input should return nil",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset global status
+			globalStatus.UAT_messages_total = 0
+
+			result, msgtype := parseInput(tc.input)
+
+			if tc.expectNil {
+				if result != nil {
+					t.Errorf("%s: expected nil result, got %d bytes", tc.description, len(result))
+				}
+			} else {
+				if result == nil {
+					t.Errorf("%s: expected non-nil result", tc.description)
+				}
+			}
+
+			if msgtype != tc.expectedType {
+				t.Errorf("%s: expected msgtype %d, got %d", tc.description, tc.expectedType, msgtype)
+			}
+
+			t.Logf("%s: msgtype=%d, result_len=%d", tc.description, msgtype, len(result))
+		})
+	}
+}
+
+// TestParseInput_UplinkMessage tests uplink message parsing
+func TestParseInput_UplinkMessage(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Create an uplink message (starts with '+', exactly 432 data bytes)
+	// Each byte is 2 hex chars, so 432 bytes = 864 chars
+	uplinkData := "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";"
+
+	result, msgtype := parseInput(uplinkData)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result for uplink message")
+	}
+
+	if msgtype != MSGTYPE_UPLINK {
+		t.Errorf("Expected msgtype MSGTYPE_UPLINK (%d), got %d", MSGTYPE_UPLINK, msgtype)
+	}
+
+	if len(result) != UPLINK_FRAME_DATA_BYTES {
+		t.Errorf("Expected result length %d, got %d", UPLINK_FRAME_DATA_BYTES, len(result))
+	}
+
+	t.Logf("Uplink message parsed: msgtype=%d, len=%d", msgtype, len(result))
+}
+
+// TestParseInput_SignalStrength tests signal strength parsing
+func TestParseInput_SignalStrength(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Initialize maxSignalStrength
+	maxSignalStrength = 0
+
+	// Create uplink message with signal strength
+	uplinkData := "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=1;ss=5000"
+
+	result, msgtype := parseInput(uplinkData)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	if msgtype != MSGTYPE_UPLINK {
+		t.Errorf("Expected MSGTYPE_UPLINK, got %d", msgtype)
+	}
+
+	// Signal strength should be parsed and update maxSignalStrength
+	if maxSignalStrength != 5000 {
+		t.Errorf("Expected maxSignalStrength=5000, got %d", maxSignalStrength)
+	}
+
+	t.Logf("Signal strength parsed: maxSignalStrength=%d", maxSignalStrength)
+}
+
+// TestParseInput_InvalidSignalStrength tests invalid signal strength
+func TestParseInput_InvalidSignalStrength(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	maxSignalStrength = 0
+
+	// Invalid signal strength (not a number)
+	uplinkData := "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=1;ss=invalid"
+
+	result, msgtype := parseInput(uplinkData)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result even with invalid ss")
+	}
+
+	if msgtype != MSGTYPE_UPLINK {
+		t.Errorf("Expected MSGTYPE_UPLINK, got %d", msgtype)
+	}
+
+	// Invalid ss should not update maxSignalStrength
+	if maxSignalStrength != 0 {
+		t.Errorf("Expected maxSignalStrength=0 (invalid not parsed), got %d", maxSignalStrength)
+	}
+}
+
+// TestParseInput_ShortUplinkPadded tests uplink message padding
+func TestParseInput_ShortUplinkPadded(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	crcInit()
+
+	// Initialize traffic system
+	if trafficMutex == nil {
+		initTraffic(false)
+	}
+
+	// Create a short uplink (should be padded to UPLINK_FRAME_DATA_BYTES)
+	shortUplink := "+" + strings.Repeat("FF", 100) + ";"
+
+	result, msgtype := parseInput(shortUplink)
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	if msgtype != MSGTYPE_UPLINK {
+		t.Errorf("Expected MSGTYPE_UPLINK, got %d", msgtype)
+	}
+
+	// Should be padded to full frame size
+	if len(result) != UPLINK_FRAME_DATA_BYTES {
+		t.Errorf("Expected padded length %d, got %d", UPLINK_FRAME_DATA_BYTES, len(result))
+	}
+
+	// Check that padding is zeros
+	for i := 100; i < len(result); i++ {
+		if result[i] != 0x00 {
+			t.Errorf("Expected padding byte at %d to be 0x00, got 0x%02X", i, result[i])
+			break
+		}
+	}
+
+	t.Logf("Short uplink padded: original ~%d bytes, padded to %d bytes", 100, len(result))
+}
+
+// =============================================================================
+// Settings Tests
+// =============================================================================
+
+// TestReadSettings_NoFile tests readSettings when config file doesn't exist
+func TestReadSettings_NoFile(t *testing.T) {
+	// Save original configLocation
+	origLocation := configLocation
+	defer func() { configLocation = origLocation }()
+
+	// Set to non-existent file
+	configLocation = "/tmp/nonexistent_stratux_test_config.conf"
+
+	// Should use defaults without error
+	readSettings()
+
+	// Verify defaults were applied (check a few key settings)
+	if !globalSettings.UAT_Enabled {
+		t.Error("Expected UAT_Enabled=true (default)")
+	}
+	if !globalSettings.ES_Enabled {
+		t.Error("Expected ES_Enabled=true (default)")
+	}
+	if globalSettings.RegionSelected != 0 {
+		t.Errorf("Expected RegionSelected=0 (default), got %d", globalSettings.RegionSelected)
+	}
+}
+
+// TestReadSettings_InvalidJSONContent tests readSettings with invalid JSON content
+func TestReadSettings_InvalidJSONContent(t *testing.T) {
+	// Save original configLocation
+	origLocation := configLocation
+	defer func() {
+		configLocation = origLocation
+		os.Remove("/tmp/test_invalid_stratux2.conf")
+	}()
+
+	// Create temp file with invalid JSON
+	configLocation = "/tmp/test_invalid_stratux2.conf"
+	err := os.WriteFile(configLocation, []byte("{ invalid json "), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should use defaults when JSON is invalid
+	readSettings()
+
+	// Verify defaults were applied
+	if !globalSettings.UAT_Enabled {
+		t.Error("Expected UAT_Enabled=true (default after invalid JSON)")
+	}
+}
+
+// TestDefaultSettings tests the defaultSettings function
+func TestDefaultSettings(t *testing.T) {
+	// Clear settings
+	globalSettings = settings{}
+
+	defaultSettings()
+
+	// Verify all critical defaults
+	tests := []struct {
+		name     string
+		actual   interface{}
+		expected interface{}
+	}{
+		{"RegionSelected", globalSettings.RegionSelected, 0},
+		{"UAT_Enabled", globalSettings.UAT_Enabled, true},
+		{"ES_Enabled", globalSettings.ES_Enabled, true},
+		{"OGN_Enabled", globalSettings.OGN_Enabled, false},
+		{"GPS_Enabled", globalSettings.GPS_Enabled, true},
+		{"IMU_Sensor_Enabled", globalSettings.IMU_Sensor_Enabled, true},
+		{"BMP_Sensor_Enabled", globalSettings.BMP_Sensor_Enabled, true},
+		{"WiFiIPAddress", globalSettings.WiFiIPAddress, "192.168.10.1"},
+		{"WiFiSSID", globalSettings.WiFiSSID, "Stratux"},
+		{"WiFiChannel", globalSettings.WiFiChannel, 1},
+		{"OwnshipModeS", globalSettings.OwnshipModeS, "F00000"},
+		{"Dump1090Gain", globalSettings.Dump1090Gain, 37.2},
+		{"DeveloperMode", globalSettings.DeveloperMode, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.actual != tc.expected {
+				t.Errorf("Expected %s=%v, got %v", tc.name, tc.expected, tc.actual)
+			}
+		})
+	}
+
+	// Verify network outputs are initialized
+	if len(globalSettings.NetworkOutputs) == 0 {
+		t.Error("Expected NetworkOutputs to be initialized")
+	}
+
+	// Verify BLE outputs are initialized
+	if len(globalSettings.BleOutputs) == 0 {
+		t.Error("Expected BleOutputs to be initialized")
+	}
+}
+
+// =============================================================================
+// System Error Tracking Tests
+// =============================================================================
+
+// TestAddSystemErrorBasic tests adding system errors
+func TestAddSystemErrorBasic(t *testing.T) {
+	// Initialize if needed
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Clear errors
+	globalStatus.Errors = make([]string, 0)
+	systemErrs = make(map[string]string)
+
+	err1 := fmt.Errorf("test error 1")
+	addSystemError(err1)
+
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error, got %d", len(globalStatus.Errors))
+	}
+
+	if globalStatus.Errors[0] != "test error 1" {
+		t.Errorf("Expected error message 'test error 1', got %q", globalStatus.Errors[0])
+	}
+}
+
+// TestAddSingleSystemErrorf tests single system error tracking
+func TestAddSingleSystemErrorf(t *testing.T) {
+	// Initialize if needed
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Clear errors
+	globalStatus.Errors = make([]string, 0)
+	systemErrs = make(map[string]string)
+
+	// Add first error
+	addSingleSystemErrorf("test1", "Error: %d", 123)
+
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error, got %d", len(globalStatus.Errors))
+	}
+
+	if globalStatus.Errors[0] != "Error: 123" {
+		t.Errorf("Expected 'Error: 123', got %q", globalStatus.Errors[0])
+	}
+
+	// Add same error again - should not duplicate
+	addSingleSystemErrorf("test1", "Error: %d", 123)
+
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error (no duplicate), got %d", len(globalStatus.Errors))
+	}
+
+	// Add different error
+	addSingleSystemErrorf("test2", "Another error")
+
+	if len(globalStatus.Errors) != 2 {
+		t.Errorf("Expected 2 errors, got %d", len(globalStatus.Errors))
+	}
+}
+
+// TestRemoveSingleSystemError tests removing system errors
+func TestRemoveSingleSystemError(t *testing.T) {
+	// Initialize if needed
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Clear and add errors
+	globalStatus.Errors = make([]string, 0)
+	systemErrs = make(map[string]string)
+
+	addSingleSystemErrorf("err1", "Error 1")
+	addSingleSystemErrorf("err2", "Error 2")
+
+	if len(globalStatus.Errors) != 2 {
+		t.Fatalf("Expected 2 errors, got %d", len(globalStatus.Errors))
+	}
+
+	// Remove first error
+	removeSingleSystemError("err1")
+
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error after removal, got %d", len(globalStatus.Errors))
+	}
+
+	if globalStatus.Errors[0] != "Error 2" {
+		t.Errorf("Expected remaining error to be 'Error 2', got %q", globalStatus.Errors[0])
+	}
+
+	// Remove non-existent error (should not crash)
+	removeSingleSystemError("nonexistent")
+
+	if len(globalStatus.Errors) != 1 {
+		t.Errorf("Expected 1 error (unchanged), got %d", len(globalStatus.Errors))
+	}
+}
+
+// =============================================================================
+// Region Settings Tests
+// =============================================================================
+
+// TestChangeRegionSettings_US tests US region settings
+func TestChangeRegionSettings_US(t *testing.T) {
+	// Save original
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	// Set to US
+	globalSettings.RegionSelected = 1
+	changeRegionSettings()
+
+	if !globalSettings.UAT_Enabled {
+		t.Error("Expected UAT_Enabled=true for US region")
+	}
+	if globalSettings.OGN_Enabled {
+		t.Error("Expected OGN_Enabled=false for US region")
+	}
+	if globalSettings.DeveloperMode {
+		t.Error("Expected DeveloperMode=false for US region")
+	}
+}
+
+// TestChangeRegionSettings_EU tests EU region settings
+func TestChangeRegionSettings_EU(t *testing.T) {
+	// Save original
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	// Set to EU
+	globalSettings.RegionSelected = 2
+	changeRegionSettings()
+
+	if globalSettings.UAT_Enabled {
+		t.Error("Expected UAT_Enabled=false for EU region")
+	}
+	if !globalSettings.OGN_Enabled {
+		t.Error("Expected OGN_Enabled=true for EU region")
+	}
+	if !globalSettings.DeveloperMode {
+		t.Error("Expected DeveloperMode=true for EU region")
+	}
+}
+
+// TestChangeRegionSettings_None tests no region selected
+func TestChangeRegionSettings_None(t *testing.T) {
+	// Save original
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	// Set initial values
+	globalSettings.RegionSelected = 0
+	globalSettings.UAT_Enabled = true
+	globalSettings.OGN_Enabled = false
+	origUAT := globalSettings.UAT_Enabled
+	origOGN := globalSettings.OGN_Enabled
+
+	changeRegionSettings()
+
+	// Settings should not change when region is 0
+	if globalSettings.UAT_Enabled != origUAT {
+		t.Error("UAT_Enabled should not change when region=0")
+	}
+	if globalSettings.OGN_Enabled != origOGN {
+		t.Error("OGN_Enabled should not change when region=0")
+	}
+}
+
+// =============================================================================
+// Message Log Tests
+// =============================================================================
+
+// TestMsgLogAppend tests message log appending
+func TestMsgLogAppend(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Clear log
+	msgLogMutex.Lock()
+	msgLog = make([]msg, 0)
+	msgLogMutex.Unlock()
+
+	// Add a message
+	testMsg := msg{
+		MessageClass: MSGCLASS_UAT,
+		TimeReceived: stratuxClock.Time,
+		Data:         "test",
+	}
+
+	msgLogAppend(testMsg)
+
+	// Verify it was added
+	msgLogMutex.Lock()
+	defer msgLogMutex.Unlock()
+
+	if len(msgLog) != 1 {
+		t.Fatalf("Expected 1 message in log, got %d", len(msgLog))
+	}
+
+	if msgLog[0].Data != "test" {
+		t.Errorf("Expected Data='test', got %q", msgLog[0].Data)
+	}
+	if msgLog[0].MessageClass != MSGCLASS_UAT {
+		t.Errorf("Expected MessageClass=MSGCLASS_UAT, got %d", msgLog[0].MessageClass)
+	}
+}
+
+// =============================================================================
+// isX86DebugMode Tests
+// =============================================================================
+
+// TestIsX86DebugMode tests the platform detection function
+func TestIsX86DebugMode(t *testing.T) {
+	result := isX86DebugMode()
+
+	// Just verify it returns a boolean without panic
+	// The actual value depends on the platform we're running on
+	t.Logf("isX86DebugMode() = %v (GOARCH=%s)", result, runtime.GOARCH)
+
+	// Verify logic
+	expectedResult := runtime.GOARCH == "i386" || runtime.GOARCH == "amd64"
+	if result != expectedResult {
+		t.Errorf("Expected isX86DebugMode()=%v for GOARCH=%s, got %v",
+			expectedResult, runtime.GOARCH, result)
+	}
 }

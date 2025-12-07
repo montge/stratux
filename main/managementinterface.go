@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -625,7 +624,7 @@ func handleDeleteLogFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteAHRSLogFiles(w http.ResponseWriter, r *http.Request) {
-	files, err := ioutil.ReadDir("/var/log")
+	files, err := os.ReadDir("/var/log")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error deleting AHRS logs: %s", err), http.StatusNotFound)
 		return
@@ -786,7 +785,7 @@ func handleDownloadAHRSLogsRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("error zipping AHRS logs: %s", e), http.StatusNotFound)
 	}
 
-	files, err := ioutil.ReadDir("/var/log")
+	files, err := os.ReadDir("/var/log")
 	if err != nil {
 		httpErr(w, err)
 		return
@@ -809,7 +808,12 @@ func handleDownloadAHRSLogsRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fh, err := zip.FileInfoHeader(f)
+		finfo, err := f.Info()
+		if err != nil {
+			httpErr(w, err)
+			return
+		}
+		fh, err := zip.FileInfoHeader(finfo)
 		if err != nil {
 			httpErr(w, err)
 			return
@@ -1045,7 +1049,7 @@ func viewLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	names, err := ioutil.ReadDir(cleanPath)
+	names, err := os.ReadDir(cleanPath)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read directory: %s", err.Error()),
 			http.StatusInternalServerError)
@@ -1058,13 +1062,17 @@ func viewLogs(w http.ResponseWriter, r *http.Request) {
 			continue
 		} // Remove hidden files from listing
 
-		if val.IsDir() {
-			mtime := val.ModTime().Format("2006-Jan-02 15:04:05")
+		info, err := val.Info()
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			mtime := info.ModTime().Format("2006-Jan-02 15:04:05")
 			sz := ""
 			fi = append(fi, fileInfo{Name: val.Name() + "/", Path: urlpath + "/" + val.Name(), Mtime: mtime, Size: sz})
 		} else {
-			mtime := val.ModTime().Format("2006-Jan-02 15:04:05")
-			sz := humanize.Comma(val.Size())
+			mtime := info.ModTime().Format("2006-Jan-02 15:04:05")
+			sz := humanize.Comma(info.Size())
 			fi = append(fi, fileInfo{Name: val.Name(), Path: urlpath + "/" + val.Name(), Mtime: mtime, Size: sz})
 		}
 	}
@@ -1091,7 +1099,7 @@ func connectMbTilesArchive(path string) (*sql.DB, map[string]string, error) {
 		if !conn.IsOutdated() {
 			return conn.Conn, conn.Metadata, nil
 		}
-		log.Printf("Reloading MBTiles " + path)
+		log.Printf("Reloading MBTiles %s", path)
 	}
 
 	conn, err := sql.Open("sqlite3", "file:"+path+"?mode=ro")
@@ -1163,7 +1171,7 @@ func readMbTilesMetadata(fname string, db *sql.DB) map[string]string {
 
 // Scans mapdata dir for all .db and .mbtiles files and returns json representation of all metadata values
 func handleTilesets(w http.ResponseWriter, r *http.Request) {
-	files, err := ioutil.ReadDir(STRATUX_HOME + "/mapdata/")
+	files, err := os.ReadDir(STRATUX_HOME + "/mapdata/")
 	if err != nil {
 		log.Printf("handleTilesets() error: %s\n", err.Error())
 		http.Error(w, err.Error(), 500)
@@ -1205,7 +1213,7 @@ func loadTile(fname string, z, x, y int) ([]byte, error) {
 		if format, ok := meta["format"]; ok && format == "pbf" && len(res) >= 2 && res[0] == 0x1f && res[1] == 0x8b {
 			reader := bytes.NewReader(res)
 			gzreader, _ := gzip.NewReader(reader)
-			unzipped, err := ioutil.ReadAll(gzreader)
+			unzipped, err := io.ReadAll(gzreader)
 			if err != nil {
 				log.Printf("Failed to unzip gzipped PBF data")
 				return nil, nil

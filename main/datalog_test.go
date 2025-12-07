@@ -963,3 +963,672 @@ func TestSetDataLogTimeWithGPS(t *testing.T) {
 		}
 	})
 }
+
+// TestLogSituation tests the logSituation function
+func TestLogSituation(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	t.Run("logs_when_conditions_met", func(t *testing.T) {
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logSituation()
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "mySituation" {
+				t.Errorf("Expected table 'mySituation', got %q", row.tbl)
+			}
+			t.Logf("Successfully logged situation to table %q", row.tbl)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_replay_disabled", func(t *testing.T) {
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logSituation()
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when ReplayLog disabled")
+		default:
+			t.Log("Correctly did not log when ReplayLog disabled")
+		}
+	})
+
+	t.Run("does_not_log_when_not_ready", func(t *testing.T) {
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = false
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logSituation()
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when datalog not ready")
+		default:
+			t.Log("Correctly did not log when not ready")
+		}
+	})
+}
+
+// TestLogStatus tests the logStatus function
+func TestLogStatus(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	t.Run("logs_when_conditions_met", func(t *testing.T) {
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logStatus()
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "status" {
+				t.Errorf("Expected table 'status', got %q", row.tbl)
+			}
+			t.Logf("Successfully logged status to table %q", row.tbl)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_replay_disabled", func(t *testing.T) {
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logStatus()
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when ReplayLog disabled")
+		default:
+			t.Log("Correctly did not log when ReplayLog disabled")
+		}
+	})
+}
+
+// TestLogSettings tests the logSettings function
+func TestLogSettings(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	t.Run("logs_when_conditions_met", func(t *testing.T) {
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logSettings()
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "settings" {
+				t.Errorf("Expected table 'settings', got %q", row.tbl)
+			}
+			t.Logf("Successfully logged settings to table %q", row.tbl)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_replay_disabled", func(t *testing.T) {
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logSettings()
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when ReplayLog disabled")
+		default:
+			t.Log("Correctly did not log when ReplayLog disabled")
+		}
+	})
+}
+
+// TestLogTraffic tests the logTraffic function
+func TestLogTraffic(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	testTraffic := TrafficInfo{
+		Icao_addr:        0xABCDEF,
+		Tail:             "N12345",
+		Last_seen:        time.Now(),
+		Position_valid:   true,
+		Lat:              45.5,
+		Lng:              -122.5,
+		Alt:              10000,
+		Track:            270,
+		Speed:            150,
+		Speed_valid:      true,
+		Vvel:             0,
+		TargetType:       TARGET_TYPE_ADSB,
+		SignalLevel:      -20,
+		Age:              1.5,
+		AgeLastAlt:       2.0,
+		ExtrapolatedPosition: false,
+		BearingDist_valid: true,
+		Bearing:          90,
+		Distance:         5000,
+	}
+
+	t.Run("logs_when_conditions_met", func(t *testing.T) {
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logTraffic(testTraffic)
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "traffic" {
+				t.Errorf("Expected table 'traffic', got %q", row.tbl)
+			}
+			receivedTraffic, ok := row.data.(TrafficInfo)
+			if !ok {
+				t.Errorf("Expected data type TrafficInfo, got %T", row.data)
+			}
+			if receivedTraffic.Icao_addr != testTraffic.Icao_addr {
+				t.Errorf("Expected ICAO %x, got %x", testTraffic.Icao_addr, receivedTraffic.Icao_addr)
+			}
+			if receivedTraffic.Tail != testTraffic.Tail {
+				t.Errorf("Expected tail %q, got %q", testTraffic.Tail, receivedTraffic.Tail)
+			}
+			t.Logf("Successfully logged traffic: %s (ICAO: %06X)", receivedTraffic.Tail, receivedTraffic.Icao_addr)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_replay_disabled", func(t *testing.T) {
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logTraffic(testTraffic)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when ReplayLog disabled")
+		default:
+			t.Log("Correctly did not log when ReplayLog disabled")
+		}
+	})
+
+	t.Run("does_not_log_when_not_ready", func(t *testing.T) {
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = false
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logTraffic(testTraffic)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when datalog not ready")
+		default:
+			t.Log("Correctly did not log when not ready")
+		}
+	})
+}
+
+// TestLogESMsg tests the logESMsg function
+func TestLogESMsg(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	testESMsg := esmsg{
+		Data: "*8DABCDEF;",
+	}
+
+	t.Run("logs_when_conditions_met", func(t *testing.T) {
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logESMsg(testESMsg)
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "es_messages" {
+				t.Errorf("Expected table 'es_messages', got %q", row.tbl)
+			}
+			receivedMsg, ok := row.data.(esmsg)
+			if !ok {
+				t.Errorf("Expected data type esmsg, got %T", row.data)
+			}
+			if receivedMsg.Data != testESMsg.Data {
+				t.Errorf("Expected message data %q, got %q", testESMsg.Data, receivedMsg.Data)
+			}
+			t.Logf("Successfully logged ES message: %s", receivedMsg.Data)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_replay_disabled", func(t *testing.T) {
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logESMsg(testESMsg)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when ReplayLog disabled")
+		default:
+			t.Log("Correctly did not log when ReplayLog disabled")
+		}
+	})
+}
+
+// TestLogGPSAttitude tests the logGPSAttitude function
+func TestLogGPSAttitude(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	testGPSPerf := gpsPerfStats{
+		stratuxTime: 12345,
+		nmeaTime:    67890,
+		msgType:     "GGA",
+	}
+
+	t.Run("logs_when_conditions_met", func(t *testing.T) {
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logGPSAttitude(testGPSPerf)
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "gps_attitude" {
+				t.Errorf("Expected table 'gps_attitude', got %q", row.tbl)
+			}
+			receivedPerf, ok := row.data.(gpsPerfStats)
+			if !ok {
+				t.Errorf("Expected data type gpsPerfStats, got %T", row.data)
+			}
+			if receivedPerf.msgType != testGPSPerf.msgType {
+				t.Errorf("Expected msgType %q, got %q", testGPSPerf.msgType, receivedPerf.msgType)
+			}
+			t.Logf("Successfully logged GPS attitude: %+v", receivedPerf)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_replay_disabled", func(t *testing.T) {
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logGPSAttitude(testGPSPerf)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when ReplayLog disabled")
+		default:
+			t.Log("Correctly did not log when ReplayLog disabled")
+		}
+	})
+}
+
+// TestLogDump1090TermMessage tests the logDump1090TermMessage function
+func TestLogDump1090TermMessage(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	origDEBUG := globalSettings.DEBUG
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		globalSettings.DEBUG = origDEBUG
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	testDump1090Msg := Dump1090TermMessage{
+		Text:   "Test dump1090 message",
+		Source: "dump1090",
+	}
+
+	t.Run("logs_when_all_conditions_met", func(t *testing.T) {
+		globalSettings.DEBUG = true
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logDump1090TermMessage(testDump1090Msg)
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "dump1090_terminal" {
+				t.Errorf("Expected table 'dump1090_terminal', got %q", row.tbl)
+			}
+			receivedMsg, ok := row.data.(Dump1090TermMessage)
+			if !ok {
+				t.Errorf("Expected data type Dump1090TermMessage, got %T", row.data)
+			}
+			if receivedMsg.Text != testDump1090Msg.Text {
+				t.Errorf("Expected text %q, got %q", testDump1090Msg.Text, receivedMsg.Text)
+			}
+			t.Logf("Successfully logged dump1090 message: %s", receivedMsg.Text)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_debug_disabled", func(t *testing.T) {
+		globalSettings.DEBUG = false
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logDump1090TermMessage(testDump1090Msg)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when DEBUG disabled")
+		default:
+			t.Log("Correctly did not log when DEBUG disabled")
+		}
+	})
+
+	t.Run("does_not_log_when_replay_disabled", func(t *testing.T) {
+		globalSettings.DEBUG = true
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logDump1090TermMessage(testDump1090Msg)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when ReplayLog disabled")
+		default:
+			t.Log("Correctly did not log when ReplayLog disabled")
+		}
+	})
+
+	t.Run("does_not_log_when_not_ready", func(t *testing.T) {
+		globalSettings.DEBUG = true
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = false
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logDump1090TermMessage(testDump1090Msg)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when datalog not ready")
+		default:
+			t.Log("Correctly did not log when not ready")
+		}
+	})
+}
+
+// TestLogPongTermMessage tests the logPongTermMessage function
+func TestLogPongTermMessage(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	origDEBUG := globalSettings.DEBUG
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		globalSettings.DEBUG = origDEBUG
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	testPongMsg := PongTermMessage{
+		Text:   "Test pong message",
+		Source: "pong",
+	}
+
+	t.Run("logs_when_all_conditions_met", func(t *testing.T) {
+		globalSettings.DEBUG = true
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logPongTermMessage(testPongMsg)
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "pong_update" {
+				t.Errorf("Expected table 'pong_update', got %q", row.tbl)
+			}
+			receivedMsg, ok := row.data.(PongTermMessage)
+			if !ok {
+				t.Errorf("Expected data type PongTermMessage, got %T", row.data)
+			}
+			if receivedMsg.Text != testPongMsg.Text {
+				t.Errorf("Expected text %q, got %q", testPongMsg.Text, receivedMsg.Text)
+			}
+			t.Logf("Successfully logged pong message: %s", receivedMsg.Text)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_debug_disabled", func(t *testing.T) {
+		globalSettings.DEBUG = false
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logPongTermMessage(testPongMsg)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when DEBUG disabled")
+		default:
+			t.Log("Correctly did not log when DEBUG disabled")
+		}
+	})
+}
+
+// TestLogAISTermMessage tests the logAISTermMessage function
+func TestLogAISTermMessage(t *testing.T) {
+	// Save original settings
+	origReplayLog := globalSettings.ReplayLog
+	origReadyToWrite := dataLogReadyToWrite
+	origDEBUG := globalSettings.DEBUG
+	defer func() {
+		globalSettings.ReplayLog = origReplayLog
+		dataLogReadyToWrite = origReadyToWrite
+		globalSettings.DEBUG = origDEBUG
+		if dataLogChan != nil {
+			for len(dataLogChan) > 0 {
+				<-dataLogChan
+			}
+		}
+	}()
+
+	testAISMsg := AISTermMessage{
+		Text:   "Test AIS message",
+		Source: "rtl_ais",
+	}
+
+	t.Run("logs_when_all_conditions_met", func(t *testing.T) {
+		globalSettings.DEBUG = true
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logAISTermMessage(testAISMsg)
+
+		select {
+		case row := <-dataLogChan:
+			if row.tbl != "ais_message" {
+				t.Errorf("Expected table 'ais_message', got %q", row.tbl)
+			}
+			receivedMsg, ok := row.data.(AISTermMessage)
+			if !ok {
+				t.Errorf("Expected data type AISTermMessage, got %T", row.data)
+			}
+			if receivedMsg.Text != testAISMsg.Text {
+				t.Errorf("Expected text %q, got %q", testAISMsg.Text, receivedMsg.Text)
+			}
+			t.Logf("Successfully logged AIS message: %s", receivedMsg.Text)
+		default:
+			t.Error("Expected message in dataLogChan, but channel was empty")
+		}
+	})
+
+	t.Run("does_not_log_when_debug_disabled", func(t *testing.T) {
+		globalSettings.DEBUG = false
+		globalSettings.ReplayLog = true
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logAISTermMessage(testAISMsg)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when DEBUG disabled")
+		default:
+			t.Log("Correctly did not log when DEBUG disabled")
+		}
+	})
+
+	t.Run("does_not_log_when_replay_disabled", func(t *testing.T) {
+		globalSettings.DEBUG = true
+		globalSettings.ReplayLog = false
+		dataLogReadyToWrite = true
+		if dataLogChan == nil {
+			dataLogChan = make(chan DataLogRow, 10)
+		}
+
+		logAISTermMessage(testAISMsg)
+
+		select {
+		case <-dataLogChan:
+			t.Error("Expected no message when ReplayLog disabled")
+		default:
+			t.Log("Correctly did not log when ReplayLog disabled")
+		}
+	})
+}

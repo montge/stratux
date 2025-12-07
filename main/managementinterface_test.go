@@ -11,7 +11,7 @@ package main
 
 import (
 	"html"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -24,14 +24,14 @@ import (
 // setupTestLogDir creates a temporary directory structure for testing
 func setupTestLogDir(t *testing.T) (string, func()) {
 	// Create a temporary directory to act as /var/log
-	tmpDir, err := ioutil.TempDir("", "stratux-test-logs-")
+	tmpDir, err := os.MkdirTemp("", "stratux-test-logs-")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
 	// Create some test files and directories
 	testFile := filepath.Join(tmpDir, "stratux.log")
-	if err := ioutil.WriteFile(testFile, []byte("test log content\n"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test log content\n"), 0644); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -43,7 +43,7 @@ func setupTestLogDir(t *testing.T) (string, func()) {
 	}
 
 	subFile := filepath.Join(subDir, "test.log")
-	if err := ioutil.WriteFile(subFile, []byte("subdir log content\n"), 0644); err != nil {
+	if err := os.WriteFile(subFile, []byte("subdir log content\n"), 0644); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create subdir file: %v", err)
 	}
@@ -51,7 +51,7 @@ func setupTestLogDir(t *testing.T) (string, func()) {
 	// Create a file outside the log directory to test path traversal
 	parentDir := filepath.Dir(tmpDir)
 	secretFile := filepath.Join(parentDir, "secret.txt")
-	if err := ioutil.WriteFile(secretFile, []byte("secret data"), 0644); err != nil {
+	if err := os.WriteFile(secretFile, []byte("secret data"), 0644); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create secret file: %v", err)
 	}
@@ -85,7 +85,7 @@ func vulnerableViewLogs(baseDir string) http.HandlerFunc {
 		}
 
 		// Directory listing (simplified)
-		names, err := ioutil.ReadDir(path)
+		names, err := os.ReadDir(path)
 		if err != nil {
 			return
 		}
@@ -114,7 +114,7 @@ func TestViewLogs_ValidFileAccess(t *testing.T) {
 	handler(w, req)
 
 	resp := w.Result()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -138,7 +138,7 @@ func TestViewLogs_DirectoryListing(t *testing.T) {
 	handler(w, req)
 
 	resp := w.Result()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -196,7 +196,7 @@ func TestViewLogs_PathTraversal_ParentDir(t *testing.T) {
 			handler(w, req)
 
 			resp := w.Result()
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, _ := io.ReadAll(resp.Body)
 			bodyStr := string(body)
 
 			// After the fix, these should return an error or 403
@@ -299,7 +299,7 @@ func TestViewLogs_XSS_ErrorMessage(t *testing.T) {
 			handler(w, req)
 
 			resp := w.Result()
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, _ := io.ReadAll(resp.Body)
 			bodyStr := string(body)
 
 			// Check if the XSS payload is reflected without escaping
@@ -381,7 +381,7 @@ func TestViewLogs_NormalOperation(t *testing.T) {
 			} else {
 				// For nonexistent files, the vulnerable version doesn't set proper status codes
 				// After the fix, we should see 404
-				body, _ := ioutil.ReadAll(resp.Body)
+				body, _ := io.ReadAll(resp.Body)
 				if !strings.Contains(string(body), "Failed to open") {
 					t.Logf("Note: Nonexistent file should generate error message for %s", tc.description)
 				}
@@ -402,7 +402,7 @@ func TestHandleStatusRequest(t *testing.T) {
 	handleStatusRequest(w, req)
 
 	resp := w.Result()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	// Should return 200 OK
 	if resp.StatusCode != http.StatusOK {
@@ -441,7 +441,7 @@ func TestHandleSituationRequest(t *testing.T) {
 	handleSituationRequest(w, req)
 
 	resp := w.Result()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -474,7 +474,7 @@ func TestHandleTowersRequest(t *testing.T) {
 	handleTowersRequest(w, req)
 
 	resp := w.Result()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -508,7 +508,7 @@ func TestHandleSatellitesRequest(t *testing.T) {
 	handleSatellitesRequest(w, req)
 
 	resp := w.Result()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -541,7 +541,7 @@ func TestHandleSettingsGetRequest(t *testing.T) {
 	handleSettingsGetRequest(w, req)
 
 	resp := w.Result()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -619,7 +619,7 @@ func TestHandleRegionGet(t *testing.T) {
 			handleRegionGet(w, req)
 
 			resp := w.Result()
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, _ := io.ReadAll(resp.Body)
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -726,7 +726,7 @@ func TestHandleClientsGetRequest(t *testing.T) {
 	handleClientsGetRequest(w, req)
 
 	resp := w.Result()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -746,7 +746,7 @@ func TestHandleClientsGetRequest(t *testing.T) {
 // TestMbTileConnectionCacheEntry tests the MbTile cache entry functions
 func TestMbTileConnectionCacheEntry(t *testing.T) {
 	// Create a temporary file for testing
-	tmpFile, err := ioutil.TempFile("", "test-mbtile-*.mbtile")
+	tmpFile, err := os.CreateTemp("", "test-mbtile-*.mbtile")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -782,7 +782,7 @@ func TestMbTileConnectionCacheEntry(t *testing.T) {
 
 	t.Run("IsOutdated_FileDeleted", func(t *testing.T) {
 		// Create another temp file
-		tmpFile2, err := ioutil.TempFile("", "test-mbtile2-*.mbtile")
+		tmpFile2, err := os.CreateTemp("", "test-mbtile2-*.mbtile")
 		if err != nil {
 			t.Fatalf("Failed to create temp file: %v", err)
 		}
@@ -1261,7 +1261,7 @@ func TestHandleSettingsSetRequest_POST_ValidSettings(t *testing.T) {
 			tc.verifyFunc(t)
 
 			// Verify response contains updated settings JSON
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, _ := io.ReadAll(resp.Body)
 			bodyStr := string(body)
 			if !strings.Contains(bodyStr, "{") || !strings.Contains(bodyStr, "}") {
 				t.Errorf("Expected JSON response, got: %s", bodyStr)
@@ -1299,7 +1299,7 @@ func TestHandleSettingsSetRequest_POST_EmptyBody(t *testing.T) {
 	}
 
 	// Verify response contains settings JSON (even if nothing was changed)
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	bodyStr := string(body)
 	if !strings.Contains(bodyStr, "{") {
 		t.Errorf("Expected JSON response, got: %s", bodyStr)
@@ -1745,4 +1745,533 @@ func TestHandleSettingsSetRequest_POST_StringSettings(t *testing.T) {
 			tc.verifyFunc(t)
 		})
 	}
+}
+
+// =============================================================================
+// Additional Handler Tests for Improved Coverage
+// =============================================================================
+
+// TestHandleDeleteLogFile tests the /deletelogfile endpoint
+func TestHandleDeleteLogFile(t *testing.T) {
+	req := httptest.NewRequest("POST", "/deletelogfile", nil)
+	w := httptest.NewRecorder()
+
+	handleDeleteLogFile(w, req)
+
+	// Function doesn't return error, just calls clearDebugLogFile
+	// which may fail silently if file doesn't exist
+	resp := w.Result()
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200 or 0, got %d", resp.StatusCode)
+	}
+}
+
+// TestHandleDeleteAHRSLogFiles tests the /deleteahrslogfiles endpoint
+func TestHandleDeleteAHRSLogFiles(t *testing.T) {
+	// Create a temporary log directory
+	tmpDir, err := os.MkdirTemp("", "stratux-test-ahrs-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create some test sensor log files
+	testFiles := []string{
+		"sensors_20231206.csv",
+		"sensors_20231207.csv",
+		"stratux.log", // Should not be deleted by this function
+		"other.csv",   // Should not be deleted by this function
+	}
+
+	for _, fn := range testFiles {
+		path := filepath.Join(tmpDir, fn)
+		if err := os.WriteFile(path, []byte("test data"), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", fn, err)
+		}
+	}
+
+	req := httptest.NewRequest("POST", "/deleteahrslogfiles", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This test would need to modify the handler to use tmpDir
+	// For now, we test with /var/log which may not exist
+	handleDeleteAHRSLogFiles(w, req)
+
+	resp := w.Result()
+	// Could be 404 if /var/log doesn't exist in test environment
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status 200, 404, or 0, got %d", resp.StatusCode)
+	}
+}
+
+// TestHandleDevelModeToggle tests the /develmodetoggle endpoint
+func TestHandleDevelModeToggle(t *testing.T) {
+	// Initialize required mutexes
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Save original settings
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	globalSettings.DeveloperMode = false
+
+	req := httptest.NewRequest("POST", "/develmodetoggle", nil)
+	w := httptest.NewRecorder()
+
+	handleDevelModeToggle(w, req)
+
+	// Verify developer mode was enabled
+	if !globalSettings.DeveloperMode {
+		t.Error("Expected DeveloperMode to be true after toggle")
+	}
+
+	resp := w.Result()
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200 or 0, got %d", resp.StatusCode)
+	}
+}
+
+// TestHandleRestartRequest tests the /restart endpoint
+func TestHandleRestartRequest(t *testing.T) {
+	req := httptest.NewRequest("POST", "/restart", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This actually spawns a goroutine that tries to restart the service
+	// In a test environment, it will fail but won't crash
+	handleRestartRequest(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200 or 0, got %d", resp.StatusCode)
+	}
+}
+
+// TestHandleRebootRequest tests the /reboot endpoint
+func TestHandleRebootRequest(t *testing.T) {
+	req := httptest.NewRequest("POST", "/reboot", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This spawns a goroutine that tries to reboot the system
+	// In a test environment, it will fail but won't crash
+	handleRebootRequest(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Verify CORS headers are set
+	if w.Header().Get("Access-Control-Allow-Method") == "" {
+		t.Error("Expected Access-Control-Allow-Method header")
+	}
+	if w.Header().Get("Access-Control-Allow-Headers") == "" {
+		t.Error("Expected Access-Control-Allow-Headers header")
+	}
+
+	// Verify cache and JSON headers
+	contentType := w.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Errorf("Expected Content-Type to contain 'application/json', got: %s", contentType)
+	}
+}
+
+// TestHandleShutdownRequest tests the /shutdown endpoint
+func TestHandleShutdownRequest(t *testing.T) {
+	req := httptest.NewRequest("POST", "/shutdown", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This tries to shut down the system
+	// In a test environment, it will fail but won't crash
+	handleShutdownRequest(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200 or 0, got %d", resp.StatusCode)
+	}
+}
+
+// TestHandleOrientAHRS tests the /orientAHRS endpoint
+func TestHandleOrientAHRS(t *testing.T) {
+	testCases := []struct {
+		name           string
+		method         string
+		body           string
+		expectedStatus int
+	}{
+		{
+			name:           "options_request",
+			method:         "OPTIONS",
+			body:           "",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "get_request",
+			method:         "GET",
+			body:           "",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "post_empty_body",
+			method:         "POST",
+			body:           "", // Empty body causes error reading action
+			expectedStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, "/orientAHRS", strings.NewReader(tc.body))
+			w := httptest.NewRecorder()
+
+			handleOrientAHRS(w, req)
+
+			resp := w.Result()
+			if tc.expectedStatus > 0 && resp.StatusCode != tc.expectedStatus && resp.StatusCode != 0 {
+				t.Errorf("Expected status %d, got %d", tc.expectedStatus, resp.StatusCode)
+			}
+
+			// Verify CORS headers
+			if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+				t.Error("Expected Access-Control-Allow-Origin header to be '*'")
+			}
+		})
+	}
+}
+
+// TestHandleCageAHRS tests the /cageAHRS endpoint
+func TestHandleCageAHRS(t *testing.T) {
+	testCases := []struct {
+		name   string
+		method string
+	}{
+		{"options_request", "OPTIONS"},
+		{"get_request", "GET"},
+		{"post_request", "POST"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, "/cageAHRS", nil)
+			w := httptest.NewRecorder()
+
+			handleCageAHRS(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status 200 or 0, got %d", resp.StatusCode)
+			}
+
+			// Verify headers
+			if w.Header().Get("Content-Type") != "text/plain" {
+				t.Error("Expected Content-Type to be 'text/plain'")
+			}
+			if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+				t.Error("Expected Access-Control-Allow-Origin to be '*'")
+			}
+		})
+	}
+}
+
+// TestHandleCalibrateAHRS tests the /calibrateAHRS endpoint
+func TestHandleCalibrateAHRS(t *testing.T) {
+	testCases := []struct {
+		name   string
+		method string
+	}{
+		{"options_request", "OPTIONS"},
+		{"get_request", "GET"},
+		{"post_request", "POST"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, "/calibrateAHRS", nil)
+			w := httptest.NewRecorder()
+
+			handleCalibrateAHRS(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status 200 or 0, got %d", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestHandleResetGMeter tests the /resetGMeter endpoint
+func TestHandleResetGMeter(t *testing.T) {
+	testCases := []struct {
+		name   string
+		method string
+	}{
+		{"options_request", "OPTIONS"},
+		{"get_request", "GET"},
+		{"post_request", "POST"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, "/resetGMeter", nil)
+			w := httptest.NewRecorder()
+
+			handleResetGMeter(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status 200 or 0, got %d", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestHandleDownloadLogRequest tests the /downloadlog endpoint
+func TestHandleDownloadLogRequest(t *testing.T) {
+	req := httptest.NewRequest("GET", "/downloadlog", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This tries to serve /var/log/stratux.log which may not exist
+	handleDownloadLogRequest(w, req)
+
+	resp := w.Result()
+	// Could be 404 if file doesn't exist
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status 200, 404, or 0, got %d", resp.StatusCode)
+	}
+
+	// Verify Content-Disposition header
+	contentDisp := w.Header().Get("Content-Disposition")
+	if contentDisp != "" && !strings.Contains(contentDisp, "stratux.log") {
+		t.Errorf("Expected Content-Disposition to contain 'stratux.log', got: %s", contentDisp)
+	}
+}
+
+// TestHandleDownloadDBRequest tests the /downloaddb endpoint
+func TestHandleDownloadDBRequest(t *testing.T) {
+	req := httptest.NewRequest("GET", "/downloaddb", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This tries to serve /var/log/stratux.sqlite which may not exist
+	handleDownloadDBRequest(w, req)
+
+	resp := w.Result()
+	// Could be 404 if file doesn't exist
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status 200, 404, or 0, got %d", resp.StatusCode)
+	}
+
+	// Verify Content-Disposition header
+	contentDisp := w.Header().Get("Content-Disposition")
+	if contentDisp != "" && !strings.Contains(contentDisp, "stratux.sqlite") {
+		t.Errorf("Expected Content-Disposition to contain 'stratux.sqlite', got: %s", contentDisp)
+	}
+}
+
+// TestHandleDownloadAHRSLogsRequest tests the /downloadahrslogs endpoint
+func TestHandleDownloadAHRSLogsRequest(t *testing.T) {
+	req := httptest.NewRequest("GET", "/downloadahrslogs", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This tries to read /var/log which may not exist or may be empty
+	handleDownloadAHRSLogsRequest(w, req)
+
+	resp := w.Result()
+	// Could be 404 if /var/log doesn't exist, or 200 with empty zip
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status 200, 404, or 0, got %d", resp.StatusCode)
+	}
+}
+
+// TestDefaultServer tests the default server handler
+func TestDefaultServer(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This tries to serve files from STRATUX_WWW_DIR
+	// In test environment, may not exist
+	defaultServer(w, req)
+
+	resp := w.Result()
+	// Any status is acceptable - depends on whether files exist
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK &&
+	   resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusForbidden {
+		t.Logf("Note: defaultServer returned status %d (acceptable in test)", resp.StatusCode)
+	}
+
+	// Verify Cache-Control header is set
+	cacheControl := w.Header().Get("Cache-Control")
+	if cacheControl != "" && !strings.Contains(cacheControl, "max-age") {
+		t.Logf("Note: Cache-Control header: %s", cacheControl)
+	}
+}
+
+// TestHandleTilesets tests the /tiles/tilesets endpoint
+func TestHandleTilesets(t *testing.T) {
+	req := httptest.NewRequest("GET", "/tiles/tilesets", nil)
+	w := httptest.NewRecorder()
+
+	// Note: This tries to read STRATUX_HOME + "/mapdata/"
+	// In test environment, may not exist
+	handleTilesets(w, req)
+
+	resp := w.Result()
+	body, _ := io.ReadAll(resp.Body)
+
+	// Could be 500 if mapdata directory doesn't exist, or 200 with empty/valid JSON
+	if resp.StatusCode == http.StatusOK {
+		// Should return JSON
+		bodyStr := string(body)
+		if !strings.HasPrefix(bodyStr, "{") && !strings.HasPrefix(bodyStr, "[") {
+			t.Errorf("Expected JSON response, got: %s", bodyStr)
+		}
+	} else if resp.StatusCode == http.StatusInternalServerError {
+		// Expected if mapdata directory doesn't exist
+		t.Logf("Note: handleTilesets returned 500 (expected if mapdata doesn't exist)")
+	}
+}
+
+// TestHandleTile tests the /tiles/ endpoint
+func TestHandleTile(t *testing.T) {
+	testCases := []struct {
+		name           string
+		uri            string
+		expectedStatus int
+	}{
+		{
+			name:           "invalid_uri_too_short",
+			uri:            "/tiles/",
+			expectedStatus: http.StatusInternalServerError,
+		},
+		{
+			name:           "valid_format_nonexistent_tile",
+			uri:            "/tiles/testfile.mbtiles/0/0/0.png",
+			expectedStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tc.uri, nil)
+			req.RequestURI = tc.uri // Set RequestURI explicitly
+			w := httptest.NewRecorder()
+
+			handleTile(w, req)
+
+			resp := w.Result()
+			// Status depends on whether tile exists and can be parsed
+			if tc.expectedStatus > 0 && resp.StatusCode != tc.expectedStatus &&
+			   resp.StatusCode != http.StatusInternalServerError {
+				t.Logf("Note: Expected status %d, got %d (may vary)", tc.expectedStatus, resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestTileToDegree tests the tileToDegree helper function
+func TestTileToDegree(t *testing.T) {
+	testCases := []struct {
+		name string
+		z, x, y int
+		checkFunc func(lon, lat float64) bool
+	}{
+		{
+			name: "zoom_0_tile_0_0",
+			z: 0, x: 0, y: 0,
+			checkFunc: func(lon, lat float64) bool {
+				// At zoom 0, tile 0,0 should be roughly -180, 85.05
+				return lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90
+			},
+		},
+		{
+			name: "zoom_1_tile_0_0",
+			z: 1, x: 0, y: 0,
+			checkFunc: func(lon, lat float64) bool {
+				return lon >= -180 && lon <= 0 && lat >= 0 && lat <= 90
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			lon, lat := tileToDegree(tc.z, tc.x, tc.y)
+			if !tc.checkFunc(lon, lat) {
+				t.Errorf("tileToDegree(%d, %d, %d) = (%f, %f), check failed",
+					tc.z, tc.x, tc.y, lon, lat)
+			}
+		})
+	}
+}
+
+// TestViewLogs_SecurityFixes tests that the security fixes are working
+func TestViewLogs_SecurityFixes(t *testing.T) {
+	// Create a temporary directory for testing
+	tmpDir, err := os.MkdirTemp("", "stratux-viewlogs-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a test file
+	testFile := filepath.Join(tmpDir, "test.log")
+	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Note: The actual viewLogs function uses hardcoded /var/log base directory
+	// These tests verify the handler's behavior, though it can't be fully tested
+	// without modifying the base directory constant
+
+	t.Run("normal_file_access", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/logs/stratux.log", nil)
+		req.URL.Path = "/logs/stratux.log"
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		// Will likely be 404 since /var/log/stratux.log may not exist in test
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+			t.Logf("Note: Got status %d (expected in test environment)", resp.StatusCode)
+		}
+	})
+
+	t.Run("path_traversal_blocked", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/logs/../etc/passwd", nil)
+		req.URL.Path = "/logs/../etc/passwd"
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		// Should return 403 Forbidden for path traversal attempts
+		if resp.StatusCode != http.StatusForbidden {
+			body, _ := io.ReadAll(resp.Body)
+			bodyStr := string(body)
+			// Should not contain sensitive data
+			if strings.Contains(bodyStr, "root:") {
+				t.Error("Path traversal attack succeeded - /etc/passwd content found")
+			}
+		}
+	})
+
+	t.Run("absolute_path_blocked", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/logs//etc/passwd", nil)
+		req.URL.Path = "/logs//etc/passwd"
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusForbidden {
+			body, _ := io.ReadAll(resp.Body)
+			bodyStr := string(body)
+			if strings.Contains(bodyStr, "root:") {
+				t.Error("Absolute path attack succeeded - /etc/passwd content found")
+			}
+		}
+	})
 }

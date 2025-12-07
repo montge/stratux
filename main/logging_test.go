@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"io/ioutil"
 	"log"
 	"os"
 	"testing"
@@ -81,7 +80,7 @@ func TestLogFileSize(t *testing.T) {
 
 	t.Run("valid_file", func(t *testing.T) {
 		// Create a temp file
-		tmpFile, err := ioutil.TempFile("", "test-log-*.log")
+		tmpFile, err := os.CreateTemp("", "test-log-*.log")
 		if err != nil {
 			t.Fatalf("Failed to create temp file: %v", err)
 		}
@@ -104,7 +103,7 @@ func TestLogFileSize(t *testing.T) {
 
 	t.Run("closed_file", func(t *testing.T) {
 		// Create and close a temp file
-		tmpFile, err := ioutil.TempFile("", "test-log-closed-*.log")
+		tmpFile, err := os.CreateTemp("", "test-log-closed-*.log")
 		if err != nil {
 			t.Fatalf("Failed to create temp file: %v", err)
 		}

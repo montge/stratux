@@ -43,8 +43,8 @@ func authenticate(c net.Conn) {
 			globalSettings.RadarRange*2) // RadarRange is an int in NM, APRS wants an int in km and 2~=1.852
 	}
 	auth := fmt.Sprintf("user OGNNOCALL pass -1 vers stratux %s %s\r\n", globalStatus.Version, filter)
-	log.Printf(auth)
-	fmt.Fprintf(c, auth)
+	log.Printf("%s", auth)
+	fmt.Fprintf(c, "%s", auth)
 }
 
 func keepalive(c net.Conn) {
@@ -70,7 +70,7 @@ func updateFilter(c net.Conn) {
 						"#filter r/%.7f/%.7f/%d\r\n",
 						mySituation.GPSLatitude, mySituation.GPSLongitude,
 						globalSettings.RadarRange*2) // RadarRange is an int in NM, APRS wants an int in km and 2~=1.852
-					fmt.Fprintf(c, filter)
+					fmt.Fprintf(c, "%s", filter)
 				}
 			} else {
 				break
@@ -121,7 +121,7 @@ func aprsListen() {
 				}
 			}
 			if scanner.Err() != nil {
-				log.Printf("APRS issue: " + scanner.Err().Error())
+				log.Printf("APRS issue: %s", scanner.Err().Error())
 			}
 			aprsExitChan <- true
 		}()
@@ -158,12 +158,12 @@ func parseAprsMessage(data string, fakeCurrentTime bool) {
 			// log.Printf("GW data: " + data)
 		} else {
 			if globalSettings.DEBUG {
-				log.Printf("No match for: " + data)
+				log.Printf("No match for: %s", data)
 			}
 		}
 		return
 	} else if len(res) < 15 { // too few captures
-		log.Printf("Invalid APRS data format: " + data)
+		log.Printf("Invalid APRS data format: %s", data)
 	} else if len(res[14]) > 0 {
 		ts := time.Now().UTC()
 		hh, _ := strconv.ParseInt(res[4][:2], 10, 8)

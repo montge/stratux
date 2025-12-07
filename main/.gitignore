@@ -1,0 +1,9 @@
+
+# AI working directory
+.local/
+
+# Duplicate test files (temporary - until resolved)
+flarm_nmea_input_test.go
+flarm_nmea_output_test.go
+ogn-aprs_test.go
+traffic_coverage_test.go

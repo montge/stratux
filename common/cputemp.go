@@ -1,7 +1,7 @@
 package common
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -20,7 +20,7 @@ func CpuTempMonitor(updater CpuTempUpdateFunc) {
 	timer := time.NewTicker(1 * time.Second)
 	for {
 		// Update CPUTemp.
-		temp, err := ioutil.ReadFile("/sys/class/thermal/thermal_zone0/temp")
+		temp, err := os.ReadFile("/sys/class/thermal/thermal_zone0/temp")
 		tempStr := strings.Trim(string(temp), "\n")
 		t := InvalidCpuTemp
 		if err == nil {

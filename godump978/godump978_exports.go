@@ -33,7 +33,7 @@ func dump978Cb(updown C.char, data *C.uint8_t, length C.int, rs_errors C.int, si
 	b.Data = uintptr(unsafe.Pointer(data))
 
 	// copy incoming to outgoing
-	outData := string(updown)
+	outData := string([]byte{byte(updown)})
 	for i := 0; i < int(length); i++ {
 		outData += fmt.Sprintf("%02x", buf[i])
 	}

@@ -14,8 +14,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"io/ioutil"
 	"log"
+	"os"
 	"net"
 	"strconv"
 	"strings"
@@ -96,7 +96,7 @@ func ognListen() {
 				ognIncomingMsgChan <- scanner.Text()
 			}
 			if scanner.Err() != nil {
-				log.Printf("ogn-rx-eu connection lost: " + scanner.Err().Error())
+				log.Printf("ogn-rx-eu connection lost: %s", scanner.Err().Error())
 			}
 			ognExitChan <- true
 		}()
@@ -137,7 +137,7 @@ func parseOgnMessage(data string, fakeCurrentTime bool) {
 	var msg OgnMessage
 	err := json.Unmarshal([]byte(data), &msg)
 	if err != nil {
-		log.Printf("Invalid Data from OGN: " + data + " -> " + err.Error())
+		log.Printf("Invalid Data from OGN: %s -> %s", data, err.Error())
 		return
 	}
 
@@ -167,7 +167,7 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 	addressBytes, _ := hex.DecodeString(msg.Addr)
 	addressBytes = append([]byte{0}, addressBytes...) // prepend 0 byte
 	if len(addressBytes) != 4 {
-		log.Printf("Ignoring invalid ogn address: " + msg.Addr)
+		log.Printf("Ignoring invalid ogn address: %s", msg.Addr)
 		return
 	}
 	address := binary.BigEndian.Uint32(addressBytes)
@@ -339,7 +339,7 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 
 	if globalSettings.DEBUG {
 		txt, _ := json.Marshal(ti)
-		log.Printf("OGN traffic imported: " + string(txt))
+		log.Printf("OGN traffic imported: %s", string(txt))
 	}
 }
 
@@ -348,7 +348,7 @@ var ognTailNumberCache = make(map[string]string)
 func lookupOgnTailNumber(ognid string) string {
 	if len(ognTailNumberCache) == 0 {
 		log.Printf("Parsing OGN device db")
-		ddb, err := ioutil.ReadFile(STRATUX_HOME + "/ogn/ddb.json")
+		ddb, err := os.ReadFile(STRATUX_HOME + "/ogn/ddb.json")
 		if err != nil {
 			log.Printf("Failed to read OGN device db")
 			return ognid

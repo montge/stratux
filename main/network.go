@@ -12,7 +12,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -59,7 +58,7 @@ func getDHCPLeases() (map[string]string, error) {
 		}
 		dhcpLeaseDirectoryLastTest = stratuxClock.Time
 	}
-	dat, err := ioutil.ReadFile(dhcp_lease_file)
+	dat, err := os.ReadFile(dhcp_lease_file)
 	ret := make(map[string]string)
 
 	if err == nil {
@@ -85,7 +84,7 @@ func getDHCPLeases() (map[string]string, error) {
 	}
 
 	// Check kernel ARP table - useful when in client mode. We skip reverse hostname lookup since it can be very slow..
-	dat2, err := ioutil.ReadFile("/proc/net/arp")
+	dat2, err := os.ReadFile("/proc/net/arp")
 	if err != nil {
 		return ret, nil
 	}
@@ -102,7 +101,7 @@ func getDHCPLeases() (map[string]string, error) {
 
 	// Added the ability to have static IP hosts stored in /etc/stratux-static-hosts.conf
 
-	dat3, err := ioutil.ReadFile(extra_hosts_file)
+	dat3, err := os.ReadFile(extra_hosts_file)
 	if err != nil {
 		return ret, nil
 	}
@@ -233,13 +232,13 @@ func tcpNMEAOutListener() {
 func tcpNMEAInListener() {
 	ln, err := net.Listen("tcp", ":30011")
 	if err != nil {
-		log.Printf(err.Error())
+		log.Printf("%s", err.Error())
 		return
 	}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Printf(err.Error())
+			log.Printf("%s", err.Error())
 			continue
 		}
 		go handleNmeaInConnection(conn)

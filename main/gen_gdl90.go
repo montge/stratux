@@ -18,7 +18,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -1010,10 +1009,13 @@ func updateStatus() {
 	globalStatus.Logfile_Size = logFileSize()
 
 	var ahrsLogSize int64
-	ahrsLogFiles, _ := ioutil.ReadDir("/var/log")
+	ahrsLogFiles, _ := os.ReadDir("/var/log")
 	for _, f := range ahrsLogFiles {
 		if v, _ := filepath.Match("sensors_*.csv", f.Name()); v {
-			ahrsLogSize += f.Size()
+			info, err := f.Info()
+			if err == nil {
+				ahrsLogSize += info.Size()
+			}
 		}
 	}
 	globalStatus.AHRS_LogFiles_Size = ahrsLogSize
@@ -1531,7 +1533,7 @@ func openReplay(fn string, compressed bool) (WriteCloser, error) {
 
 func fsWriteTest(dir string) error {
 	fn := dir + "/.write_test"
-	err := ioutil.WriteFile(fn, []byte("test\n"), 0644)
+	err := os.WriteFile(fn, []byte("test\n"), 0644)
 	if err != nil {
 		return err
 	}
@@ -1565,7 +1567,7 @@ func printStats() {
 			sensorsOutput = append(sensorsOutput, fmt.Sprintf("Last BMP read: %s", stratuxClock.HumanizeTime(mySituation.BaroLastMeasurementTime)))
 		}
 		if len(sensorsOutput) > 0 {
-			log.Printf("- " + strings.Join(sensorsOutput, ", ") + "\n")
+			log.Printf("- %s\n", strings.Join(sensorsOutput, ", "))
 		}
 		// Check if we're using more than 95% of the free space. If so, throw a warning (only once).
 		if usage.Usage() > 0.95 {
@@ -1674,7 +1676,7 @@ func setActLed(state bool) {
 	if state {
 		data = []byte("1\n")
 	}
-	ioutil.WriteFile(ledPath, data, 0644)
+	os.WriteFile(ledPath, data, 0644)
 }
 
 func signalWatcher() {
