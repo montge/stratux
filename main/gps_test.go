@@ -1375,3 +1375,508 @@ func TestCalcGPSAttitude(t *testing.T) {
 		}
 	})
 }
+// New tests at end of gps_test.go
+
+// TestProcessNMEALine_GPGSA tests GSA (satellite active) message parsing
+func TestProcessNMEALine_GPGSA(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original satellites
+	origSatellites := Satellites
+	defer func() { Satellites = origSatellites }()
+
+	testCases := []struct {
+		name             string
+		input            string
+		expectUsed       bool
+		expectSatCount   uint16
+		setupFixQuality  uint8
+		expectHAccuracy  bool
+		expectVAccuracy  bool
+	}{
+		{
+			name:            "Valid GPGSA with 3D fix",
+			input:           "$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*39",
+			expectUsed:      true,
+			setupFixQuality: 1,
+			expectSatCount:  4,
+			expectHAccuracy: true,
+			expectVAccuracy: true,
+		},
+		{
+			name:            "Valid GNGSA variant",
+			input:           "$GNGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.0,0.5,0.8*23",
+			expectUsed:      true,
+			setupFixQuality: 2, // SBAS fix
+			expectSatCount:  12,
+			expectHAccuracy: true,
+			expectVAccuracy: true,
+		},
+		{
+			name:       "GSA with no fix (empty solution type)",
+			input:      "$GPGSA,A,,04,05,09,12,,,24,,,,,2.5,1.3,2.1*26",
+			expectUsed: false,
+		},
+		{
+			name:       "GSA with no fix (solution type 1)",
+			input:      "$GPGSA,A,1,04,05,09,12,,,24,,,,,2.5,1.3,2.1*17",
+			expectUsed: false,
+		},
+		{
+			name:       "GSA with too few fields",
+			input:      "$GPGSA,A,3,04,05*31",
+			expectUsed: false,
+		},
+		{
+			name:       "GSA with invalid checksum",
+			input:      "$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*FF",
+			expectUsed: false,
+		},
+		{
+			name:            "GSA with 2D fix",
+			input:           "$GPGSA,A,2,01,02,03,04,05,06,,,,,,,3.0,2.0,2.2*35",
+			expectUsed:      true,
+			setupFixQuality: 1,
+			expectSatCount:  6,
+			expectHAccuracy: true,
+			expectVAccuracy: true,
+		},
+		{
+			name:            "GSA with GLONASS satellites",
+			input:           "$GNGSA,A,3,65,66,67,68,69,70,,,,,,,1.5,0.8,1.3*26",
+			expectUsed:      true,
+			setupFixQuality: 1,
+			expectSatCount:  6,
+			expectHAccuracy: true,
+			expectVAccuracy: true,
+		},
+		{
+			name:            "GSA with Galileo satellites",
+			input:           "$GNGSA,A,3,301,302,303,304,,,,,,,,,1.8,1.0,1.5*24",
+			expectUsed:      true,
+			setupFixQuality: 1,
+			expectSatCount:  4,
+			expectHAccuracy: true,
+			expectVAccuracy: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset state
+			Satellites = make(map[string]SatelliteInfo)
+			mySituation.GPSFixQuality = tc.setupFixQuality
+			mySituation.GPSHorizontalAccuracy = 0
+			mySituation.GPSVerticalAccuracy = 0
+			mySituation.GPSLastAccuracyTime = time.Time{}
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			if tc.expectUsed {
+				if tc.expectSatCount > 0 {
+					satCount := uint16(0)
+					mySituation.muSatellite.Lock()
+					for _, sat := range Satellites {
+						if sat.InSolution {
+							satCount++
+						}
+					}
+					mySituation.muSatellite.Unlock()
+
+					if satCount == 0 {
+						t.Errorf("Expected at least some satellites in solution, got 0")
+					}
+					t.Logf("Satellites in solution: %d", satCount)
+				}
+
+				if tc.expectHAccuracy && mySituation.GPSHorizontalAccuracy == 0 {
+					t.Error("Expected GPSHorizontalAccuracy to be set")
+				}
+				if tc.expectVAccuracy && mySituation.GPSVerticalAccuracy == 0 {
+					t.Error("Expected GPSVerticalAccuracy to be set")
+				}
+
+				t.Logf("Parsed GSA: hacc=%.2f, vacc=%.2f, NACp=%d",
+					mySituation.GPSHorizontalAccuracy,
+					mySituation.GPSVerticalAccuracy,
+					mySituation.GPSNACp)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_GPGST tests GST (error statistics) message parsing
+func TestProcessNMEALine_GPGST(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name            string
+		input           string
+		expectUsed      bool
+		expectHAccuracy float32
+		expectVAccuracy float32
+		expectNACp      uint8
+	}{
+		{
+			name:            "Valid GPGST with low error",
+			input:           "$GPGST,172814.0,0.006,0.023,0.020,273.6,0.023,0.020,0.031*6A",
+			expectUsed:      true,
+			expectHAccuracy: 0.060,
+			expectVAccuracy: 0.062,
+			expectNACp:      11,
+		},
+		{
+			name:            "Valid GNGST variant",
+			input:           "$GNGST,082356.00,1.4,1.3,0.52,217.5,1.2,0.95,1.4*48",
+			expectUsed:      true,
+			expectHAccuracy: 3.13,
+			expectVAccuracy: 2.8,
+			expectNACp:      10,
+		},
+		{
+			name:            "GST with medium error",
+			input:           "$GPGST,172814.0,2.0,5.0,4.0,90.0,5.0,4.0,6.0*53",
+			expectUsed:      true,
+			expectHAccuracy: 12.81,
+			expectVAccuracy: 12.0,
+			expectNACp:      9,
+		},
+		{
+			name:       "GST with too few fields",
+			input:      "$GPGST,172814.0,0.006,0.023*0C",
+			expectUsed: false,
+		},
+		{
+			name:       "GST with invalid checksum",
+			input:      "$GPGST,172814.0,0.006,0.023,0.020,273.6,0.023,0.020,0.031*FF",
+			expectUsed: false,
+		},
+		{
+			name:            "GST with zero error",
+			input:           "$GPGST,172814.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0*6E",
+			expectUsed:      true,
+			expectHAccuracy: 0.0,
+			expectVAccuracy: 0.0,
+			expectNACp:      11,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mySituation.GPSHorizontalAccuracy = 0
+			mySituation.GPSVerticalAccuracy = 0
+			mySituation.GPSNACp = 0
+			mySituation.GPSLastAccuracyTime = time.Time{}
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			if tc.expectUsed {
+				haccDiff := mySituation.GPSHorizontalAccuracy - tc.expectHAccuracy
+				tolerance := tc.expectHAccuracy * 0.05
+				if tolerance < 0.01 {
+					tolerance = 0.01
+				}
+				if haccDiff < -tolerance || haccDiff > tolerance {
+					t.Errorf("Expected GPSHorizontalAccuracy=%.2f±%.2f, got %.2f",
+						tc.expectHAccuracy, tolerance, mySituation.GPSHorizontalAccuracy)
+				}
+
+				vaccDiff := mySituation.GPSVerticalAccuracy - tc.expectVAccuracy
+				tolerance = tc.expectVAccuracy * 0.05
+				if tolerance < 0.01 {
+					tolerance = 0.01
+				}
+				if vaccDiff < -tolerance || vaccDiff > tolerance {
+					t.Errorf("Expected GPSVerticalAccuracy=%.2f±%.2f, got %.2f",
+						tc.expectVAccuracy, tolerance, mySituation.GPSVerticalAccuracy)
+				}
+
+				if mySituation.GPSNACp != tc.expectNACp {
+					t.Errorf("Expected GPSNACp=%d, got %d",
+						tc.expectNACp, mySituation.GPSNACp)
+				}
+
+				if mySituation.GPSLastAccuracyTime.IsZero() {
+					t.Error("Expected GPSLastAccuracyTime to be updated")
+				}
+
+				t.Logf("Parsed GST: hacc=%.2fm, vacc=%.2fm, NACp=%d",
+					mySituation.GPSHorizontalAccuracy,
+					mySituation.GPSVerticalAccuracy,
+					mySituation.GPSNACp)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_GPGSV tests GSV (satellites in view) message parsing
+func TestProcessNMEALine_GPGSV(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original satellites
+	origSatellites := Satellites
+	defer func() { Satellites = origSatellites }()
+
+	testCases := []struct {
+		name           string
+		input          string
+		expectUsed     bool
+		expectSatID    string
+		expectSignal   int8
+		expectElevation int16
+		expectAzimuth  int16
+	}{
+		{
+			name:            "Valid GPGSV with GPS satellites",
+			input:           "$GPGSV,3,1,12,01,85,349,48,03,60,075,47,06,57,186,48,11,15,063,38*7F",
+			expectUsed:      true,
+			expectSatID:     "G1",
+			expectSignal:    48,
+			expectElevation: 85,
+			expectAzimuth:   349,
+		},
+		{
+			name:            "Valid GLGSV with GLONASS satellites",
+			input:           "$GLGSV,3,1,10,65,45,125,42,66,38,215,40,67,30,280,38,68,25,045,36*63",
+			expectUsed:      true,
+			expectSatID:     "R1",
+			expectSignal:    42,
+			expectElevation: 45,
+			expectAzimuth:   125,
+		},
+		{
+			name:            "Valid GAGSV with Galileo satellites",
+			input:           "$GAGSV,2,1,07,301,55,023,45,302,48,156,43,303,38,245,41,304,28,315,39*6B",
+			expectUsed:      true,
+			expectSatID:     "E1",
+			expectSignal:    45,
+			expectElevation: 55,
+			expectAzimuth:   23,
+		},
+		{
+			name:            "Valid GBGSV with BeiDou satellites",
+			input:           "$GBGSV,3,1,09,401,42,156,38,402,38,215,36,403,32,280,34,404,28,045,32*65",
+			expectUsed:      true,
+			expectSatID:     "B1",
+			expectSignal:    38,
+			expectElevation: 42,
+			expectAzimuth:   156,
+		},
+		{
+			name:       "GSV with too few fields",
+			input:      "$GPGSV,3,1*77",
+			expectUsed: false,
+		},
+		{
+			name:       "GSV with invalid checksum",
+			input:      "$GPGSV,3,1,12,01,85,349,48,03,60,075,47,06,57,186,48,11,15,063,38*FF",
+			expectUsed: false,
+		},
+		{
+			name:            "GSV with SBAS satellites",
+			input:           "$GPGSV,2,1,05,33,45,125,42,34,38,215,40,01,85,349,48,03,60,075,47*7A",
+			expectUsed:      true,
+			expectSatID:     "S120",
+			expectSignal:    42,
+			expectElevation: 45,
+			expectAzimuth:   125,
+		},
+		{
+			name:            "GSV with QZSS satellites",
+			input:           "$GPGSV,2,1,05,193,55,023,45,194,48,156,43,01,85,349,48,03,60,075,47*7B",
+			expectUsed:      true,
+			expectSatID:     "Q1",
+			expectSignal:    45,
+			expectElevation: 55,
+			expectAzimuth:   23,
+		},
+		{
+			name:            "GSV with satellite without signal",
+			input:           "$GPGSV,2,1,06,01,85,349,,03,60,075,47,06,57,186,48,11,15,063,38*77",
+			expectUsed:      true,
+			expectSatID:     "G1",
+			expectSignal:    -99,
+			expectElevation: 85,
+			expectAzimuth:   349,
+		},
+		{
+			name:            "GSV with satellite missing elevation/azimuth",
+			input:           "$GPGSV,2,1,06,01,,,48,03,60,075,47,06,57,186,48,11,15,063,38*48",
+			expectUsed:      true,
+			expectSatID:     "G1",
+			expectSignal:    48,
+			expectElevation: -999,
+			expectAzimuth:   -999,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			Satellites = make(map[string]SatelliteInfo)
+			mySituation.GPSFixQuality = 1
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			if tc.expectUsed && tc.expectSatID != "" {
+				mySituation.muSatellite.Lock()
+				sat, ok := Satellites[tc.expectSatID]
+				mySituation.muSatellite.Unlock()
+
+				if !ok {
+					t.Errorf("Expected satellite %s to be in Satellites map", tc.expectSatID)
+				} else {
+					if sat.Signal != tc.expectSignal {
+						t.Errorf("Expected Signal=%d, got %d", tc.expectSignal, sat.Signal)
+					}
+					if sat.Elevation != tc.expectElevation {
+						t.Errorf("Expected Elevation=%d, got %d", tc.expectElevation, sat.Elevation)
+					}
+					if sat.Azimuth != tc.expectAzimuth {
+						t.Errorf("Expected Azimuth=%d, got %d", tc.expectAzimuth, sat.Azimuth)
+					}
+
+					t.Logf("Parsed GSV: sat=%s, signal=%d, elev=%d°, az=%d°",
+						tc.expectSatID, sat.Signal, sat.Elevation, sat.Azimuth)
+				}
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_POGNB tests POGNB (OGN Tracker barometric) message parsing
+func TestProcessNMEALine_POGNB(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name              string
+		input             string
+		expectUsed        bool
+		expectPressureAlt float32
+		expectVertSpeed   float32
+	}{
+		{
+			name:              "Valid POGNB message",
+			input:             "$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,-0.04,+32.6*47",
+			expectUsed:        true,
+			expectPressureAlt: 96.46,
+			expectVertSpeed:   -7.87,
+		},
+		{
+			name:              "POGNB with positive climb",
+			input:             "$POGNB,22.0,+29.1,100972.3,3.8,+150.0,+150.0,+2.5,+32.6*70",
+			expectUsed:        true,
+			expectPressureAlt: 492.13,
+			expectVertSpeed:   492.12,
+		},
+		{
+			name:       "POGNB with too few fields",
+			input:      "$POGNB,22.0,+29.1*5C",
+			expectUsed: false,
+		},
+		{
+			name:       "POGNB with invalid checksum",
+			input:      "$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,-0.04,+32.6,*FF",
+			expectUsed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mySituation.muBaro.Lock()
+			mySituation.BaroSourceType = BARO_TYPE_NONE
+			mySituation.BaroPressureAltitude = 0
+			mySituation.BaroVerticalSpeed = 0
+			mySituation.muBaro.Unlock()
+
+			result := processNMEALine(tc.input)
+
+			if result != tc.expectUsed {
+				t.Errorf("processNMEALine(%q) returned %v, expected %v",
+					tc.input, result, tc.expectUsed)
+			}
+
+			if tc.expectUsed {
+				altDiff := mySituation.BaroPressureAltitude - tc.expectPressureAlt
+				if altDiff < -1.0 || altDiff > 1.0 {
+					t.Errorf("Expected BaroPressureAltitude=%.2f±1.0, got %.2f",
+						tc.expectPressureAlt, mySituation.BaroPressureAltitude)
+				}
+
+				vsDiff := mySituation.BaroVerticalSpeed - tc.expectVertSpeed
+				if vsDiff < -1.0 || vsDiff > 1.0 {
+					t.Errorf("Expected BaroVerticalSpeed=%.2f±1.0, got %.2f",
+						tc.expectVertSpeed, mySituation.BaroVerticalSpeed)
+				}
+
+				if mySituation.BaroSourceType != BARO_TYPE_OGNTRACKER {
+					t.Errorf("Expected BaroSourceType=%d (OGNTRACKER), got %d",
+						BARO_TYPE_OGNTRACKER, mySituation.BaroSourceType)
+				}
+
+				t.Logf("Parsed POGNB: alt=%.2f ft, vs=%.2f ft/min",
+					mySituation.BaroPressureAltitude,
+					mySituation.BaroVerticalSpeed)
+			}
+		})
+	}
+}

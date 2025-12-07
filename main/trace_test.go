@@ -746,3 +746,196 @@ func initTestState() {
 		msgLog = make([]msg, 0)
 	}
 }
+
+// TestTraceLoggerFlush_WithFileHandle tests Flush with active file handle
+func TestTraceLoggerFlush_WithFileHandle(t *testing.T) {
+	// Save original state
+	origTraceLog := saveTraceLogState()
+
+	// Create temp directory for test files
+	tmpDir := t.TempDir()
+	traceFile := filepath.Join(tmpDir, "test_flush.txt.gz")
+
+	// Create the trace file
+	fh, err := os.Create(traceFile)
+	if err != nil {
+		t.Fatalf("Failed to create trace file: %v", err)
+	}
+
+	gzw := gzip.NewWriter(fh)
+	csvw := csv.NewWriter(gzw)
+
+	setTraceLogForTest(fh, gzw, csvw, traceFile, false)
+
+	// Write some data to the CSV writer buffer
+	err = csvw.Write([]string{"timestamp", "context", "data"})
+	if err != nil {
+		t.Fatalf("Failed to write test data: %v", err)
+	}
+
+	// Flush should write buffered data to gzip writer and sync to disk
+	TraceLog.Flush()
+
+	// Close file to verify data was written
+	csvw.Flush()
+	gzw.Close()
+	fh.Close()
+
+	// Verify file exists and has data
+	info, err := os.Stat(traceFile)
+	if err != nil {
+		t.Fatalf("Failed to stat trace file: %v", err)
+	}
+
+	if info.Size() == 0 {
+		t.Error("Trace file is empty after flush, expected data to be written")
+	}
+
+	// Restore original
+	restoreTraceLogState(origTraceLog)
+
+	t.Logf("Flush with file handle wrote %d bytes", info.Size())
+}
+
+// TestTraceLoggerFlush_MultipleFlushes tests calling Flush multiple times
+func TestTraceLoggerFlush_MultipleFlushes(t *testing.T) {
+	// Save original state
+	origTraceLog := saveTraceLogState()
+
+	// Create temp directory for test files
+	tmpDir := t.TempDir()
+	traceFile := filepath.Join(tmpDir, "test_multi_flush.txt.gz")
+
+	// Create the trace file
+	fh, err := os.Create(traceFile)
+	if err != nil {
+		t.Fatalf("Failed to create trace file: %v", err)
+	}
+
+	gzw := gzip.NewWriter(fh)
+	csvw := csv.NewWriter(gzw)
+
+	setTraceLogForTest(fh, gzw, csvw, traceFile, false)
+
+	// Write and flush multiple times
+	for i := 0; i < 5; i++ {
+		err = csvw.Write([]string{
+			time.Now().Format(time.RFC3339Nano),
+			CONTEXT_DUMP1090,
+			`{"hex":"A12345"}`,
+		})
+		if err != nil {
+			t.Fatalf("Failed to write test data: %v", err)
+		}
+
+		// Flush after each write
+		TraceLog.Flush()
+	}
+
+	// Final cleanup
+	csvw.Flush()
+	gzw.Close()
+	fh.Close()
+
+	// Verify file has data
+	info, err := os.Stat(traceFile)
+	if err != nil {
+		t.Fatalf("Failed to stat trace file: %v", err)
+	}
+
+	if info.Size() == 0 {
+		t.Error("Trace file is empty after multiple flushes")
+	}
+
+	// Restore original
+	restoreTraceLogState(origTraceLog)
+
+	t.Logf("Multiple flushes wrote %d bytes total", info.Size())
+}
+
+// TestTraceLoggerFlush_ConcurrentCalls tests concurrent calls to Flush
+func TestTraceLoggerFlush_ConcurrentCalls(t *testing.T) {
+	// Save original state
+	origTraceLog := saveTraceLogState()
+
+	// Create temp directory for test files
+	tmpDir := t.TempDir()
+	traceFile := filepath.Join(tmpDir, "test_concurrent_flush.txt.gz")
+
+	// Create the trace file
+	fh, err := os.Create(traceFile)
+	if err != nil {
+		t.Fatalf("Failed to create trace file: %v", err)
+	}
+
+	gzw := gzip.NewWriter(fh)
+	csvw := csv.NewWriter(gzw)
+
+	setTraceLogForTest(fh, gzw, csvw, traceFile, false)
+
+	// Write some data
+	err = csvw.Write([]string{"timestamp", "context", "data"})
+	if err != nil {
+		t.Fatalf("Failed to write test data: %v", err)
+	}
+
+	// Call Flush from multiple goroutines concurrently
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			TraceLog.Flush()
+		}()
+	}
+
+	// Wait for all flushes to complete
+	wg.Wait()
+
+	// Cleanup
+	csvw.Flush()
+	gzw.Close()
+	fh.Close()
+
+	// Restore original
+	restoreTraceLogState(origTraceLog)
+
+	t.Log("Concurrent flushes completed without panic")
+}
+
+// TestTraceLoggerFlush_AfterClose tests Flush behavior after file is closed
+func TestTraceLoggerFlush_AfterClose(t *testing.T) {
+	// Save original state
+	origTraceLog := saveTraceLogState()
+
+	// Create temp directory for test files
+	tmpDir := t.TempDir()
+	traceFile := filepath.Join(tmpDir, "test_flush_after_close.txt.gz")
+
+	// Create and close the trace file
+	fh, err := os.Create(traceFile)
+	if err != nil {
+		t.Fatalf("Failed to create trace file: %v", err)
+	}
+
+	gzw := gzip.NewWriter(fh)
+	csvw := csv.NewWriter(gzw)
+
+	setTraceLogForTest(fh, gzw, csvw, traceFile, false)
+
+	// Close everything
+	csvw.Flush()
+	gzw.Close()
+	fh.Close()
+
+	// Now set fileHandle to nil to simulate a closed state
+	TraceLog.fileHandle = nil
+
+	// Flush should not panic when fileHandle is nil
+	TraceLog.Flush()
+
+	// Restore original
+	restoreTraceLogState(origTraceLog)
+
+	t.Log("Flush after close completed without panic")
+}

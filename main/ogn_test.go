@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"sync"
 	"testing"
 )
@@ -513,5 +514,211 @@ func TestImportOgnStatusMessage_TxEnabled(t *testing.T) {
 
 		globalStatus.OGN_connected = false
 		globalStatus.GPS_detected_type = 0
+	})
+}
+
+// TestLookupOgnTailNumber_FileLoad tests lookupOgnTailNumber with actual file loading
+func TestLookupOgnTailNumber_FileLoad(t *testing.T) {
+	// Save original cache
+	origCache := ognTailNumberCache
+	defer func() {
+		ognTailNumberCache = origCache
+	}()
+
+	// Create ogn subdirectory in STRATUX_HOME
+	ognDir := STRATUX_HOME + "/ogn"
+	err := os.MkdirAll(ognDir, 0755)
+	if err != nil {
+		t.Skipf("Cannot create test directory in STRATUX_HOME: %v", err)
+	}
+
+	// Clean up test files after all subtests
+	defer func() {
+		os.Remove(ognDir + "/ddb.json")
+	}()
+
+	t.Run("successful_file_parse", func(t *testing.T) {
+		// Clear cache to force file load
+		ognTailNumberCache = make(map[string]string)
+
+		// Create test ddb.json
+		testJSON := `{
+  "devices": [
+    {
+      "device_id": "ABC123",
+      "registration": "N12345"
+    },
+    {
+      "device_id": "DEF456",
+      "registration": "D-ELSA"
+    },
+    {
+      "device_id": "GHI789",
+      "registration": "G-GLID"
+    }
+  ]
+}`
+		err := os.WriteFile(ognDir+"/ddb.json", []byte(testJSON), 0644)
+		if err != nil {
+			t.Fatalf("Failed to write ddb.json: %v", err)
+		}
+
+		// Test lookups after file load
+		result := lookupOgnTailNumber("ABC123")
+		if result != "N12345" {
+			t.Errorf("Expected 'N12345', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("DEF456")
+		if result != "D-ELSA" {
+			t.Errorf("Expected 'D-ELSA', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("GHI789")
+		if result != "G-GLID" {
+			t.Errorf("Expected 'G-GLID', got '%s'", result)
+		}
+
+		// Test non-existent entry after successful load
+		result = lookupOgnTailNumber("NONEXIST")
+		if result != "" {
+			t.Errorf("Expected empty string for non-existent ID, got '%s'", result)
+		}
+
+		// Verify cache was populated
+		if len(ognTailNumberCache) != 3 {
+			t.Errorf("Expected cache to have 3 entries, got %d", len(ognTailNumberCache))
+		}
+
+		t.Logf("Successfully loaded and cached %d OGN devices", len(ognTailNumberCache))
+	})
+
+	t.Run("file_read_error", func(t *testing.T) {
+		// Clear cache
+		ognTailNumberCache = make(map[string]string)
+
+		// Remove the ddb.json file to trigger read error
+		os.Remove(ognDir + "/ddb.json")
+
+		// Lookup should return the ognid itself when file doesn't exist
+		result := lookupOgnTailNumber("TEST123")
+		if result != "TEST123" {
+			t.Errorf("Expected 'TEST123' when file not found, got '%s'", result)
+		}
+	})
+
+	t.Run("invalid_json", func(t *testing.T) {
+		// Clear cache
+		ognTailNumberCache = make(map[string]string)
+
+		// Write invalid JSON
+		invalidJSON := `{this is not valid json}`
+		err := os.WriteFile(ognDir+"/ddb.json", []byte(invalidJSON), 0644)
+		if err != nil {
+			t.Fatalf("Failed to write invalid ddb.json: %v", err)
+		}
+
+		// Lookup should return the ognid itself when JSON is invalid
+		result := lookupOgnTailNumber("TEST456")
+		if result != "TEST456" {
+			t.Errorf("Expected 'TEST456' when JSON is invalid, got '%s'", result)
+		}
+	})
+
+	t.Run("cache_persistence", func(t *testing.T) {
+		// Pre-populate cache
+		ognTailNumberCache = map[string]string{
+			"CACHED1": "N99999",
+			"CACHED2": "D-TEST",
+		}
+
+		// Create valid ddb.json (should not be read since cache is not empty)
+		testJSON := `{
+  "devices": [
+    {
+      "device_id": "NEW123",
+      "registration": "SHOULD-NOT-LOAD"
+    }
+  ]
+}`
+		err := os.WriteFile(ognDir+"/ddb.json", []byte(testJSON), 0644)
+		if err != nil {
+			t.Fatalf("Failed to write ddb.json: %v", err)
+		}
+
+		// Lookup should use cache, not reload file
+		result := lookupOgnTailNumber("CACHED1")
+		if result != "N99999" {
+			t.Errorf("Expected 'N99999' from cache, got '%s'", result)
+		}
+
+		// New entry from file should NOT be available (cache not reloaded)
+		result = lookupOgnTailNumber("NEW123")
+		if result != "" {
+			t.Errorf("Expected empty string (file not loaded), got '%s'", result)
+		}
+
+		t.Logf("Cache correctly persists without reloading file")
+	})
+}
+
+// TestLookupOgnTailNumber_EdgeCases tests edge cases for lookupOgnTailNumber
+func TestLookupOgnTailNumber_EdgeCases(t *testing.T) {
+	// Save original cache
+	origCache := ognTailNumberCache
+	defer func() { ognTailNumberCache = origCache }()
+
+	t.Run("empty_ognid", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"":       "EMPTY-REG",
+			"ABC123": "N12345",
+		}
+
+		// Empty string lookup
+		result := lookupOgnTailNumber("")
+		if result != "EMPTY-REG" {
+			t.Errorf("Expected 'EMPTY-REG' for empty ID, got '%s'", result)
+		}
+	})
+
+	t.Run("special_characters_in_registration", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"TEST1": "D-KÖLM",    // Umlaut
+			"TEST2": "F-AÆRO",    // Special chars
+			"TEST3": "N123XY-45", // Hyphen
+		}
+
+		result := lookupOgnTailNumber("TEST1")
+		if result != "D-KÖLM" {
+			t.Errorf("Expected 'D-KÖLM', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("TEST2")
+		if result != "F-AÆRO" {
+			t.Errorf("Expected 'F-AÆRO', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("TEST3")
+		if result != "N123XY-45" {
+			t.Errorf("Expected 'N123XY-45', got '%s'", result)
+		}
+	})
+
+	t.Run("case_sensitive_lookup", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"abc123": "N-LOWER",
+			"ABC123": "N-UPPER",
+		}
+
+		// Case matters
+		result := lookupOgnTailNumber("abc123")
+		if result != "N-LOWER" {
+			t.Errorf("Expected 'N-LOWER' for lowercase, got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("ABC123")
+		if result != "N-UPPER" {
+			t.Errorf("Expected 'N-UPPER' for uppercase, got '%s'", result)
+		}
 	})
 }
