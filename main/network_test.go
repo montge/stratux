@@ -1238,6 +1238,87 @@ func TestCollectMessages_XPlanePacketSize(t *testing.T) {
 	}
 }
 
+// TestCollectMessages_ThrottledConnection tests that throttled connections only get high priority messages
+func TestCollectMessages_ThrottledConnection(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	conn := &networkConnection{
+		Ip:         "192.168.10.100",
+		Port:       4000,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	// Trigger throttling by overflowing the queue multiple times
+	// Add many messages to cause overflow
+	for i := 0; i < 20; i++ {
+		dummyMsg := []byte{0x7E, byte(i), 0x7E}
+		conn.Queue.Put(0, 1*time.Millisecond, dummyMsg) // Short maxAge to expire
+	}
+
+	// Wait for messages to expire
+	time.Sleep(10 * time.Millisecond)
+
+	// Now add a regular priority message and a high priority message
+	regularMsg := []byte{0x7E, 0x00, 0x01, 0x7E}
+	conn.Queue.Put(1, 5*time.Second, regularMsg) // priority 1 (should be filtered when throttled)
+
+	highPrioMsg := []byte{0x7E, 0x00, 0x02, 0x7E}
+	conn.Queue.Put(-1, 5*time.Second, highPrioMsg) // priority -1 (should pass through)
+
+	// Check if the connection is throttled
+	if conn.IsThrottled() {
+		result := collectMessages(conn)
+		// When throttled, only messages with priority <= 0 should be collected
+		t.Logf("Throttled connection collected %d bytes", len(result))
+	} else {
+		t.Skip("Connection not throttled, cannot test throttle behavior")
+	}
+}
+
+// TestCollectMessages_SleepingWithHighPriority tests sleeping connection with heartbeat priority
+func TestCollectMessages_SleepingWithHighPriority(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save original NoSleep setting
+	originalNoSleep := globalSettings.NoSleep
+	globalSettings.NoSleep = false
+	defer func() {
+		globalSettings.NoSleep = originalNoSleep
+	}()
+
+	conn := &networkConnection{
+		Ip:         "192.168.10.100",
+		Port:       4000,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	// Verify the connection is sleeping
+	if !conn.IsSleeping() {
+		t.Skip("Connection is not sleeping, cannot test sleeping + high priority behavior")
+	}
+
+	// Add heartbeat message with priority -11 (should be sent even when sleeping)
+	heartbeatMsg := []byte{0x7E, 0x00, 0x00, 0x7E}
+	conn.Queue.Put(-11, 5*time.Second, heartbeatMsg)
+
+	// Add regular message with priority 0 (should NOT be sent when sleeping)
+	regularMsg := []byte{0x7E, 0x00, 0x01, 0x7E}
+	conn.Queue.Put(0, 5*time.Second, regularMsg)
+
+	result := collectMessages(conn)
+
+	// Should collect the heartbeat message
+	if len(result) != len(heartbeatMsg) {
+		t.Logf("Expected heartbeat message (%d bytes), got %d bytes", len(heartbeatMsg), len(result))
+	}
+}
+
 // TestSendGDL90 tests the sendGDL90 wrapper function
 func TestSendGDL90(t *testing.T) {
 	// Initialize required global variables

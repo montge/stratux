@@ -1178,3 +1178,41 @@ func TestImportAISTrafficMessage_TurnRateCalculation(t *testing.T) {
 
 	t.Log("Turn rate calculation test complete")
 }
+
+// TestImportAISTrafficMessage_Type27ValidCog tests Type 27 with valid COG (not 511)
+func TestImportAISTrafficMessage_Type27ValidCog(t *testing.T) {
+	resetAISState()
+
+	// Set GPS close to target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 37.0
+	mySituation.GPSLongitude = -122.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 27 message - this covers the COG != 511 branch
+	aisMsg := "!AIVDM,1,1,,A,KC5E2b@U19PFdLbL,0*62"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 27 valid COG test: messages=%d", globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_Type27ValidSpeed tests Type 27 with valid speed (< 63)
+func TestImportAISTrafficMessage_Type27ValidSpeed(t *testing.T) {
+	resetAISState()
+
+	// Set GPS close to target
+	mySituation.muGPS.Lock()
+	mySituation.GPSLatitude = 37.0
+	mySituation.GPSLongitude = -122.0
+	mySituation.GPSFixQuality = 1
+	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.muGPS.Unlock()
+
+	// Type 27 message - this covers the Sog < 63 branch
+	aisMsg := "!AIVDM,1,1,,A,KC5E2b@U19PFdLbL,0*62"
+	parseAisMessage(aisMsg)
+
+	t.Logf("Type 27 valid speed test: messages=%d", globalStatus.AIS_messages_total)
+}

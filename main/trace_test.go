@@ -703,6 +703,7 @@ func TestInjectTraceMessage_AllContexts(t *testing.T) {
 		{CONTEXT_APRS, `FLR395F39>APRS,qAS,OXFORD:/120000h5145.945N/00111.511W'057/057/A=000407 !W02! id06395F39`},
 		{CONTEXT_OGN_RX, `{"sys":"OGN","addr":"123456","lat_deg":51.7657,"lon_deg":-1.1918}`},
 		{CONTEXT_DUMP1090, `{"hex":"A12345","flight":"N12345","lat":47.5,"lon":-122.3}`},
+		{CONTEXT_GODUMP978, "+12345678901234567890;"},
 	}
 
 	for _, tc := range testCases {
@@ -716,6 +717,54 @@ func TestInjectTraceMessage_AllContexts(t *testing.T) {
 			t.Logf("Injected %s message", tc.context)
 		})
 	}
+}
+
+// TestInjectTraceMessage_LOWPOWERUAT tests CONTEXT_LOWPOWERUAT message injection
+func TestInjectTraceMessage_LOWPOWERUAT(t *testing.T) {
+	// Initialize stratuxClock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Initialize required globals
+	initTestState()
+
+	// Create a sample radio message (raw byte data)
+	// This is the data format expected by processRadioMessage
+	radioData := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
+
+	// Set time slightly in the future so we don't sleep
+	ts := stratuxClock.Time.Add(-1 * time.Millisecond)
+
+	// This should not panic and should call processRadioMessage
+	injectTraceMessage(CONTEXT_LOWPOWERUAT, ts, radioData)
+
+	t.Logf("Injected LOWPOWERUAT message: %d bytes", len(radioData))
+}
+
+// TestInjectTraceMessage_UnknownContext tests injection with an unknown context
+func TestInjectTraceMessage_UnknownContext(t *testing.T) {
+	// Initialize stratuxClock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Initialize required globals
+	initTestState()
+
+	// Use an unknown context
+	unknownContext := "unknown_context"
+	testData := []byte("test data")
+
+	// Set time slightly in the future so we don't sleep
+	ts := stratuxClock.Time.Add(-1 * time.Millisecond)
+
+	// This should not panic - the function should just not match any branch
+	injectTraceMessage(unknownContext, ts, testData)
+
+	t.Log("Injected message with unknown context (should be ignored)")
 }
 
 // initTestState initializes global state for trace injection tests

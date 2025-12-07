@@ -1747,6 +1747,221 @@ func TestHandleSettingsSetRequest_POST_StringSettings(t *testing.T) {
 	}
 }
 
+// TestHandleSettingsSetRequest_POST_BoolSettings tests additional boolean settings
+func TestHandleSettingsSetRequest_POST_BoolSettings(t *testing.T) {
+	// Initialize required mutexes
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+
+	// Save original settings
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	testCases := []struct {
+		name       string
+		body       string
+		verifyFunc func(t *testing.T)
+	}{
+		{
+			name: "set_ogni2ctxenabled",
+			body: `{"OGNI2CTXEnabled": true}`,
+			verifyFunc: func(t *testing.T) {
+				if !globalSettings.OGNI2CTXEnabled {
+					t.Error("Expected OGNI2CTXEnabled to be true")
+				}
+			},
+		},
+		{
+			name: "set_replaylog_true",
+			body: `{"ReplayLog": true}`,
+			verifyFunc: func(t *testing.T) {
+				if !globalSettings.ReplayLog {
+					t.Error("Expected ReplayLog to be true")
+				}
+			},
+		},
+		{
+			name: "set_replaylog_false",
+			body: `{"ReplayLog": false}`,
+			verifyFunc: func(t *testing.T) {
+				if globalSettings.ReplayLog {
+					t.Error("Expected ReplayLog to be false")
+				}
+			},
+		},
+		{
+			name: "set_tracelog",
+			body: `{"TraceLog": true}`,
+			verifyFunc: func(t *testing.T) {
+				if !globalSettings.TraceLog {
+					t.Error("Expected TraceLog to be true")
+				}
+			},
+		},
+		{
+			name: "set_ahrslog",
+			body: `{"AHRSLog": true}`,
+			verifyFunc: func(t *testing.T) {
+				if !globalSettings.AHRSLog {
+					t.Error("Expected AHRSLog to be true")
+				}
+			},
+		},
+		{
+			name: "set_persistentlogging",
+			body: `{"PersistentLogging": true}`,
+			verifyFunc: func(t *testing.T) {
+				if !globalSettings.PersistentLogging {
+					t.Error("Expected PersistentLogging to be true")
+				}
+			},
+		},
+		{
+			name: "set_estimatebearinglessdist",
+			body: `{"EstimateBearinglessDist": true}`,
+			verifyFunc: func(t *testing.T) {
+				if !globalSettings.EstimateBearinglessDist {
+					t.Error("Expected EstimateBearinglessDist to be true")
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			globalSettings = settings{}
+
+			req := httptest.NewRequest("POST", "/setSettings", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			handleSettingsSetRequest(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status 200, got %d", resp.StatusCode)
+			}
+
+			tc.verifyFunc(t)
+		})
+	}
+}
+
+// TestHandleSettingsSetRequest_POST_WiFiSettings tests WiFi-related settings
+func TestHandleSettingsSetRequest_POST_WiFiSettings(t *testing.T) {
+	// Initialize required mutexes
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+
+	// Save original settings
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	testCases := []struct {
+		name       string
+		body       string
+		verifyFunc func(t *testing.T)
+	}{
+		{
+			name: "set_wifi_country",
+			body: `{"WiFiCountry": "US"}`,
+			verifyFunc: func(t *testing.T) {
+				// Function calls setWifiCountry which may modify settings
+				t.Log("WiFiCountry setting processed")
+			},
+		},
+		{
+			name: "set_wifi_ssid",
+			body: `{"WiFiSSID": "MyStratux"}`,
+			verifyFunc: func(t *testing.T) {
+				// Function calls setWifiSSID which may modify settings
+				t.Log("WiFiSSID setting processed")
+			},
+		},
+		{
+			name: "set_wifi_channel",
+			body: `{"WiFiChannel": 6}`,
+			verifyFunc: func(t *testing.T) {
+				// Function calls setWifiChannel which may modify settings
+				t.Log("WiFiChannel setting processed")
+			},
+		},
+		{
+			name: "set_wifi_security_enabled",
+			body: `{"WiFiSecurityEnabled": true}`,
+			verifyFunc: func(t *testing.T) {
+				// Function calls setWifiSecurityEnabled which may modify settings
+				t.Log("WiFiSecurityEnabled setting processed")
+			},
+		},
+		{
+			name: "set_wifi_passphrase",
+			body: `{"WiFiPassphrase": "password123"}`,
+			verifyFunc: func(t *testing.T) {
+				// Function calls setWifiPassphrase which may modify settings
+				t.Log("WiFiPassphrase setting processed")
+			},
+		},
+		{
+			name: "set_wifi_ip_address",
+			body: `{"WiFiIPAddress": "192.168.10.1"}`,
+			verifyFunc: func(t *testing.T) {
+				// Function calls setWifiIPAddress which may modify settings
+				t.Log("WiFiIPAddress setting processed")
+			},
+		},
+		{
+			name: "set_wifi_mode",
+			body: `{"WiFiMode": 1}`,
+			verifyFunc: func(t *testing.T) {
+				// Function calls setWiFiMode which may modify settings
+				t.Log("WiFiMode setting processed")
+			},
+		},
+		{
+			name: "set_wifi_direct_pin",
+			body: `{"WiFiDirectPin": "12345678"}`,
+			verifyFunc: func(t *testing.T) {
+				// Function calls setWifiDirectPin which may modify settings
+				t.Log("WiFiDirectPin setting processed")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			globalSettings = settings{}
+
+			req := httptest.NewRequest("POST", "/setSettings", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			handleSettingsSetRequest(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status 200, got %d", resp.StatusCode)
+			}
+
+			tc.verifyFunc(t)
+		})
+	}
+}
+
 // =============================================================================
 // Additional Handler Tests for Improved Coverage
 // =============================================================================
