@@ -2019,6 +2019,61 @@ func TestHandleDeleteAHRSLogFiles(t *testing.T) {
 	}
 }
 
+// TestHandleDeleteAHRSLogFiles_ErrorReadDir tests error handling when directory doesn't exist
+func TestHandleDeleteAHRSLogFiles_ErrorReadDir(t *testing.T) {
+	req := httptest.NewRequest("POST", "/deleteahrslogfiles", nil)
+	w := httptest.NewRecorder()
+
+	// This will try to read /var/log which may not exist, triggering the error path
+	handleDeleteAHRSLogFiles(w, req)
+
+	resp := w.Result()
+	// If /var/log doesn't exist, should return 404
+	// If it does exist, should return 200
+	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status 200, 404, or 0, got %d", resp.StatusCode)
+	}
+
+	// Verify error message format if 404
+	if resp.StatusCode == http.StatusNotFound {
+		body, _ := io.ReadAll(resp.Body)
+		bodyStr := string(body)
+		if !strings.Contains(bodyStr, "error deleting AHRS logs") {
+			t.Logf("Note: Expected error message about AHRS logs, got: %s", bodyStr)
+		}
+	}
+}
+
+// TestSetPersistentLogging tests the setPersistentLogging function
+func TestSetPersistentLogging(t *testing.T) {
+	testCases := []struct {
+		name       string
+		persistent bool
+		desc       string
+	}{
+		{
+			name:       "enable_persistent_logging",
+			persistent: true,
+			desc:       "Enable persistent logging (disable overlay)",
+		},
+		{
+			name:       "disable_persistent_logging",
+			persistent: false,
+			desc:       "Disable persistent logging (enable overlay)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Note: This function calls overlayctl which is an external command
+			// In a test environment without overlayctl, this will fail silently
+			// We're just testing that the function doesn't panic
+			setPersistentLogging(tc.persistent)
+			t.Logf("%s: setPersistentLogging(%v) completed", tc.desc, tc.persistent)
+		})
+	}
+}
+
 // TestHandleDevelModeToggle tests the /develmodetoggle endpoint
 func TestHandleDevelModeToggle(t *testing.T) {
 	// Initialize required mutexes

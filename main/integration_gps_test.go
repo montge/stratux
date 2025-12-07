@@ -712,3 +712,40 @@ func TestGPSMultiConstellation(t *testing.T) {
 
 	t.Logf("Multi-constellation: %d total satellites (GPS, GLONASS, Galileo)", len(Satellites))
 }
+
+// TestGPSGSTSentenceErrors tests GST sentence error handling
+func TestGPSGSTSentenceErrors(t *testing.T) {
+	resetGPSState()
+
+	testCases := []struct {
+		name     string
+		sentence string
+		desc     string
+	}{
+		{
+			name:     "invalid_lat_stddev",
+			sentence: "$GNGST,205246.00,1.19,0.02,0.01,-2.4501,XXX,0.01,0.03*5B",
+			desc:     "Invalid latitude stddev (non-numeric)",
+		},
+		{
+			name:     "invalid_lon_stddev",
+			sentence: "$GNGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,YYY,0.03*5B",
+			desc:     "Invalid longitude stddev (non-numeric)",
+		},
+		{
+			name:     "invalid_alt_stddev",
+			sentence: "$GNGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,0.01,ZZZ*5B",
+			desc:     "Invalid altitude stddev (non-numeric)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := processNMEALineLow(tc.sentence, false)
+			if result {
+				t.Errorf("%s: Expected sentence to be rejected, but it was accepted", tc.desc)
+			}
+			t.Logf("%s: correctly rejected invalid sentence", tc.desc)
+		})
+	}
+}

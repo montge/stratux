@@ -454,6 +454,49 @@ func TestRegexOGNHasIDNilRegex(t *testing.T) {
 	}
 }
 
+// TestRegexOGNHasIDWithRegex tests OGN matching with a non-nil regex that matches
+func TestRegexOGNHasIDWithRegex(t *testing.T) {
+	// Create a regex that matches any serial containing "868"
+	pattern := regexp.MustCompile(".*868.*")
+	regexWithPattern := (*regexOGN)(pattern)
+
+	tests := []struct {
+		name     string
+		serial   string
+		expected bool
+	}{
+		{
+			name:     "Match via regex - contains 868",
+			serial:   "stratux:868:52",
+			expected: true,
+		},
+		{
+			name:     "Match via regex - custom with 868",
+			serial:   "custom-868-device",
+			expected: true,
+		},
+		{
+			name:     "No match - doesn't contain 868",
+			serial:   "stratux:978",
+			expected: false,
+		},
+		{
+			name:     "No match - empty string",
+			serial:   "",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := regexWithPattern.hasID(tt.serial)
+			if result != tt.expected {
+				t.Errorf("regexWithPattern.hasID(%q) = %v, want %v", tt.serial, result, tt.expected)
+			}
+		})
+	}
+}
+
 // TestRegexAISHasID tests AIS (162MHz) serial matching
 func TestRegexAISHasID(t *testing.T) {
 	tests := []struct {
