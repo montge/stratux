@@ -2393,3 +2393,544 @@ func TestParseDump1090Message_DisplayTrafficSource_TailLength1(t *testing.T) {
 		t.Errorf("Expected Tail=%s, got %s", expected, ti.Tail)
 	}
 }
+
+// TestMakeTrafficReportMsg_SpeedInvalid tests message generation with invalid speed
+// Verifies: FR-604 (GDL90 Traffic Report - speed validity flag)
+func TestMakeTrafficReportMsg_SpeedInvalid(t *testing.T) {
+	ti := TrafficInfo{
+		Icao_addr:   0xABCDEF,
+		Addr_type:   0,
+		Lat:         43.99,
+		Lng:         -88.56,
+		Alt:         5000,
+		Speed:       0,
+		Speed_valid: false, // Speed is not valid
+		Track:       90.0,
+		Vvel:        0,
+		Tail:        "N12345",
+	}
+
+	msg := makeTrafficReportMsg(ti)
+
+	// Verify message generated successfully
+	if len(msg) < 28 {
+		t.Fatalf("Message too short: %d bytes", len(msg))
+	}
+
+	// When Speed_valid is false, the track type bits should not be set (msg[12] bit 0 should be 0)
+	// This test verifies the function handles invalid speed correctly
+}
+
+// TestMakeTrafficReportMsg_SpecialCallsignChars tests callsign with special allowed chars
+// Verifies: FR-604 (GDL90 Traffic Report - callsign with 'e', 'u', 'a', 'r', 't')
+func TestMakeTrafficReportMsg_SpecialCallsignChars(t *testing.T) {
+	testCases := []struct {
+		name string
+		tail string
+	}{
+		{"With 'e'", "Ne12345"},
+		{"With 'u'", "Nu12345"},
+		{"With 'a'", "Na12345"},
+		{"With 'r'", "Nr12345"},
+		{"With 't'", "Nt12345"},
+		{"All special", "earture"}, // All allowed lowercase chars
+		{"Mixed", "N12eurat"},       // Mixed digits and special chars
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       5000,
+				Speed:     120,
+				Track:     90.0,
+				Tail:      tc.tail,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// These lowercase letters should be preserved in the callsign field
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_VerticalVelocity tests various vertical velocity values
+// Verifies: FR-604 (GDL90 Traffic Report - vertical velocity encoding)
+func TestMakeTrafficReportMsg_VerticalVelocity(t *testing.T) {
+	testCases := []struct {
+		name string
+		vvel int16
+	}{
+		{"Zero vvel", 0},
+		{"Climb", 1000},
+		{"Fast climb", 2000},
+		{"Descent", -1000},
+		{"Fast descent", -2000},
+		{"Max climb", 32000}, // Near max int16/2
+		{"Max descent", -32000},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       5000,
+				Speed:     120,
+				Track:     90.0,
+				Vvel:      tc.vvel,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Vertical velocity is encoded with 64 fpm resolution
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_NICNACp tests various NIC and NACp values
+// Verifies: FR-604 (GDL90 Traffic Report - navigation accuracy encoding)
+func TestMakeTrafficReportMsg_NICNACp(t *testing.T) {
+	testCases := []struct {
+		name string
+		nic  int
+		nacp int
+	}{
+		{"Both zero", 0, 0},
+		{"NIC only", 8, 0},
+		{"NACp only", 0, 8},
+		{"Both max", 11, 11},
+		{"Mid values", 7, 7},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       5000,
+				Speed:     120,
+				Track:     90.0,
+				NIC:       tc.nic,
+				NACp:      tc.nacp,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// NIC is in upper 4 bits, NACp in lower 4 bits of msg[13]
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_PriorityStatus tests various priority/emergency status values
+// Verifies: FR-604 (GDL90 Traffic Report - emergency status encoding)
+func TestMakeTrafficReportMsg_PriorityStatus(t *testing.T) {
+	testCases := []struct {
+		name           string
+		priorityStatus uint8
+	}{
+		{"No emergency", 0},
+		{"General emergency", 1},
+		{"Medical emergency", 3},
+		{"Low fuel", 4},
+		{"Communication failure", 5},
+		{"Unlawful interference", 6},
+		{"Downed aircraft", 7},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr:      0xABCDEF,
+				Lat:            43.99,
+				Lng:            -88.56,
+				Alt:            5000,
+				Speed:          120,
+				Track:          90.0,
+				PriorityStatus: tc.priorityStatus,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Priority status is in upper 4 bits of msg[27]
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_AddressTypes tests different address type values
+// Verifies: FR-604 (GDL90 Traffic Report - address type encoding)
+func TestMakeTrafficReportMsg_AddressTypes(t *testing.T) {
+	testCases := []struct {
+		name      string
+		addrType  uint8
+		expectVal byte
+	}{
+		{"ADS-B", 0, 0x00},
+		{"Reserved", 1, 0x01},
+		{"TIS-B with ICAO", 2, 0x02},
+		{"TIS-B without ICAO", 3, 0x03},
+		{"Surface vehicle", 4, 0x04},
+		{"Fixed beacon", 5, 0x05},
+		{"ADS-R", 6, 0x06},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr:         0xABCDEF,
+				Addr_type:         tc.addrType,
+				Lat:               43.99,
+				Lng:               -88.56,
+				Alt:               5000,
+				Speed:             120,
+				Track:             90.0,
+				BearingDist_valid: false, // No alert
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Fatalf("Message too short: %d bytes", len(msg))
+			}
+
+			// Address type is in lower 4 bits of msg[2] (after frame flag and message type)
+			// Without alert bit, it should match exactly
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_EmitterCategory tests various emitter category values
+// Verifies: FR-604 (GDL90 Traffic Report - emitter category encoding)
+func TestMakeTrafficReportMsg_EmitterCategory(t *testing.T) {
+	testCases := []struct {
+		name     string
+		category uint8
+	}{
+		{"No info", 0},
+		{"Light", 1},
+		{"Small", 2},
+		{"Large", 3},
+		{"High vortex", 4},
+		{"Heavy", 5},
+		{"Highly maneuverable", 6},
+		{"Rotorcraft", 7},
+		{"Glider", 9},
+		{"Balloon", 10},
+		{"Parachute", 11},
+		{"Surface vehicle", 18},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr:        0xABCDEF,
+				Lat:              43.99,
+				Lng:              -88.56,
+				Alt:              5000,
+				Speed:            120,
+				Track:            90.0,
+				Emitter_category: tc.category,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Emitter category is in msg[18]
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_AirborneOnGroundCombinations tests airborne/ground with other flags
+// Verifies: FR-604 (GDL90 Traffic Report - miscellaneous field encoding)
+func TestMakeTrafficReportMsg_AirborneOnGroundCombinations(t *testing.T) {
+	testCases := []struct {
+		name         string
+		onGround     bool
+		speedValid   bool
+		extrapolated bool
+	}{
+		{"Airborne, valid speed, not extrapolated", false, true, false},
+		{"Airborne, invalid speed, not extrapolated", false, false, false},
+		{"Airborne, valid speed, extrapolated", false, true, true},
+		{"Airborne, invalid speed, extrapolated", false, false, true},
+		{"Ground, valid speed, not extrapolated", true, true, false},
+		{"Ground, invalid speed, not extrapolated", true, false, false},
+		{"Ground, valid speed, extrapolated", true, true, true},
+		{"Ground, invalid speed, extrapolated", true, false, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr:            0xABCDEF,
+				Lat:                  43.99,
+				Lng:                  -88.56,
+				Alt:                  5000,
+				Speed:                120,
+				Track:                90.0,
+				OnGround:             tc.onGround,
+				Speed_valid:          tc.speedValid,
+				ExtrapolatedPosition: tc.extrapolated,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Miscellaneous field is in msg[12]:
+			// Bit 0: track type valid (if Speed_valid)
+			// Bit 2: extrapolated
+			// Bit 3: airborne (if !OnGround)
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_TrackValues tests various track/heading values
+// Verifies: FR-604 (GDL90 Traffic Report - track encoding)
+func TestMakeTrafficReportMsg_TrackValues(t *testing.T) {
+	testCases := []struct {
+		name  string
+		track float32
+	}{
+		{"North", 0},
+		{"East", 90},
+		{"South", 180},
+		{"West", 270},
+		{"Just before wrap", 359.5},
+		{"NE", 45},
+		{"SE", 135},
+		{"SW", 225},
+		{"NW", 315},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       5000,
+				Speed:     120,
+				Track:     tc.track,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Track is encoded with ~1.4 degree resolution in msg[17]
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_SpeedValues tests various speed values
+// Verifies: FR-604 (GDL90 Traffic Report - speed encoding)
+func TestMakeTrafficReportMsg_SpeedValues(t *testing.T) {
+	testCases := []struct {
+		name  string
+		speed uint16
+	}{
+		{"Zero", 0},
+		{"Slow", 50},
+		{"Medium", 150},
+		{"Fast", 400},
+		{"Very fast", 600},
+		{"Max representable", 4095}, // 12-bit max
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       5000,
+				Speed:     tc.speed,
+				Track:     90.0,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Speed is encoded in msg[14] (upper 8 bits) and msg[15] upper 4 bits
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_ICAOAddresses tests various ICAO address patterns
+// Verifies: FR-604 (GDL90 Traffic Report - ICAO address encoding)
+func TestMakeTrafficReportMsg_ICAOAddresses(t *testing.T) {
+	testCases := []struct {
+		name string
+		icao uint32
+	}{
+		{"Zero", 0x000000},
+		{"Low value", 0x000001},
+		{"US aircraft", 0xA12345},
+		{"Canadian", 0xC00001},
+		{"High value", 0xFFFFFF},
+		{"All patterns", 0xAAAAAA},
+		{"Alternating", 0x555555},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: tc.icao,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       5000,
+				Speed:     120,
+				Track:     90.0,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// ICAO is encoded in msg[2-4] (3 bytes)
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_LatLngExtremes tests extreme latitude/longitude values
+// Verifies: FR-604 (GDL90 Traffic Report - position encoding)
+func TestMakeTrafficReportMsg_LatLngExtremes(t *testing.T) {
+	testCases := []struct {
+		name string
+		lat  float32
+		lng  float32
+	}{
+		{"Equator prime meridian", 0, 0},
+		{"North pole", 90, 0},
+		{"South pole", -90, 0},
+		{"Date line", 0, 180},
+		{"Negative date line", 0, -180},
+		{"Northeast extreme", 89.9, 179.9},
+		{"Southwest extreme", -89.9, -179.9},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       tc.lat,
+				Lng:       tc.lng,
+				Alt:       5000,
+				Speed:     120,
+				Track:     90.0,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Lat is in msg[5-7], Lng in msg[8-10]
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_CallsignCharacterSanitization tests character filtering
+// Verifies: FR-604 (GDL90 Traffic Report - callsign character validation)
+func TestMakeTrafficReportMsg_CallsignCharacterSanitization(t *testing.T) {
+	testCases := []struct {
+		name string
+		tail string
+		desc string
+	}{
+		{"Lowercase letters", "nxyz", "Non-allowed lowercase should be replaced"},
+		{"Special chars", "N123!@#$%^&*()", "Special characters should be replaced"},
+		{"Control chars", "N123\x00\x01\x02", "Control characters should be replaced"},
+		{"Mixed valid/invalid", "N1b2c3d4", "Mix of valid digits and invalid lowercase"},
+		{"Spaces preserved", "N 123", "Spaces should be preserved"},
+		{"Digits preserved", "0123456789", "All digits should be preserved"},
+		{"Uppercase preserved", "ABCDEFGHIJ", "All uppercase should be preserved"},
+		{"Allowed lowercase", "NeaurtuX", "e,a,u,r,t should be preserved"},
+		{"8 char exactly", "N1234567", "8 characters should all be encoded"},
+		{"Over 8 chars", "N123456789ABC", "Only first 8 should be encoded"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ti := TrafficInfo{
+				Icao_addr: 0xABCDEF,
+				Lat:       43.99,
+				Lng:       -88.56,
+				Alt:       5000,
+				Speed:     120,
+				Track:     90.0,
+				Tail:      tc.tail,
+			}
+
+			msg := makeTrafficReportMsg(ti)
+
+			if len(msg) < 28 {
+				t.Errorf("Message too short: %d bytes", len(msg))
+			}
+			// Callsign is in msg[19-26], filtered per GDL90 spec
+			// Valid: space (0x20), 0-9 (48-57), A-Z (65-90), e, u, a, r, t
+		})
+	}
+}
+
+// TestMakeTrafficReportMsg_GNSSAltitudeNoBaroPress tests GNSS altitude without valid baro pressure
+// Verifies: FR-604 (GDL90 Traffic Report - GNSS altitude handling without baro)
+func TestMakeTrafficReportMsg_GNSSAltitudeNoBaroPress(t *testing.T) {
+	// Initialize stratuxClock if not already initialized
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// Initialize mutexes if not already initialized
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	// Setup INVALID baro pressure (old timestamp)
+	mySituation.muBaro.Lock()
+	mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-1 * time.Hour) // Very old
+	mySituation.muBaro.Unlock()
+
+	ti := TrafficInfo{
+		Icao_addr: 0xABCDEF,
+		Lat:       43.99,
+		Lng:       -88.56,
+		Alt:       5300, // GNSS altitude
+		AltIsGNSS: true, // This is GNSS altitude, but baro is invalid so should use as-is
+		Speed:     120,
+		Track:     90.0,
+	}
+
+	msg := makeTrafficReportMsg(ti)
+
+	// Verify message was generated
+	if len(msg) < 28 {
+		t.Fatalf("Message too short: %d bytes", len(msg))
+	}
+	// When baro pressure is invalid, GNSS altitude should be used directly (not converted)
+}

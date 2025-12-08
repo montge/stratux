@@ -2346,3 +2346,83 @@ func TestImportOgnTrafficMessage_CompleteCoverage(t *testing.T) {
 		trafficMutex.Unlock()
 	})
 }
+
+// TestParseAprsMessage_TooFewCapturesWithLog documents line 165-167 (too few captures)
+// This branch is unreachable with the current regex structure.
+func TestParseAprsMessage_TooFewCapturesWithLog(t *testing.T) {
+	// ANALYSIS: The aprsRegex has 14 capture groups plus the full match (res[0]),
+	// giving exactly 15 elements when any match occurs. The regex is structured such that
+	// if it matches at all, all 15 elements are present (some may be empty strings for optional groups).
+	//
+	// Group breakdown:
+	// res[0] = full match, res[1-2] = protocol/id (required), res[3] = gateway (required)
+	// res[4-6] = time/lat/lon (required), res[7-10] = track/speed/alt group (optional, empty if absent)
+	// res[11-12] = precision group (optional, empty if absent), res[13-14] = id group (optional, empty if absent)
+	//
+	// Therefore, len(res) < 15 is unreachable defensive code.
+
+	t.Skip("Line 165-167: Unreachable - regex always returns exactly 15 elements when it matches")
+}
+
+// TestParseAprsMessage_InvalidSecondsInTime documents line 172-174 (seconds parsing error)
+// This branch is unreachable because the regex validates the format.
+func TestParseAprsMessage_InvalidSecondsInTime(t *testing.T) {
+	// ANALYSIS: The regex pattern includes `(?P<time>\d{6})h` which requires exactly 6 digits
+	// for the time field (HHMMSS). The seconds portion res[4][4:] is substring of these 6 digits,
+	// so it will always be numeric. ParseInt(res[4][4:], 10, 8) cannot fail with non-numeric input
+	// because the regex prevents non-numeric characters from matching.
+	//
+	// This is unreachable defensive code.
+
+	t.Skip("Line 172-174: Unreachable - regex pattern \\d{6}h ensures seconds are always numeric")
+}
+
+// TestParseAprsMessage_InvalidLatPrecisionDigit documents line 186-188 (lat_m3d parsing error)
+// This branch is unreachable because the regex validates the format.
+func TestParseAprsMessage_InvalidLatPrecisionDigit(t *testing.T) {
+	// ANALYSIS: The regex pattern includes `(?P<lonlatprecision>\d+)` which requires one or more digits
+	// for the precision field. When captured in res[12], it will only contain numeric characters.
+	// Therefore, ParseFloat(res[12][:1], 64) cannot fail with non-numeric input because the regex
+	// prevents non-numeric characters from matching.
+	//
+	// Note: res[12] could be empty (covered by other tests), but if non-empty, it's always numeric.
+	// This is unreachable defensive code.
+
+	t.Skip("Line 186-188: Unreachable - regex pattern \\d+ ensures precision is always numeric when present")
+}
+
+// TestParseAprsMessage_InvalidSpeedCoverage documents line 213-215 (speed parsing error)
+// This branch is unreachable because the regex validates the format.
+func TestParseAprsMessage_InvalidSpeedCoverage(t *testing.T) {
+	// ANALYSIS: The regex pattern includes `(?P<speed>\d{3})` which requires exactly 3 digits
+	// for the speed field. When captured in res[9], it will only contain numeric characters.
+	// Therefore, ParseFloat(res[9], 64) cannot fail with non-numeric input because the regex
+	// prevents non-numeric characters from matching.
+	//
+	// Note: res[9] could be empty when the optional track/speed/alt group is not present (covered by other tests),
+	// but when the group is present and res[14] is populated (required to reach this code), res[9] is always numeric.
+	// This is unreachable defensive code.
+
+	t.Skip("Line 213-215: Unreachable - regex pattern \\d{3} ensures speed is always numeric when present")
+}
+
+// TestParseAprsMessage_InvalidHexInID tests line 222-224 (hex decode error)
+// Note: This test cannot be easily executed because line 223 calls log.Fatal()
+// which terminates the test process. We document this but skip actual execution.
+func TestParseAprsMessage_InvalidHexInID(t *testing.T) {
+	t.Skip("Skipping test for line 222-224: hex.DecodeString error calls log.Fatal() which would terminate the test")
+
+	// To trigger this, we would need res[14][:2] to contain invalid hex characters
+	// The ID field format is id followed by 8 hex digits: id06395F39
+	// res[14] is the captured 8 hex digits: "06395F39"
+	// res[14][:2] would be "06"
+
+	// To make hex.DecodeString fail, we'd need non-hex characters in the first 2 chars
+	// However, the regex pattern [\dA-F]{8} should prevent this from matching in the first place
+	// This means line 222-224 is unreachable defensive code
+
+	// If we somehow bypass the regex (which we can't), the message would look like:
+	// invalidHexMsg := `FLR395F39>APRS,qAS,OXFORD:/120000h5145.945N/00111.511W'057/057/A=000407 !W02! idXY395F39`
+
+	t.Log("Line 222-224: Unreachable - hex decode error would call log.Fatal()")
+}

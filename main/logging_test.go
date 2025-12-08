@@ -185,5 +185,34 @@ func TestClearDebugLogFile(t *testing.T) {
 		clearDebugLogFile()
 		t.Log("clearDebugLogFile handled closed file gracefully")
 	})
+
+	t.Run("truncate_error", func(t *testing.T) {
+		// Create a temp file with read-only permissions
+		tmpFile, err := os.CreateTemp("", "test-clear-readonly-*.log")
+		if err != nil {
+			t.Fatalf("Failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile.Name())
+		tmpFilePath := tmpFile.Name()
+
+		// Write some content
+		content := "Test content for truncate error"
+		tmpFile.WriteString(content)
+		tmpFile.Sync()
+		tmpFile.Close()
+
+		// Reopen the file as read-only
+		readOnlyFile, err := os.OpenFile(tmpFilePath, os.O_RDONLY, 0444)
+		if err != nil {
+			t.Fatalf("Failed to reopen file as read-only: %v", err)
+		}
+		defer readOnlyFile.Close()
+
+		logFileHandle = readOnlyFile
+
+		// Should handle truncate error gracefully (truncate will fail on read-only file)
+		clearDebugLogFile()
+		t.Log("clearDebugLogFile handled truncate error gracefully")
+	})
 }
 

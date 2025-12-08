@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/tarm/serial"
 )
 
 // TestChksumUBX tests UBX checksum calculation
@@ -4038,6 +4040,253 @@ func TestProcessNMEALineLow_Comprehensive(t *testing.T) {
 		result := processNMEALineLow("$GPXYZ,1,2,3*3C", false)
 		if result {
 			t.Error("Expected unknown sentence to return false")
+		}
+	})
+}
+
+// Mock tracker for testing writeTrackerConfigFromSettings
+type mockTrackerForGPS struct {
+	configWritten       bool
+	configRequested     bool
+	writeDelay          time.Duration
+	shouldReturnChanged bool
+}
+
+func (m *mockTrackerForGPS) initNewConnection(serialPort *serial.Port)      {}
+func (m *mockTrackerForGPS) onNmea(serialPort *serial.Port, nmea []string) bool { return false }
+func (m *mockTrackerForGPS) gpsTimeOffsetPps() time.Duration                { return 0 }
+func (m *mockTrackerForGPS) getGpsHardwareType() uint                       { return 0 }
+func (m *mockTrackerForGPS) isDetected() bool                               { return true }
+func (m *mockTrackerForGPS) isConfigRead() bool                             { return true }
+func (m *mockTrackerForGPS) writeReadDelay() time.Duration                  { return m.writeDelay }
+func (m *mockTrackerForGPS) writeInitialConfig(serialPort *serial.Port) bool { return false }
+func (m *mockTrackerForGPS) requestTrackerConfig(serialPort *serial.Port) {
+	m.configRequested = true
+}
+func (m *mockTrackerForGPS) writeConfigFromSettings(serialPort *serial.Port) bool {
+	m.configWritten = true
+	return m.shouldReturnChanged
+}
+
+func TestWriteTrackerConfigFromSettings(t *testing.T) {
+	t.Run("No tracker detected", func(t *testing.T) {
+		// Save and restore original state
+		originalTracker := detectedTracker
+		defer func() { detectedTracker = originalTracker }()
+
+		// Set detectedTracker to nil
+		detectedTracker = nil
+
+		// Call function - should return early without panic
+		writeTrackerConfigFromSettings()
+
+		// No assertions needed - just verify it doesn't crash
+	})
+
+	t.Run("Tracker exists but writeConfigFromSettings returns false", func(t *testing.T) {
+		// Save and restore original state
+		originalTracker := detectedTracker
+		defer func() { detectedTracker = originalTracker }()
+
+		// Create mock tracker that returns false
+		mock := &mockTrackerForGPS{
+			shouldReturnChanged: false,
+			writeDelay:          10 * time.Millisecond,
+		}
+		detectedTracker = mock
+
+		// Call function
+		writeTrackerConfigFromSettings()
+
+		// Verify writeConfigFromSettings was called
+		if !mock.configWritten {
+			t.Error("Expected writeConfigFromSettings to be called")
+		}
+
+		// Wait a bit to ensure goroutine doesn't run
+		time.Sleep(20 * time.Millisecond)
+
+		// Verify requestTrackerConfig was NOT called (because writeConfigFromSettings returned false)
+		if mock.configRequested {
+			t.Error("Expected requestTrackerConfig NOT to be called when writeConfigFromSettings returns false")
+		}
+	})
+
+	t.Run("Tracker exists and writeConfigFromSettings returns true", func(t *testing.T) {
+		// Save and restore original state
+		originalTracker := detectedTracker
+		defer func() { detectedTracker = originalTracker }()
+
+		// Create mock tracker that returns true
+		mock := &mockTrackerForGPS{
+			shouldReturnChanged: true,
+			writeDelay:          10 * time.Millisecond,
+		}
+		detectedTracker = mock
+
+		// Call function
+		writeTrackerConfigFromSettings()
+
+		// Verify writeConfigFromSettings was called
+		if !mock.configWritten {
+			t.Error("Expected writeConfigFromSettings to be called")
+		}
+
+		// Wait for goroutine to complete (writeDelay + extra buffer)
+		time.Sleep(30 * time.Millisecond)
+
+		// Verify requestTrackerConfig WAS called
+		if !mock.configRequested {
+			t.Error("Expected requestTrackerConfig to be called when writeConfigFromSettings returns true")
+		}
+	})
+
+	t.Run("Tracker changes before goroutine runs", func(t *testing.T) {
+		// Save and restore original state
+		originalTracker := detectedTracker
+		defer func() { detectedTracker = originalTracker }()
+
+		// Create first mock tracker
+		mock1 := &mockTrackerForGPS{
+			shouldReturnChanged: true,
+			writeDelay:          20 * time.Millisecond,
+		}
+		detectedTracker = mock1
+
+		// Call function
+		writeTrackerConfigFromSettings()
+
+		// Immediately change the detectedTracker to a different one
+		mock2 := &mockTrackerForGPS{
+			shouldReturnChanged: true,
+			writeDelay:          10 * time.Millisecond,
+		}
+		detectedTracker = mock2
+
+		// Wait for goroutine to complete
+		time.Sleep(40 * time.Millisecond)
+
+		// Verify requestTrackerConfig was NOT called on mock1
+		// (because tracker changed between writeConfigFromSettings and goroutine execution)
+		if mock1.configRequested {
+			t.Error("Expected requestTrackerConfig NOT to be called on original tracker after it changed")
+		}
+
+		// mock2 should not have been called either
+		if mock2.configRequested {
+			t.Error("Expected requestTrackerConfig NOT to be called on new tracker")
+		}
+	})
+
+	t.Run("Tracker becomes nil before goroutine runs", func(t *testing.T) {
+		// Save and restore original state
+		originalTracker := detectedTracker
+		defer func() { detectedTracker = originalTracker }()
+
+		// Create mock tracker
+		mock := &mockTrackerForGPS{
+			shouldReturnChanged: true,
+			writeDelay:          20 * time.Millisecond,
+		}
+		detectedTracker = mock
+
+		// Call function
+		writeTrackerConfigFromSettings()
+
+		// Immediately set detectedTracker to nil
+		detectedTracker = nil
+
+		// Wait for goroutine to complete
+		time.Sleep(40 * time.Millisecond)
+
+		// Verify requestTrackerConfig was NOT called
+		// (because tracker became nil before goroutine ran)
+		if mock.configRequested {
+			t.Error("Expected requestTrackerConfig NOT to be called when tracker becomes nil")
+		}
+	})
+
+	t.Run("Zero write delay", func(t *testing.T) {
+		// Save and restore original state
+		originalTracker := detectedTracker
+		defer func() { detectedTracker = originalTracker }()
+
+		// Create mock tracker with zero delay
+		mock := &mockTrackerForGPS{
+			shouldReturnChanged: true,
+			writeDelay:          0,
+		}
+		detectedTracker = mock
+
+		// Call function
+		writeTrackerConfigFromSettings()
+
+		// Wait a small amount for goroutine to complete (even with 0 delay, need some time)
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify requestTrackerConfig WAS called
+		if !mock.configRequested {
+			t.Error("Expected requestTrackerConfig to be called with zero delay")
+		}
+	})
+
+	t.Run("Long write delay", func(t *testing.T) {
+		// Save and restore original state
+		originalTracker := detectedTracker
+		defer func() { detectedTracker = originalTracker }()
+
+		// Create mock tracker with longer delay
+		mock := &mockTrackerForGPS{
+			shouldReturnChanged: true,
+			writeDelay:          50 * time.Millisecond,
+		}
+		detectedTracker = mock
+
+		// Call function
+		writeTrackerConfigFromSettings()
+
+		// Verify it hasn't been called yet (before delay expires)
+		time.Sleep(25 * time.Millisecond)
+		if mock.configRequested {
+			t.Error("Expected requestTrackerConfig NOT to be called before delay expires")
+		}
+
+		// Wait for delay to expire
+		time.Sleep(40 * time.Millisecond)
+
+		// Now it should be called
+		if !mock.configRequested {
+			t.Error("Expected requestTrackerConfig to be called after delay expires")
+		}
+	})
+
+	t.Run("Multiple calls with same tracker", func(t *testing.T) {
+		// Save and restore original state
+		originalTracker := detectedTracker
+		defer func() { detectedTracker = originalTracker }()
+
+		// Create mock tracker
+		mock := &mockTrackerForGPS{
+			shouldReturnChanged: true,
+			writeDelay:          10 * time.Millisecond,
+		}
+		detectedTracker = mock
+
+		// Call function multiple times
+		writeTrackerConfigFromSettings()
+		writeTrackerConfigFromSettings()
+
+		// Wait for goroutines to complete
+		time.Sleep(30 * time.Millisecond)
+
+		// Verify requestTrackerConfig was called (potentially multiple times)
+		if !mock.configRequested {
+			t.Error("Expected requestTrackerConfig to be called")
+		}
+
+		// Verify writeConfigFromSettings was called at least once
+		if !mock.configWritten {
+			t.Error("Expected writeConfigFromSettings to be called")
 		}
 	})
 }

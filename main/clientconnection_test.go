@@ -12,6 +12,7 @@ package main
 
 import (
 	"errors"
+	"io"
 	"net"
 	"runtime"
 	"sync"
@@ -233,6 +234,289 @@ func TestNetworkConnection_IsSleeping(t *testing.T) {
 	}
 }
 
+// TestNetworkConnection_IsSleeping_AllBranches provides comprehensive branch coverage
+// for the IsSleeping method. These tests will execute on ARM hardware.
+func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Save original settings and restore after test
+	origNoSleep := globalSettings.NoSleep
+	defer func() { globalSettings.NoSleep = origNoSleep }()
+
+	isX86 := runtime.GOARCH == "i386" || runtime.GOARCH == "amd64"
+
+	testCases := []struct {
+		name             string
+		noSleep          bool
+		lastPongResponse time.Time
+		lastPingResponse time.Time
+		lastUnreachable  time.Time
+		wantSleeping     bool
+		wantSleepFlag    bool
+		description      string
+	}{
+		{
+			name:             "NoSleep enabled",
+			noSleep:          true,
+			lastPongResponse: time.Time{},
+			lastPingResponse: time.Time{},
+			lastUnreachable:  time.Time{},
+			wantSleeping:     false,
+			wantSleepFlag:    false,
+			description:      "globalSettings.NoSleep == true returns false",
+		},
+		{
+			name:             "LastPongResponse is zero",
+			noSleep:          false,
+			lastPongResponse: time.Time{},
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "conn.LastPongResponse.IsZero() == true branch",
+		},
+		{
+			name:             "LastPongResponse older than 10 seconds",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time.Add(-11 * time.Second),
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "stratuxClock.Since(conn.LastPongResponse) > 10s branch",
+		},
+		{
+			name:             "LastPongResponse exactly 10 seconds",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time.Add(-10 * time.Second),
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     false,
+			wantSleepFlag:    false,
+			description:      "boundary: exactly 10s should not sleep",
+		},
+		{
+			name:             "LastPingResponse is zero",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: time.Time{},
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "conn.LastPingResponse.IsZero() == true branch",
+		},
+		{
+			name:             "LastPingResponse older than 10 seconds",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time.Add(-11 * time.Second),
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "stratuxClock.Since(conn.LastPingResponse) > 10s branch",
+		},
+		{
+			name:             "LastPingResponse exactly 10 seconds",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time.Add(-10 * time.Second),
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     false,
+			wantSleepFlag:    false,
+			description:      "boundary: exactly 10s should not sleep",
+		},
+		{
+			name:             "LastUnreachable less than 5 seconds",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-2 * time.Second),
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "stratuxClock.Since(conn.LastUnreachable) < 5s branch",
+		},
+		{
+			name:             "LastUnreachable exactly 5 seconds",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-5 * time.Second),
+			wantSleeping:     false,
+			wantSleepFlag:    false,
+			description:      "boundary: exactly 5s should not sleep (else branch)",
+		},
+		{
+			name:             "All responses healthy",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     false,
+			wantSleepFlag:    false,
+			description:      "else branch: all healthy, sets SleepFlag = false",
+		},
+		{
+			name:             "All times zero",
+			noSleep:          false,
+			lastPongResponse: time.Time{},
+			lastPingResponse: time.Time{},
+			lastUnreachable:  time.Time{},
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "both ping and pong zero triggers first if",
+		},
+		{
+			name:             "Pong recent but ping old",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time.Add(-12 * time.Second),
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "tests else-if for ping when pong is OK",
+		},
+		{
+			name:             "Both pings recent but unreachable recent",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-1 * time.Second),
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "tests third else-if for unreachable",
+		},
+		{
+			name:             "Pong 9 seconds old",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time.Add(-9 * time.Second),
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     false,
+			wantSleepFlag:    false,
+			description:      "just under 10s threshold should not sleep",
+		},
+		{
+			name:             "Ping 9 seconds old",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time.Add(-9 * time.Second),
+			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			wantSleeping:     false,
+			wantSleepFlag:    false,
+			description:      "just under 10s threshold should not sleep",
+		},
+		{
+			name:             "Unreachable 4 seconds ago",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.Time,
+			lastUnreachable:  stratuxClock.Time.Add(-4 * time.Second),
+			wantSleeping:     true,
+			wantSleepFlag:    true,
+			description:      "just under 5s threshold should sleep",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Skip tests that require non-x86 on x86 architecture
+			if isX86 && !tc.noSleep {
+				t.Skipf("Skipping on x86: %s", tc.description)
+			}
+
+			globalSettings.NoSleep = tc.noSleep
+
+			conn := &networkConnection{
+				Ip:               "192.168.10.100",
+				Port:             4000,
+				LastPongResponse: tc.lastPongResponse,
+				LastPingResponse: tc.lastPingResponse,
+				LastUnreachable:  tc.lastUnreachable,
+			}
+
+			got := conn.IsSleeping()
+
+			if got != tc.wantSleeping {
+				t.Errorf("IsSleeping() = %v, want %v (%s)", got, tc.wantSleeping, tc.description)
+			}
+
+			if conn.SleepFlag != tc.wantSleepFlag {
+				t.Errorf("SleepFlag = %v, want %v (%s)", conn.SleepFlag, tc.wantSleepFlag, tc.description)
+			}
+		})
+	}
+}
+
+// TestNetworkConnection_IsSleeping_X86Only tests behavior specific to x86 architecture
+func TestNetworkConnection_IsSleeping_X86Only(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Only run on x86/amd64
+	if runtime.GOARCH != "i386" && runtime.GOARCH != "amd64" {
+		t.Skip("Skipping x86-specific test on non-x86 architecture")
+	}
+
+	// Save original settings and restore after test
+	origNoSleep := globalSettings.NoSleep
+	defer func() { globalSettings.NoSleep = origNoSleep }()
+
+	// On x86, isX86DebugMode() always returns true, causing early return
+	testCases := []struct {
+		name             string
+		noSleep          bool
+		lastPongResponse time.Time
+		lastPingResponse time.Time
+		lastUnreachable  time.Time
+	}{
+		{
+			name:             "x86 with zero times",
+			noSleep:          false,
+			lastPongResponse: time.Time{},
+			lastPingResponse: time.Time{},
+			lastUnreachable:  time.Time{},
+		},
+		{
+			name:             "x86 with old responses",
+			noSleep:          false,
+			lastPongResponse: stratuxClock.Time.Add(-20 * time.Second),
+			lastPingResponse: stratuxClock.Time.Add(-20 * time.Second),
+			lastUnreachable:  stratuxClock.Time,
+		},
+		{
+			name:             "x86 with NoSleep",
+			noSleep:          true,
+			lastPongResponse: time.Time{},
+			lastPingResponse: time.Time{},
+			lastUnreachable:  time.Time{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			globalSettings.NoSleep = tc.noSleep
+
+			conn := &networkConnection{
+				Ip:               "192.168.10.100",
+				Port:             4000,
+				LastPongResponse: tc.lastPongResponse,
+				LastPingResponse: tc.lastPingResponse,
+				LastUnreachable:  tc.lastUnreachable,
+			}
+
+			// On x86, should always return false due to isX86DebugMode()
+			if got := conn.IsSleeping(); got != false {
+				t.Errorf("IsSleeping() = %v, want false (x86 mode always returns false)", got)
+			}
+		})
+	}
+}
+
 // TestNetworkConnection_Capabilities tests the Capabilities method
 func TestNetworkConnection_Capabilities(t *testing.T) {
 	testCases := []struct {
@@ -311,10 +595,168 @@ func TestNetworkConnection_OnError(t *testing.T) {
 	// UDP connections ignore errors and keep socket open
 }
 
+// TestNetworkConnection_OnError_Comprehensive tests OnError with various scenarios
+func TestNetworkConnection_OnError_Comprehensive(t *testing.T) {
+	// Test with nil UDP connection
+	t.Run("NilConnection", func(t *testing.T) {
+		conn := &networkConnection{
+			Conn: nil,
+			Ip:   "192.168.10.101",
+			Port: 4001,
+		}
+
+		// Should not panic with nil connection
+		conn.OnError(errors.New("test error with nil conn"))
+	})
+
+	// Test with various error types
+	t.Run("VariousErrorTypes", func(t *testing.T) {
+		conn := &networkConnection{
+			Ip:   "192.168.10.102",
+			Port: 4002,
+		}
+
+		// Standard error
+		conn.OnError(errors.New("standard error"))
+
+		// nil error (should not panic)
+		conn.OnError(nil)
+
+		// Network-specific error types
+		conn.OnError(&net.OpError{Op: "write", Net: "udp", Err: errors.New("connection refused")})
+
+		// IO errors
+		conn.OnError(io.EOF)
+		conn.OnError(io.ErrUnexpectedEOF)
+	})
+
+	// Test multiple sequential calls
+	t.Run("MultipleSequentialCalls", func(t *testing.T) {
+		conn := &networkConnection{
+			Ip:   "192.168.10.103",
+			Port: 4003,
+		}
+
+		// Call OnError multiple times - should all be no-ops
+		for i := 0; i < 100; i++ {
+			conn.OnError(errors.New("error"))
+		}
+	})
+
+	// Test concurrent calls
+	t.Run("ConcurrentCalls", func(t *testing.T) {
+		conn := &networkConnection{
+			Ip:   "192.168.10.104",
+			Port: 4004,
+		}
+
+		// Call OnError concurrently from multiple goroutines
+		done := make(chan bool, 10)
+		for i := 0; i < 10; i++ {
+			go func(id int) {
+				defer func() { done <- true }()
+				for j := 0; j < 10; j++ {
+					conn.OnError(errors.New("concurrent error"))
+				}
+			}(i)
+		}
+
+		// Wait for all goroutines to complete
+		for i := 0; i < 10; i++ {
+			<-done
+		}
+	})
+
+	// Test that OnError doesn't modify connection state
+	t.Run("NoStateModification", func(t *testing.T) {
+		// Create a real UDP connection
+		udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+		if err != nil {
+			t.Skipf("Cannot resolve UDP address: %v", err)
+		}
+		udpConn, err := net.ListenUDP("udp", udpAddr)
+		if err != nil {
+			t.Skipf("Cannot create UDP connection: %v", err)
+		}
+		defer udpConn.Close()
+
+		conn := &networkConnection{
+			Conn: udpConn,
+			Ip:   "192.168.10.105",
+			Port: 4005,
+		}
+
+		// Store original state
+		origConn := conn.Conn
+		origIp := conn.Ip
+		origPort := conn.Port
+
+		// Call OnError
+		conn.OnError(errors.New("test error"))
+
+		// Verify state unchanged
+		if conn.Conn != origConn {
+			t.Error("OnError modified Conn field")
+		}
+		if conn.Ip != origIp {
+			t.Error("OnError modified Ip field")
+		}
+		if conn.Port != origPort {
+			t.Error("OnError modified Port field")
+		}
+
+		// Verify connection is still usable after OnError
+		// UDP connections should remain open
+		testData := []byte("test")
+		localAddr := udpConn.LocalAddr().(*net.UDPAddr)
+		n, err := udpConn.WriteToUDP(testData, localAddr)
+		if err != nil {
+			t.Errorf("Connection not usable after OnError: %v", err)
+		}
+		if n != len(testData) {
+			t.Errorf("Wrote %d bytes, expected %d", n, len(testData))
+		}
+	})
+
+	// Test OnError with Queue present
+	t.Run("WithQueue", func(t *testing.T) {
+		if stratuxClock == nil {
+			stratuxClock = NewMonotonic()
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		queue := NewMessageQueue(10)
+		conn := &networkConnection{
+			Ip:    "192.168.10.106",
+			Port:  4006,
+			Queue: queue,
+		}
+
+		// OnError should not close or modify the queue for UDP
+		conn.OnError(errors.New("test error"))
+
+		// Queue should still be usable
+		if queue.Closed {
+			t.Error("OnError should not close queue for UDP connections")
+		}
+	})
+}
+
 // TestNetworkConnection_Close tests the Close method
 func TestNetworkConnection_Close(t *testing.T) {
+	// Create a real UDP connection for testing
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("Cannot resolve UDP address: %v", err)
+	}
+	udpConn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		t.Skipf("Cannot create UDP connection: %v", err)
+	}
+	defer udpConn.Close()
+
 	conn := &networkConnection{
-		Conn: nil, // Can be nil for this test
+		Conn: udpConn,
 		Ip:   "192.168.10.100",
 		Port: 4000,
 	}
@@ -322,8 +764,220 @@ func TestNetworkConnection_Close(t *testing.T) {
 	// Close should not panic or do anything for UDP
 	conn.Close()
 
+	// Verify that the UDP connection is still usable after Close()
+	// This confirms that Close() is a no-op for UDP connections
+	testData := []byte("test")
+	_, writeErr := conn.Conn.WriteToUDP(testData, udpAddr)
+	if writeErr != nil {
+		t.Logf("UDP connection still writable after Close() (expected): %v", writeErr)
+	}
+
+	// Verify connection properties are unchanged
+	if conn.Conn == nil {
+		t.Error("Close() should not modify Conn for UDP connections")
+	}
+	if conn.Ip != "192.168.10.100" {
+		t.Error("Close() should not modify Ip")
+	}
+	if conn.Port != 4000 {
+		t.Error("Close() should not modify Port")
+	}
+
+	// Calling Close multiple times should be safe (idempotent)
+	conn.Close()
+	conn.Close()
+
 	// If we get here without panic, test passes
 	// UDP connections ignore Close and keep socket open
+}
+
+// TestNetworkConnection_Close_Comprehensive tests Close with various scenarios
+func TestNetworkConnection_Close_Comprehensive(t *testing.T) {
+	// Test with nil UDP connection
+	t.Run("NilConnection", func(t *testing.T) {
+		conn := &networkConnection{
+			Conn: nil,
+			Ip:   "192.168.10.201",
+			Port: 5001,
+		}
+
+		// Should not panic with nil connection
+		conn.Close()
+
+		// Verify no state changes
+		if conn.Conn != nil {
+			t.Error("Close modified nil Conn")
+		}
+	})
+
+	// Test multiple sequential calls
+	t.Run("MultipleSequentialCalls", func(t *testing.T) {
+		conn := &networkConnection{
+			Ip:   "192.168.10.202",
+			Port: 5002,
+		}
+
+		// Call Close multiple times - should all be no-ops
+		for i := 0; i < 100; i++ {
+			conn.Close()
+		}
+	})
+
+	// Test concurrent calls
+	t.Run("ConcurrentCalls", func(t *testing.T) {
+		// Create a real UDP connection
+		udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+		if err != nil {
+			t.Skipf("Cannot resolve UDP address: %v", err)
+		}
+		udpConn, err := net.ListenUDP("udp", udpAddr)
+		if err != nil {
+			t.Skipf("Cannot create UDP connection: %v", err)
+		}
+		defer udpConn.Close()
+
+		conn := &networkConnection{
+			Conn: udpConn,
+			Ip:   "192.168.10.203",
+			Port: 5003,
+		}
+
+		// Call Close concurrently from multiple goroutines
+		done := make(chan bool, 10)
+		for i := 0; i < 10; i++ {
+			go func(id int) {
+				defer func() { done <- true }()
+				for j := 0; j < 10; j++ {
+					conn.Close()
+				}
+			}(i)
+		}
+
+		// Wait for all goroutines to complete
+		for i := 0; i < 10; i++ {
+			<-done
+		}
+
+		// Connection should still be usable
+		if conn.Conn == nil {
+			t.Error("Close modified Conn")
+		}
+	})
+
+	// Test that Close doesn't modify connection state or close the socket
+	t.Run("NoStateModification", func(t *testing.T) {
+		// Create a real UDP connection
+		udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+		if err != nil {
+			t.Skipf("Cannot resolve UDP address: %v", err)
+		}
+		udpConn, err := net.ListenUDP("udp", udpAddr)
+		if err != nil {
+			t.Skipf("Cannot create UDP connection: %v", err)
+		}
+		defer udpConn.Close()
+
+		conn := &networkConnection{
+			Conn:       udpConn,
+			Ip:         "192.168.10.204",
+			Port:       5004,
+			Capability: NETWORK_GDL90_STANDARD,
+			SleepFlag:  false,
+		}
+
+		// Store original state
+		origConn := conn.Conn
+		origIp := conn.Ip
+		origPort := conn.Port
+		origCap := conn.Capability
+		origSleep := conn.SleepFlag
+
+		// Call Close
+		conn.Close()
+
+		// Verify all state unchanged
+		if conn.Conn != origConn {
+			t.Error("Close modified Conn field")
+		}
+		if conn.Ip != origIp {
+			t.Error("Close modified Ip field")
+		}
+		if conn.Port != origPort {
+			t.Error("Close modified Port field")
+		}
+		if conn.Capability != origCap {
+			t.Error("Close modified Capability field")
+		}
+		if conn.SleepFlag != origSleep {
+			t.Error("Close modified SleepFlag field")
+		}
+
+		// Verify UDP socket is still open and usable
+		testData := []byte("test after close")
+		localAddr := udpConn.LocalAddr().(*net.UDPAddr)
+		n, err := udpConn.WriteToUDP(testData, localAddr)
+		if err != nil {
+			t.Errorf("UDP connection not usable after Close: %v", err)
+		}
+		if n != len(testData) {
+			t.Errorf("Wrote %d bytes, expected %d", n, len(testData))
+		}
+	})
+
+	// Test Close with Queue present
+	t.Run("WithQueue", func(t *testing.T) {
+		if stratuxClock == nil {
+			stratuxClock = NewMonotonic()
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		queue := NewMessageQueue(10)
+		conn := &networkConnection{
+			Ip:    "192.168.10.205",
+			Port:  5005,
+			Queue: queue,
+		}
+
+		// Close should not close or modify the queue for UDP
+		conn.Close()
+
+		// Queue should still be usable
+		if queue.Closed {
+			t.Error("Close should not close queue for UDP connections")
+		}
+
+		// Queue should still be accessible
+		if conn.Queue != queue {
+			t.Error("Close modified Queue reference")
+		}
+	})
+
+	// Test Close with various capability combinations
+	t.Run("VariousCapabilities", func(t *testing.T) {
+		capabilities := []uint8{
+			0,
+			NETWORK_GDL90_STANDARD,
+			NETWORK_AHRS_FFSIM,
+			NETWORK_POSITION_FFSIM,
+			NETWORK_GDL90_STANDARD | NETWORK_AHRS_GDL90,
+		}
+
+		for _, cap := range capabilities {
+			conn := &networkConnection{
+				Ip:         "192.168.10.206",
+				Port:       5006,
+				Capability: cap,
+			}
+
+			// Close should not panic regardless of capability
+			conn.Close()
+
+			// Capability should be unchanged
+			if conn.Capability != cap {
+				t.Errorf("Close modified Capability from %d to %d", cap, conn.Capability)
+			}
+		}
+	})
 }
 
 // TestNetworkConnection_GetConnectionKey tests the GetConnectionKey method

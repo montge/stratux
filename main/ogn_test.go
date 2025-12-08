@@ -1178,3 +1178,201 @@ func TestLookupOgnTailNumber_CoverageSummary(t *testing.T) {
 	t.Log("To enable file I/O tests:")
 	t.Log("  sudo mkdir -p /opt/stratux/ogn && sudo chmod 777 /opt/stratux/ogn")
 }
+
+// TestLookupOgnTailNumber_ComprehensiveCoverage provides additional coverage scenarios
+func TestLookupOgnTailNumber_ComprehensiveCoverage(t *testing.T) {
+	// Save original cache
+	origCache := ognTailNumberCache
+	defer func() {
+		ognTailNumberCache = origCache
+	}()
+
+	t.Run("unicode_in_registration", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"UNICODE1": "🛩️-TEST",
+			"UNICODE2": "Ñ-123ÄÖÜ",
+			"UNICODE3": "中国-ABC",
+		}
+
+		result := lookupOgnTailNumber("UNICODE1")
+		if result != "🛩️-TEST" {
+			t.Errorf("Expected '🛩️-TEST', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("UNICODE2")
+		if result != "Ñ-123ÄÖÜ" {
+			t.Errorf("Expected 'Ñ-123ÄÖÜ', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("UNICODE3")
+		if result != "中国-ABC" {
+			t.Errorf("Expected '中国-ABC', got '%s'", result)
+		}
+
+		t.Log("Unicode characters in registrations handled correctly")
+	})
+
+	t.Run("very_long_registration", func(t *testing.T) {
+		longReg := strings.Repeat("ABCDEFGHIJ", 10) // 100 chars
+		ognTailNumberCache = map[string]string{
+			"LONG1": longReg,
+		}
+
+		result := lookupOgnTailNumber("LONG1")
+		if result != longReg {
+			t.Errorf("Expected long registration to be preserved, got length %d instead of %d", len(result), len(longReg))
+		}
+
+		t.Logf("Long registration (100 chars) handled correctly")
+	})
+
+	t.Run("whitespace_in_registration", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"SPACE1": "N 123 45",
+			"SPACE2": "D-AB CD",
+			"SPACE3": "G-  XYZ",
+		}
+
+		result := lookupOgnTailNumber("SPACE1")
+		if result != "N 123 45" {
+			t.Errorf("Expected 'N 123 45', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("SPACE2")
+		if result != "D-AB CD" {
+			t.Errorf("Expected 'D-AB CD', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("SPACE3")
+		if result != "G-  XYZ" {
+			t.Errorf("Expected 'G-  XYZ', got '%s'", result)
+		}
+
+		t.Log("Whitespace in registrations preserved correctly")
+	})
+
+	t.Run("numeric_only_id_and_registration", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"123456": "789012",
+			"000000": "111111",
+			"999999": "000000",
+		}
+
+		result := lookupOgnTailNumber("123456")
+		if result != "789012" {
+			t.Errorf("Expected '789012', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("000000")
+		if result != "111111" {
+			t.Errorf("Expected '111111', got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("999999")
+		if result != "000000" {
+			t.Errorf("Expected '000000', got '%s'", result)
+		}
+
+		t.Log("Numeric-only IDs and registrations handled correctly")
+	})
+
+	t.Run("mixed_alphanumeric_ids", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"A1B2C3": "N-A1B2",
+			"1A2B3C": "D-1A2B",
+			"AABBCC": "G-AABB",
+			"112233": "F-1122",
+		}
+
+		testCases := []struct {
+			id       string
+			expected string
+		}{
+			{"A1B2C3", "N-A1B2"},
+			{"1A2B3C", "D-1A2B"},
+			{"AABBCC", "G-AABB"},
+			{"112233", "F-1122"},
+		}
+
+		for _, tc := range testCases {
+			result := lookupOgnTailNumber(tc.id)
+			if result != tc.expected {
+				t.Errorf("ID '%s': expected '%s', got '%s'", tc.id, tc.expected, result)
+			}
+		}
+
+		t.Log("Mixed alphanumeric IDs handled correctly")
+	})
+
+	t.Run("empty_string_registration", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"EMPTY1": "",
+			"EMPTY2": "",
+		}
+
+		result := lookupOgnTailNumber("EMPTY1")
+		if result != "" {
+			t.Errorf("Expected empty string, got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("EMPTY2")
+		if result != "" {
+			t.Errorf("Expected empty string, got '%s'", result)
+		}
+
+		t.Log("Empty registrations handled correctly")
+	})
+
+	t.Run("lookup_performance", func(t *testing.T) {
+		// Create a large cache
+		ognTailNumberCache = make(map[string]string)
+		for i := 0; i < 1000; i++ {
+			id := string(rune('A'+i%26)) + string(rune('A'+(i/26)%26)) + string(rune('A'+(i/676)%26)) + "123"
+			reg := "N-" + string(rune('0'+i%10)) + string(rune('0'+(i/10)%10)) + string(rune('0'+(i/100)%10))
+			ognTailNumberCache[id] = reg
+		}
+
+		// Test lookup performance
+		testID := "AAA123"
+		for i := 0; i < 100; i++ {
+			result := lookupOgnTailNumber(testID)
+			if result != "N-000" {
+				t.Errorf("Lookup %d: expected 'N-000', got '%s'", i, result)
+				break
+			}
+		}
+
+		t.Logf("Performed 100 lookups on cache with %d entries", len(ognTailNumberCache))
+	})
+
+	t.Run("hex_uppercase_vs_lowercase_ids", func(t *testing.T) {
+		ognTailNumberCache = map[string]string{
+			"ABCDEF": "N-UPPER",
+			"abcdef": "N-LOWER",
+			"AbCdEf": "N-MIXED",
+		}
+
+		result := lookupOgnTailNumber("ABCDEF")
+		if result != "N-UPPER" {
+			t.Errorf("Expected 'N-UPPER' for uppercase hex, got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("abcdef")
+		if result != "N-LOWER" {
+			t.Errorf("Expected 'N-LOWER' for lowercase hex, got '%s'", result)
+		}
+
+		result = lookupOgnTailNumber("AbCdEf")
+		if result != "N-MIXED" {
+			t.Errorf("Expected 'N-MIXED' for mixed case hex, got '%s'", result)
+		}
+
+		// Test that different cases are treated as different keys
+		result = lookupOgnTailNumber("ABCDEF")
+		if result == "N-LOWER" {
+			t.Error("Case sensitivity not working - got lowercase result for uppercase key")
+		}
+
+		t.Log("Hex ID case sensitivity working correctly")
+	})
+}
