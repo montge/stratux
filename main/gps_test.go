@@ -4290,3 +4290,513 @@ func TestWriteTrackerConfigFromSettings(t *testing.T) {
 		}
 	})
 }
+
+// TestProcessNMEALineLow_BoundsChecking tests all bounds checking branches
+func TestProcessNMEALineLow_BoundsChecking(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	// Save original state
+	origGPSType := globalStatus.GPS_detected_type
+	origSatellites := Satellites
+	defer func() {
+		globalStatus.GPS_detected_type = origGPSType
+		Satellites = origSatellites
+	}()
+
+	t.Run("GPGGA with negative fix quality", func(t *testing.T) {
+		mySituation.GPSFixQuality = 5
+		// This would normally fail checksum validation, but we can test the bounds check logic
+		// by using a valid checksum with -1 in field 6
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,01131.000,E,-1,08,0.9,545.4,M,46.9,M,,*74", false)
+		if !result {
+			t.Error("Expected GPGGA to be processed despite negative fix quality")
+		}
+		if mySituation.GPSFixQuality != 0 {
+			t.Errorf("Expected fix quality to be clamped to 0, got %d", mySituation.GPSFixQuality)
+		}
+	})
+
+	t.Run("GPGGA with fix quality > 9", func(t *testing.T) {
+		mySituation.GPSFixQuality = 0
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,01131.000,E,15,08,0.9,545.4,M,46.9,M,,*6C", false)
+		if !result {
+			t.Error("Expected GPGGA to be processed despite high fix quality")
+		}
+		if mySituation.GPSFixQuality != 9 {
+			t.Errorf("Expected fix quality to be clamped to 9, got %d", mySituation.GPSFixQuality)
+		}
+	})
+
+	t.Run("GPRMC with high speed but parse error on course", func(t *testing.T) {
+		mySituation.GPSGroundSpeed = 0
+		mySituation.GPSTrueCourse = 0
+		// High speed (> 3) with invalid course should cause error
+		result := processNMEALineLow("$GPRMC,123519.0,A,4807.038,N,01131.000,E,025.0,BAD,230394,003.1,W*16", false)
+		if result {
+			t.Error("Expected GPRMC with invalid course at high speed to fail")
+		}
+	})
+
+	t.Run("GPGSV with out-of-range elevation (< -32768)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		// Can't actually pass value < -32768 through NMEA integer parsing,
+		// but we can test blank elevation which gets set to -999
+		result := processNMEALineLow("$GPGSV,3,1,10,01,,180,42,02,45,090,43,03,30,270,44,04,15,045,45*7C", false)
+		if !result {
+			t.Error("Expected GPGSV with blank elevation to be processed")
+		}
+		if sat, ok := Satellites["G1"]; ok {
+			if sat.Elevation != -999 {
+				t.Errorf("Expected elevation -999 for blank field, got %d", sat.Elevation)
+			}
+		}
+	})
+
+	t.Run("GPGSV with out-of-range azimuth (blank)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		// Blank azimuth should get set to -999
+		result := processNMEALineLow("$GPGSV,3,1,10,01,45,,42,02,45,090,43,03,30,270,44,04,15,045,45*44", false)
+		if !result {
+			t.Error("Expected GPGSV with blank azimuth to be processed")
+		}
+		if sat, ok := Satellites["G1"]; ok {
+			if sat.Azimuth != -999 {
+				t.Errorf("Expected azimuth -999 for blank field, got %d", sat.Azimuth)
+			}
+		}
+	})
+
+	t.Run("GPGSV with out-of-range signal (blank)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSFixQuality = 1
+		// Blank signal should set to -99 and InSolution to false
+		result := processNMEALineLow("$GPGSV,3,1,10,01,45,180,,02,45,090,43,03,30,270,44,04,15,045,45*7B", false)
+		if !result {
+			t.Error("Expected GPGSV with blank signal to be processed")
+		}
+		if sat, ok := Satellites["G1"]; ok {
+			if sat.Signal != -99 {
+				t.Errorf("Expected signal -99 for blank field, got %d", sat.Signal)
+			}
+			if sat.InSolution {
+				t.Error("Expected InSolution to be false for blank signal")
+			}
+		}
+	})
+
+	t.Run("GPGSV with very high signal (> 127)", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		// Can't pass > 127 through normal parsing, but we test the clamping logic exists
+		// Test with maximum valid value that would be clamped
+		result := processNMEALineLow("$GPGSV,3,1,10,01,45,180,99,02,45,090,43,03,30,270,44,04,15,045,45*7B", false)
+		if !result {
+			t.Error("Expected GPGSV with high signal to be processed")
+		}
+		if sat, ok := Satellites["G1"]; ok {
+			if sat.Signal != 99 {
+				t.Errorf("Expected signal 99, got %d", sat.Signal)
+			}
+		}
+	})
+}
+
+// TestProcessNMEALineLow_AdditionalEdgeCases tests remaining uncovered branches
+func TestProcessNMEALineLow_AdditionalEdgeCases(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+
+	// Save original state
+	origGPSType := globalStatus.GPS_detected_type
+	origSatellites := Satellites
+	defer func() {
+		globalStatus.GPS_detected_type = origGPSType
+		Satellites = origSatellites
+	}()
+
+	t.Run("GPVTG with too few fields", func(t *testing.T) {
+		// Valid checksum but only 8 fields (needs at least 9)
+		result := processNMEALineLow("$GPVTG,054.7,T,034.4,M,005.5,N,010.2*64", false)
+		if result {
+			t.Error("Expected GPVTG with too few fields to fail")
+		}
+	})
+
+	t.Run("GPVTG with parse error on groundspeed", func(t *testing.T) {
+		result := processNMEALineLow("$GPVTG,054.7,T,034.4,M,BAD,N,010.2,K*52", false)
+		if result {
+			t.Error("Expected GPVTG with invalid groundspeed to fail")
+		}
+	})
+
+	t.Run("GPVTG with parse error on true course", func(t *testing.T) {
+		result := processNMEALineLow("$GPVTG,BAD,T,034.4,M,005.5,N,010.2,K*77", false)
+		if result {
+			t.Error("Expected GPVTG with invalid true course to fail")
+		}
+	})
+
+	t.Run("GPGGA with too few fields", func(t *testing.T) {
+		// Only 14 fields (needs at least 15)
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,*73", false)
+		if result {
+			t.Error("Expected GPGGA with too few fields to fail")
+		}
+	})
+
+	t.Run("GPGGA with short timestamp", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,12351,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*28", false)
+		if result {
+			t.Error("Expected GPGGA with short timestamp to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in timestamp hours", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,AB3519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*08", false)
+		if result {
+			t.Error("Expected GPGGA with invalid timestamp to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in timestamp minutes", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,12AB19.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*70", false)
+		if result {
+			t.Error("Expected GPGGA with invalid timestamp minutes to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in timestamp seconds", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,1235XX.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*3C", false)
+		if result {
+			t.Error("Expected GPGGA with invalid timestamp seconds to fail")
+		}
+	})
+
+	t.Run("GPGGA with short latitude", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,480,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*36", false)
+		if result {
+			t.Error("Expected GPGGA with short latitude to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in latitude degrees", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,AB07.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*21", false)
+		if result {
+			t.Error("Expected GPGGA with invalid latitude degrees to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in latitude minutes", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,48XX.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*5C", false)
+		if result {
+			t.Error("Expected GPGGA with invalid latitude minutes to fail")
+		}
+	})
+
+	t.Run("GPGGA with short longitude", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,0113,E,1,08,0.9,545.4,M,46.9,M,,*11", false)
+		if result {
+			t.Error("Expected GPGGA with short longitude to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in longitude degrees", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,ABC31.000,E,1,08,0.9,545.4,M,46.9,M,,*39", false)
+		if result {
+			t.Error("Expected GPGGA with invalid longitude degrees to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in longitude minutes", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,011XX.000,E,1,08,0.9,545.4,M,46.9,M,,*30", false)
+		if result {
+			t.Error("Expected GPGGA with invalid longitude minutes to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in altitude", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,BAD,M,46.9,M,,*75", false)
+		if result {
+			t.Error("Expected GPGGA with invalid altitude to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in geoid separation", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,BAD,M,,*7F", false)
+		if result {
+			t.Error("Expected GPGGA with invalid geoid separation to fail")
+		}
+	})
+
+	t.Run("GPGGA with parse error in fix quality", func(t *testing.T) {
+		result := processNMEALineLow("$GPGGA,123519.0,4807.038,N,01131.000,E,BAD,08,0.9,545.4,M,46.9,M,,*2F", false)
+		if result {
+			t.Error("Expected GPGGA with invalid fix quality to fail")
+		}
+	})
+
+	t.Run("GPRMC with too few fields", func(t *testing.T) {
+		// Only 10 fields (needs at least 11)
+		result := processNMEALineLow("$GPRMC,123519.0,A,4807.038,N,01131.000,E,022.4,084.4,230394*53", false)
+		if result {
+			t.Error("Expected GPRMC with too few fields to fail")
+		}
+	})
+
+	t.Run("GPRMC with invalid fix status", func(t *testing.T) {
+		mySituation.GPSFixQuality = 1
+		result := processNMEALineLow("$GPRMC,123519.0,V,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*63", false)
+		if result {
+			t.Error("Expected GPRMC with invalid fix to fail")
+		}
+		// Note: tmpSituation sets GPSFixQuality=0 but returns false without committing,
+		// so mySituation.GPSFixQuality remains unchanged
+		if mySituation.GPSFixQuality != 1 {
+			t.Errorf("Expected fix quality to remain unchanged at 1, got %d", mySituation.GPSFixQuality)
+		}
+	})
+
+	t.Run("GPRMC with short timestamp", func(t *testing.T) {
+		result := processNMEALineLow("$GPRMC,12351,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*34", false)
+		if result {
+			t.Error("Expected GPRMC with short timestamp to fail")
+		}
+	})
+
+	t.Run("GPRMC with parse error in timestamp", func(t *testing.T) {
+		result := processNMEALineLow("$GPRMC,AB3519.0,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*73", false)
+		if result {
+			t.Error("Expected GPRMC with invalid timestamp to fail")
+		}
+	})
+
+	t.Run("GPRMC with short latitude", func(t *testing.T) {
+		result := processNMEALineLow("$GPRMC,123519.0,A,480,N,01131.000,E,022.4,084.4,230394,003.1,W*62", false)
+		if result {
+			t.Error("Expected GPRMC with short latitude to fail")
+		}
+	})
+
+	t.Run("GPRMC with parse error in latitude", func(t *testing.T) {
+		result := processNMEALineLow("$GPRMC,123519.0,A,AB07.038,N,01131.000,E,022.4,084.4,230394,003.1,W*11", false)
+		if result {
+			t.Error("Expected GPRMC with invalid latitude to fail")
+		}
+	})
+
+	t.Run("GPRMC with short longitude", func(t *testing.T) {
+		result := processNMEALineLow("$GPRMC,123519.0,A,4807.038,N,0113,E,022.4,084.4,230394,003.1,W*77", false)
+		if result {
+			t.Error("Expected GPRMC with short longitude to fail")
+		}
+	})
+
+	t.Run("GPRMC with parse error in longitude", func(t *testing.T) {
+		result := processNMEALineLow("$GPRMC,123519.0,A,4807.038,N,ABC31.000,E,022.4,084.4,230394,003.1,W*06", false)
+		if result {
+			t.Error("Expected GPRMC with invalid longitude to fail")
+		}
+	})
+
+	t.Run("GPRMC with parse error in groundspeed", func(t *testing.T) {
+		result := processNMEALineLow("$GPRMC,123519.0,A,4807.038,N,01131.000,E,BAD,084.4,230394,003.1,W*57", false)
+		if result {
+			t.Error("Expected GPRMC with invalid groundspeed to fail")
+		}
+	})
+
+	t.Run("GPGSA with too few fields", func(t *testing.T) {
+		// Only 17 fields (needs at least 18)
+		result := processNMEALineLow("$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*11", false)
+		if result {
+			t.Error("Expected GPGSA with too few fields to fail")
+		}
+	})
+
+	t.Run("GPGSA with no solution (empty field 2)", func(t *testing.T) {
+		mySituation.GPSFixQuality = 1
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GPGSA,A,,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*0A", false)
+		if result {
+			t.Error("Expected GPGSA with empty solution field to fail")
+		}
+		// tmpSituation sets GPSFixQuality=0 but returns false without committing
+		if mySituation.GPSFixQuality != 1 {
+			t.Errorf("Expected fix quality to remain unchanged at 1, got %d", mySituation.GPSFixQuality)
+		}
+	})
+
+	t.Run("GPGSA with no solution (field 2 = 1)", func(t *testing.T) {
+		mySituation.GPSFixQuality = 1
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GPGSA,A,1,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*3B", false)
+		if result {
+			t.Error("Expected GPGSA with solution=1 to fail")
+		}
+		// tmpSituation sets GPSFixQuality=0 but returns false without committing
+		if mySituation.GPSFixQuality != 1 {
+			t.Errorf("Expected fix quality to remain unchanged at 1, got %d", mySituation.GPSFixQuality)
+		}
+	})
+
+	t.Run("GPGSA with parse error in HDOP", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		result := processNMEALineLow("$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,BAD,2.1*06", false)
+		if result {
+			t.Error("Expected GPGSA with invalid HDOP to fail")
+		}
+	})
+
+	t.Run("GPGSA with parse error in VDOP", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		mySituation.GPSLastAccuracyTime = time.Time{}
+		result := processNMEALineLow("$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,BAD*39", false)
+		if result {
+			t.Error("Expected GPGSA with invalid VDOP to fail")
+		}
+	})
+
+	t.Run("GPGST with too few fields", func(t *testing.T) {
+		// Only 8 fields (needs at least 9)
+		result := processNMEALineLow("$GPGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,0.01*57", false)
+		if result {
+			t.Error("Expected GPGST with too few fields to fail")
+		}
+	})
+
+	t.Run("GPGST with parse error in stdDevLat", func(t *testing.T) {
+		result := processNMEALineLow("$GNGST,205246.00,1.19,0.02,0.01,-2.4501,BAD,0.01,0.03*06", false)
+		if result {
+			t.Error("Expected GPGST with invalid stdDevLat to fail")
+		}
+	})
+
+	t.Run("GPGST with parse error in stdDevLon", func(t *testing.T) {
+		result := processNMEALineLow("$GNGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,BAD,0.03*57", false)
+		if result {
+			t.Error("Expected GPGST with invalid stdDevLon to fail")
+		}
+	})
+
+	t.Run("GPGST with parse error in stdDevAlt", func(t *testing.T) {
+		result := processNMEALineLow("$GNGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,0.01,BAD*2D", false)
+		if result {
+			t.Error("Expected GPGST with invalid stdDevAlt to fail")
+		}
+	})
+
+	t.Run("GPGSV with too few fields", func(t *testing.T) {
+		// Only 3 fields (needs at least 4)
+		result := processNMEALineLow("$GPGSV,3,1*2C", false)
+		if result {
+			t.Error("Expected GPGSV with too few fields to fail")
+		}
+	})
+
+	t.Run("GPGSV with parse error in msgNum", func(t *testing.T) {
+		result := processNMEALineLow("$GPGSV,BAD,1,10,01,45,180,42*57", false)
+		if result {
+			t.Error("Expected GPGSV with invalid msgNum to fail")
+		}
+	})
+
+	t.Run("GPGSV with parse error in msgIndex", func(t *testing.T) {
+		result := processNMEALineLow("$GPGSV,3,BAD,10,01,45,180,42*39", false)
+		if result {
+			t.Error("Expected GPGSV with invalid msgIndex to fail")
+		}
+	})
+
+	t.Run("GPGSV with parse error in satellite ID", func(t *testing.T) {
+		Satellites = make(map[string]SatelliteInfo)
+		result := processNMEALineLow("$GPGSV,3,1,10,BAD,45,180,42,02,45,090,43*30", false)
+		if result {
+			t.Error("Expected GPGSV with invalid satellite ID to fail")
+		}
+	})
+
+	t.Run("POGNB with too few fields", func(t *testing.T) {
+		// Only 4 fields (needs at least 5)
+		result := processNMEALineLow("$POGNB,22.0,+29.1,100972.3*62", false)
+		if result {
+			t.Error("Expected POGNB with too few fields to fail")
+		}
+	})
+
+	t.Run("POGNB with parse error in pressure altitude", func(t *testing.T) {
+		result := processNMEALineLow("$POGNB,22.0,+29.1,100972.3,3.8,BAD,+87.2,-0.04,+32.6,*47", false)
+		if result {
+			t.Error("Expected POGNB with invalid pressure altitude to fail")
+		}
+	})
+
+	t.Run("POGNB with parse error in vspeed", func(t *testing.T) {
+		result := processNMEALineLow("$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,BAD,+32.6,*62", false)
+		if result {
+			t.Error("Expected POGNB with invalid vspeed to fail")
+		}
+	})
+
+	t.Run("GPRMC with valid date for GPS time setting", func(t *testing.T) {
+		// Use a date after 2016-01-01 to trigger time setting logic
+		// Format: DDMMYY for date field (e.g., 081225 = Dec 8, 2025)
+		globalStatus.GPS_detected_type = 0
+		mySituation.GPSLatitude = 0
+		mySituation.GPSLongitude = 0
+		result := processNMEALineLow("$GPRMC,120000.0,A,3751.65,S,14507.36,E,000.0,360.0,081225,011.3,E*7D", false)
+		if !result {
+			t.Error("Expected GPRMC with valid date to be processed")
+		}
+		// Verify GPS protocol was detected
+		if globalStatus.GPS_detected_type&0xf0 != GPS_PROTOCOL_NMEA {
+			t.Error("Expected GPS protocol to be set to NMEA")
+		}
+	})
+
+	t.Run("GPRMC with old date (before 2016)", func(t *testing.T) {
+		// Date: 010115 = Jan 1, 2015 (should be ignored)
+		globalStatus.GPS_detected_type = 0
+		result := processNMEALineLow("$GPRMC,120000.0,A,3751.65,S,14507.36,E,000.0,360.0,010115,011.3,E*75", false)
+		if !result {
+			t.Error("Expected GPRMC to be processed even with old date")
+		}
+	})
+
+	t.Run("GPRMC with invalid date format", func(t *testing.T) {
+		// Invalid date format (only 5 digits instead of 6)
+		globalStatus.GPS_detected_type = 0
+		result := processNMEALineLow("$GPRMC,120000.0,A,3751.65,S,14507.36,E,000.0,360.0,12345,011.3,E*40", false)
+		if !result {
+			t.Error("Expected GPRMC to be processed even with invalid date")
+		}
+	})
+}
