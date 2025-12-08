@@ -460,6 +460,391 @@ func TestSetWifiClientNetworks(t *testing.T) {
 	})
 }
 
+// TestSetWifiIPAddress tests the setWifiIPAddress function
+func TestSetWifiIPAddress(t *testing.T) {
+	// Save original settings and restore after test
+	origIPAddress := globalSettings.WiFiIPAddress
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiIPAddress = origIPAddress
+		hasChanged = origHasChanged
+	}()
+
+	t.Run("valid_ip_address_changes_setting", func(t *testing.T) {
+		// Setup: set initial IP address
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: set new valid IP address
+		setWifiIPAddress("10.0.0.1")
+
+		// Verify: IP should change and hasChanged should be true
+		if globalSettings.WiFiIPAddress != "10.0.0.1" {
+			t.Errorf("Expected IP '10.0.0.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true when IP address changes")
+		}
+	})
+
+	t.Run("same_ip_address_no_change", func(t *testing.T) {
+		// Setup: set IP address
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: set same IP address
+		setWifiIPAddress("192.168.10.1")
+
+		// Verify: IP should remain same and hasChanged should be false
+		if globalSettings.WiFiIPAddress != "192.168.10.1" {
+			t.Errorf("Expected IP '192.168.10.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when IP address doesn't change")
+		}
+	})
+
+	t.Run("invalid_ip_address_rejected", func(t *testing.T) {
+		// Setup: set initial IP address
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: attempt to set invalid IP address
+		setWifiIPAddress("not.an.ip.address")
+
+		// Verify: IP should not change and hasChanged should be false
+		if globalSettings.WiFiIPAddress != "192.168.10.1" {
+			t.Errorf("Expected IP to remain '192.168.10.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("ip_address_with_invalid_octet_value", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: IP with octet > 255
+		setWifiIPAddress("192.168.256.1")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.10.1" {
+			t.Errorf("Expected IP to remain '192.168.10.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("ip_address_with_too_many_octets", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: IP with 5 octets
+		setWifiIPAddress("192.168.10.1.5")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.10.1" {
+			t.Errorf("Expected IP to remain '192.168.10.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("ip_address_with_too_few_octets", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: IP with only 3 octets
+		setWifiIPAddress("192.168.10")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.10.1" {
+			t.Errorf("Expected IP to remain '192.168.10.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("empty_string_rejected", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: empty string
+		setWifiIPAddress("")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.10.1" {
+			t.Errorf("Expected IP to remain '192.168.10.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when empty string is rejected")
+		}
+	})
+
+	t.Run("valid_ip_all_zeros", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: 0.0.0.0 is technically valid
+		setWifiIPAddress("0.0.0.0")
+
+		// Verify: should be accepted
+		if globalSettings.WiFiIPAddress != "0.0.0.0" {
+			t.Errorf("Expected IP '0.0.0.0', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true when IP changes to 0.0.0.0")
+		}
+	})
+
+	t.Run("valid_ip_all_max", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: 255.255.255.255 is valid
+		setWifiIPAddress("255.255.255.255")
+
+		// Verify: should be accepted
+		if globalSettings.WiFiIPAddress != "255.255.255.255" {
+			t.Errorf("Expected IP '255.255.255.255', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true when IP changes")
+		}
+	})
+
+	t.Run("valid_ip_class_a", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		hasChanged = false
+
+		// Test: Class A IP
+		setWifiIPAddress("10.0.0.1")
+
+		// Verify
+		if globalSettings.WiFiIPAddress != "10.0.0.1" {
+			t.Errorf("Expected IP '10.0.0.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true")
+		}
+	})
+
+	t.Run("valid_ip_class_b", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "10.0.0.1"
+		hasChanged = false
+
+		// Test: Class B IP
+		setWifiIPAddress("172.16.0.1")
+
+		// Verify
+		if globalSettings.WiFiIPAddress != "172.16.0.1" {
+			t.Errorf("Expected IP '172.16.0.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true")
+		}
+	})
+
+	t.Run("valid_ip_class_c", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "172.16.0.1"
+		hasChanged = false
+
+		// Test: Class C IP
+		setWifiIPAddress("192.168.1.1")
+
+		// Verify
+		if globalSettings.WiFiIPAddress != "192.168.1.1" {
+			t.Errorf("Expected IP '192.168.1.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true")
+		}
+	})
+
+	t.Run("invalid_ip_with_letters", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.1.1"
+		hasChanged = false
+
+		// Test: IP with letters
+		setWifiIPAddress("192.168.a.1")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.1.1" {
+			t.Errorf("Expected IP to remain '192.168.1.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("invalid_ip_with_negative_number", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.1.1"
+		hasChanged = false
+
+		// Test: IP with negative number
+		setWifiIPAddress("192.168.-1.1")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.1.1" {
+			t.Errorf("Expected IP to remain '192.168.1.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("invalid_ip_with_spaces", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.1.1"
+		hasChanged = false
+
+		// Test: IP with spaces
+		setWifiIPAddress("192.168. 1.1")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.1.1" {
+			t.Errorf("Expected IP to remain '192.168.1.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("invalid_ip_leading_zeros_invalid_format", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.1.1"
+		hasChanged = false
+
+		// Test: Leading zeros might be valid per regex
+		setWifiIPAddress("192.168.001.001")
+
+		// Verify: regex allows leading zeros, should be accepted
+		if globalSettings.WiFiIPAddress != "192.168.001.001" {
+			t.Errorf("Expected IP '192.168.001.001', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true")
+		}
+	})
+
+	t.Run("invalid_ip_double_dots", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.1.1"
+		hasChanged = false
+
+		// Test: Double dots
+		setWifiIPAddress("192..168.1.1")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.1.1" {
+			t.Errorf("Expected IP to remain '192.168.1.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("invalid_ip_trailing_dot", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.1.1"
+		hasChanged = false
+
+		// Test: Trailing dot
+		setWifiIPAddress("192.168.1.1.")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.1.1" {
+			t.Errorf("Expected IP to remain '192.168.1.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("invalid_ip_leading_dot", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.1.1"
+		hasChanged = false
+
+		// Test: Leading dot
+		setWifiIPAddress(".192.168.1.1")
+
+		// Verify: should be rejected
+		if globalSettings.WiFiIPAddress != "192.168.1.1" {
+			t.Errorf("Expected IP to remain '192.168.1.1', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if hasChanged {
+			t.Error("hasChanged should be false when invalid IP is rejected")
+		}
+	})
+
+	t.Run("valid_ip_single_digit_octets", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "192.168.1.1"
+		hasChanged = false
+
+		// Test: Single digit octets
+		setWifiIPAddress("1.2.3.4")
+
+		// Verify: should be accepted
+		if globalSettings.WiFiIPAddress != "1.2.3.4" {
+			t.Errorf("Expected IP '1.2.3.4', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true")
+		}
+	})
+
+	t.Run("valid_ip_boundary_200", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "1.2.3.4"
+		hasChanged = false
+
+		// Test: Boundary value 200
+		setWifiIPAddress("200.200.200.200")
+
+		// Verify: should be accepted
+		if globalSettings.WiFiIPAddress != "200.200.200.200" {
+			t.Errorf("Expected IP '200.200.200.200', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true")
+		}
+	})
+
+	t.Run("valid_ip_boundary_254", func(t *testing.T) {
+		// Setup
+		globalSettings.WiFiIPAddress = "200.200.200.200"
+		hasChanged = false
+
+		// Test: Boundary value 254
+		setWifiIPAddress("254.254.254.254")
+
+		// Verify: should be accepted
+		if globalSettings.WiFiIPAddress != "254.254.254.254" {
+			t.Errorf("Expected IP '254.254.254.254', got '%s'", globalSettings.WiFiIPAddress)
+		}
+		if !hasChanged {
+			t.Error("hasChanged should be true")
+		}
+	})
+}
+
 // TestWriteTemplate tests the writeTemplate function
 func TestWriteTemplate(t *testing.T) {
 	// Create a temporary directory for test files

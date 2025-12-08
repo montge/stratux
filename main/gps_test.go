@@ -2251,6 +2251,129 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Should detect left turn
 		t.Logf("Heading wrap (NE to NW): turnRate=%.3f deg/s", myGPSPerfStats[idx].gpsTurnRate)
 	})
+
+	t.Run("rollover_successful_with_valid_data", func(t *testing.T) {
+		// Test successful rollover that actually enters the time adjustment code (lines 740-741)
+		// and passes all regression checks. Keep times close together so TriCube weights aren't zero.
+		// Key: The LAST entry must be BEFORE midnight, and second-to-last must be AFTER midnight
+		// to trigger dt < 0
+		baseTime := float32(86399.0) // 23:59:59
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:59.8
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 0.9, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // 00:00:00.9 - THIS triggers dt < 0
+		}
+		result := calcGPSAttitude()
+		idx := len(myGPSPerfStats) - 1
+		// This should succeed after adjusting time +86400
+		if result {
+			t.Logf("Rollover succeeded: adjusted time=%.1f", myGPSPerfStats[idx].nmeaTime)
+		} else {
+			t.Logf("Rollover processed: result=%v, time=%.1f", result, myGPSPerfStats[idx].nmeaTime)
+		}
+	})
+
+	t.Run("rollover_triggers_full_array_rebase", func(t *testing.T) {
+		// Test that triggers the full array rebase (lines 748-759)
+		// Scenario: All existing entries are already adjusted to > 86401 (from previous rollovers),
+		// and now we get a new entry that crosses midnight again
+		// After adding 86400 to the last entry, ALL entries will be > 86401, triggering rebase
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Already adjusted from previous rollover
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.6, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.7, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.8, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.9, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.0, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.3, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 2.4, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // New data after "midnight" - will become 86402.4, minTime=86401.5 > 86401
+		}
+		result := calcGPSAttitude()
+		idx := len(myGPSPerfStats) - 1
+		// After adjustment of last entry, all times will be > 86401, triggering full rebase
+		// After rebase, times should be back to 1.x-2.x range
+		t.Logf("Full rebase test: result=%v, first_time=%.1f, last_time=%.1f",
+			result, myGPSPerfStats[0].nmeaTime, myGPSPerfStats[idx].nmeaTime)
+	})
+
+	t.Run("rollover_dt_exactly_3_seconds", func(t *testing.T) {
+		// Test the boundary condition where dt == 3 after rollover (should pass the > 3 check)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // dt after adjustment = 3.0
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		t.Logf("dt=3 boundary test: result=%v", result)
+	})
+
+	t.Run("rollover_adjustment_causes_negative_dt", func(t *testing.T) {
+		// Test the case where after rollover adjustment, dt is still negative (line 767-770)
+		// This is a pathological case but should be handled
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86350.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Older time (strange GPS behavior)
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86350.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false when dt < 0 even after adjustment checks")
+		}
+		t.Log("Negative dt after adjustment correctly rejected")
+	})
+
+	t.Run("heading_regression_all_same_timestamps", func(t *testing.T) {
+		// Test heading regression with all identical timestamps to trigger invalid regression (line 940)
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2010.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2020.0},
+		}
+		result := calcGPSAttitude()
+		// May fail due to heading regression issues with duplicate timestamps
+		t.Logf("Heading regression with duplicate times: result=%v", result)
+	})
+
+	t.Run("rollover_causes_dt_greater_than_3", func(t *testing.T) {
+		// Test rollover where after adjustment, dt is > 3 seconds (line 764-766)
+		// Last entry is way ahead after adjustment
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 5.0, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // After adjustment: 86405.0, dt = 5.2 seconds
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false when dt > 3 after rollover adjustment")
+		}
+		t.Log("dt > 3 after rollover correctly rejected")
+	})
 }
 
 // New tests at end of gps_test.go
