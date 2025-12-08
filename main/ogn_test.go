@@ -7,6 +7,22 @@ import (
 	"testing"
 )
 
+// TestMain sets up test environment - attempts to create OGN directory for file I/O tests
+func TestMain(m *testing.M) {
+	// Try to create /opt/stratux/ogn directory for file I/O tests
+	// This will succeed if running with sudo or appropriate permissions
+	// If it fails, file I/O tests will be skipped
+	ognDir := STRATUX_HOME + "/ogn"
+	_ = os.MkdirAll(ognDir, 0755)
+	// Don't fail if mkdir fails - just let individual tests skip
+
+	// Run tests
+	exitCode := m.Run()
+
+	// Cleanup is handled by individual tests
+	os.Exit(exitCode)
+}
+
 // OGN Lookup Tests Coverage Notes:
 // ===================================
 // lookupOgnTailNumber has dependencies on file I/O at STRATUX_HOME (/opt/stratux).
@@ -17,16 +33,29 @@ import (
 //   - Cache miss path (line 374)
 //   - File read error path (line 352-354)
 //
-// To achieve higher coverage (up to 100%), run tests with:
+// To achieve maximum coverage (near 100%), run tests with:
 //   sudo mkdir -p /opt/stratux/ogn && sudo chmod 777 /opt/stratux/ogn
-//   go test -run TestLookupOgnTailNumber -v
+//   go test -run TestLookupOgnTailNumber -v -coverprofile=coverage.out
+//   go tool cover -func=coverage.out | grep lookupOgnTailNumber
 //
-// This will enable:
-//   - Successful file parsing (lines 356-369)
-//   - JSON unmarshal errors
-//   - Type assertion panics
+// With file I/O access enabled, the following additional paths are tested:
+//   - Successful file parsing and cache population (lines 356-369)
+//   - JSON unmarshal errors (lines 357-360)
+//   - Type assertion panics (lines 362-367)
 //   - Empty device arrays
-//   - Large database handling
+//   - Large database handling (100+ entries)
+//   - Malformed JSON edge cases
+//   - Cache persistence across lookups
+//
+// Test Organization:
+// - TestLookupOgnTailNumber: Basic cache hit/miss tests (always runs)
+// - TestLookupOgnTailNumber_EdgeCases: Special character and edge case tests (always runs)
+// - TestLookupOgnTailNumber_FileLoad: File I/O tests (skipped without /opt/stratux/ogn)
+// - TestLookupOgnTailNumber_MultipleLookups: Performance tests (skipped without /opt/stratux/ogn)
+// - TestLookupOgnTailNumber_MalformedJSON: Error handling tests (skipped without /opt/stratux/ogn)
+// - TestLookupOgnTailNumber_EmptyDatabase: Empty database tests (skipped without /opt/stratux/ogn)
+// - TestLookupOgnTailNumber_LargeDatabase: Scalability tests (skipped without /opt/stratux/ogn)
+// - TestLookupOgnTailNumber_CoverageSummary: Coverage documentation (always runs)
 
 
 // TestGetTailNumber tests the getTailNumber function with various configurations

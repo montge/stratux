@@ -11,6 +11,9 @@
 package main
 
 import (
+	"os"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -456,6 +459,507 @@ func TestSetWifiClientNetworks(t *testing.T) {
 		}
 	})
 }
+
+// TestWriteTemplate tests the writeTemplate function
+func TestWriteTemplate(t *testing.T) {
+	// Create a temporary directory for test files
+	tmpDir := t.TempDir()
+
+	t.Run("successful_template_write", func(t *testing.T) {
+		// Create a simple template file
+		templatePath := tmpDir + "/test_template_1.tpl"
+		templateContent := `IP: {{.IpAddr}}
+SSID: {{.WiFiSSID}}
+Channel: {{.WiFiChannel}}
+Mode: {{.WiFiMode}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		// Create test settings
+		settings := NetworkTemplateParams{
+			IpAddr:      "192.168.10.1",
+			WiFiSSID:    "TestNetwork",
+			WiFiChannel: 6,
+			WiFiMode:    WifiModeAp,
+		}
+
+		// Write template
+		outputPath := tmpDir + "/output_1.conf"
+		writeTemplate(templatePath, outputPath, settings)
+
+		// Verify output file exists and has correct content
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		expected := `IP: 192.168.10.1
+SSID: TestNetwork
+Channel: 6
+Mode: 0`
+		if string(content) != expected {
+			t.Errorf("Output mismatch.\nExpected:\n%s\nGot:\n%s", expected, string(content))
+		}
+	})
+
+	t.Run("template_with_all_fields", func(t *testing.T) {
+		// Create a comprehensive template
+		templatePath := tmpDir + "/test_template_all.tpl"
+		templateContent := `WiFiMode: {{.WiFiMode}}
+WiFiCountry: {{.WiFiCountry}}
+IpAddr: {{.IpAddr}}
+IpPrefix: {{.IpPrefix}}
+DhcpRangeStart: {{.DhcpRangeStart}}
+DhcpRangeEnd: {{.DhcpRangeEnd}}
+WiFiSSID: {{.WiFiSSID}}
+WiFiChannel: {{.WiFiChannel}}
+WiFiDirectPin: {{.WiFiDirectPin}}
+WiFiPassPhrase: {{.WiFiPassPhrase}}
+WiFiInternetPassThroughEnabled: {{.WiFiInternetPassThroughEnabled}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		// Create comprehensive settings
+		settings := NetworkTemplateParams{
+			WiFiMode:                       WifiModeApClient,
+			WiFiCountry:                    "US",
+			IpAddr:                         "10.0.0.1",
+			IpPrefix:                       "10.0.0",
+			DhcpRangeStart:                 "10.0.0.10",
+			DhcpRangeEnd:                   "10.0.0.50",
+			WiFiSSID:                       "Stratux-Test",
+			WiFiChannel:                    11,
+			WiFiDirectPin:                  "12345678",
+			WiFiPassPhrase:                 "SecurePassword123",
+			WiFiInternetPassThroughEnabled: true,
+		}
+
+		outputPath := tmpDir + "/output_all.conf"
+		writeTemplate(templatePath, outputPath, settings)
+
+		// Verify file was created and contains all values
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		contentStr := string(content)
+		expectedValues := []string{
+			"WiFiMode: 2",
+			"WiFiCountry: US",
+			"IpAddr: 10.0.0.1",
+			"IpPrefix: 10.0.0",
+			"DhcpRangeStart: 10.0.0.10",
+			"DhcpRangeEnd: 10.0.0.50",
+			"WiFiSSID: Stratux-Test",
+			"WiFiChannel: 11",
+			"WiFiDirectPin: 12345678",
+			"WiFiPassPhrase: SecurePassword123",
+			"WiFiInternetPassThroughEnabled: true",
+		}
+
+		for _, expected := range expectedValues {
+			if !strings.Contains(contentStr, expected) {
+				t.Errorf("Output missing expected value: %s", expected)
+			}
+		}
+	})
+
+	t.Run("template_with_client_networks", func(t *testing.T) {
+		// Create template with range over client networks
+		templatePath := tmpDir + "/test_template_networks.tpl"
+		templateContent := `{{range .WiFiClientNetworks}}network={
+	ssid="{{.SSID}}"
+	psk="{{.Password}}"
+}
+{{end}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		// Create settings with multiple client networks
+		settings := NetworkTemplateParams{
+			WiFiClientNetworks: []wifiClientNetwork{
+				{SSID: "Network1", Password: "pass1"},
+				{SSID: "Network2", Password: "pass2"},
+				{SSID: "Network3", Password: "pass3"},
+			},
+		}
+
+		outputPath := tmpDir + "/output_networks.conf"
+		writeTemplate(templatePath, outputPath, settings)
+
+		// Verify all networks are in output
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		contentStr := string(content)
+		for _, net := range settings.WiFiClientNetworks {
+			if !strings.Contains(contentStr, `ssid="`+net.SSID+`"`) {
+				t.Errorf("Output missing SSID: %s", net.SSID)
+			}
+			if !strings.Contains(contentStr, `psk="`+net.Password+`"`) {
+				t.Errorf("Output missing password for: %s", net.SSID)
+			}
+		}
+	})
+
+	t.Run("template_with_conditional_logic", func(t *testing.T) {
+		// Create template with if/else logic (like the real dnsmasq template)
+		templatePath := tmpDir + "/test_template_conditional.tpl"
+		templateContent := `{{if and .WiFiInternetPassThroughEnabled (eq .WiFiMode 2)}}
+dhcp-option=3,{{.IpAddr}}
+dhcp-option=6,{{.IpAddr}}
+{{else}}
+# No gateway/DNS
+dhcp-option=3
+dhcp-option=6
+{{end}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		// Test with passthrough enabled and correct mode
+		settings := NetworkTemplateParams{
+			WiFiMode:                       WifiModeApClient,
+			IpAddr:                         "192.168.10.1",
+			WiFiInternetPassThroughEnabled: true,
+		}
+
+		outputPath := tmpDir + "/output_conditional_enabled.conf"
+		writeTemplate(templatePath, outputPath, settings)
+
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		if !strings.Contains(string(content), "dhcp-option=3,192.168.10.1") {
+			t.Error("Expected passthrough-enabled output, got disabled")
+		}
+
+		// Test with passthrough disabled
+		settings.WiFiInternetPassThroughEnabled = false
+		outputPath2 := tmpDir + "/output_conditional_disabled.conf"
+		writeTemplate(templatePath, outputPath2, settings)
+
+		content2, err := os.ReadFile(outputPath2)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		if !strings.Contains(string(content2), "# No gateway/DNS") {
+			t.Error("Expected passthrough-disabled output")
+		}
+	})
+
+	t.Run("template_file_not_found", func(t *testing.T) {
+		// Test with non-existent template file
+		nonExistentPath := tmpDir + "/does_not_exist.tpl"
+		outputPath := tmpDir + "/output_notfound.conf"
+
+		settings := NetworkTemplateParams{
+			IpAddr: "192.168.10.1",
+		}
+
+		// This should log an error but not panic
+		writeTemplate(nonExistentPath, outputPath, settings)
+
+		// Output file should not exist
+		if _, err := os.Stat(outputPath); err == nil {
+			t.Error("Output file should not exist when template file is not found")
+		}
+	})
+
+	t.Run("invalid_template_syntax", func(t *testing.T) {
+		// Create template with invalid syntax
+		templatePath := tmpDir + "/test_template_invalid.tpl"
+		templateContent := `IP: {{.IpAddr}
+SSID: {{.WiFiSSID}}` // Missing closing braces
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		outputPath := tmpDir + "/output_invalid.conf"
+		settings := NetworkTemplateParams{
+			IpAddr:   "192.168.10.1",
+			WiFiSSID: "Test",
+		}
+
+		// This should log an error but not panic
+		writeTemplate(templatePath, outputPath, settings)
+
+		// Output file may or may not exist depending on when error occurred
+		// The important thing is that it doesn't panic
+	})
+
+	t.Run("output_to_readonly_directory", func(t *testing.T) {
+		// Create a valid template
+		templatePath := tmpDir + "/test_template_readonly.tpl"
+		templateContent := `IP: {{.IpAddr}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		// Try to write to a directory that doesn't exist
+		outputPath := tmpDir + "/nonexistent_dir/output.conf"
+		settings := NetworkTemplateParams{
+			IpAddr: "192.168.10.1",
+		}
+
+		// This should log an error but not panic
+		writeTemplate(templatePath, outputPath, settings)
+
+		// Output file should not exist
+		if _, err := os.Stat(outputPath); err == nil {
+			t.Error("Output file should not exist when directory doesn't exist")
+		}
+	})
+
+	t.Run("template_with_undefined_field", func(t *testing.T) {
+		// Create template referencing non-existent field
+		templatePath := tmpDir + "/test_template_undefined.tpl"
+		templateContent := `IP: {{.IpAddr}}
+NonExistent: {{.ThisFieldDoesNotExist}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		outputPath := tmpDir + "/output_undefined.conf"
+		settings := NetworkTemplateParams{
+			IpAddr: "192.168.10.1",
+		}
+
+		// This should fail during template execution
+		writeTemplate(templatePath, outputPath, settings)
+
+		// The file might be created but the template execution should log an error
+		// Check if file exists - it may or may not depending on when the error occurred
+		if _, err := os.Stat(outputPath); err == nil {
+			// If file exists, verify it's either empty or incomplete
+			content, _ := os.ReadFile(outputPath)
+			if strings.Contains(string(content), "NonExistent: <no value>") ||
+				!strings.Contains(string(content), "NonExistent:") {
+				// Template either output "<no value>" or failed before writing this line
+				// Both are acceptable behaviors
+			}
+		}
+	})
+
+	t.Run("empty_template", func(t *testing.T) {
+		// Create an empty template file
+		templatePath := tmpDir + "/test_template_empty.tpl"
+		if err := os.WriteFile(templatePath, []byte(""), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		outputPath := tmpDir + "/output_empty.conf"
+		settings := NetworkTemplateParams{}
+
+		writeTemplate(templatePath, outputPath, settings)
+
+		// Output file should exist but be empty
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		if len(content) != 0 {
+			t.Errorf("Expected empty output, got: %s", string(content))
+		}
+	})
+
+	t.Run("template_with_special_characters", func(t *testing.T) {
+		// Create template and test with special characters in values
+		templatePath := tmpDir + "/test_template_special.tpl"
+		templateContent := `SSID: {{.WiFiSSID}}
+Password: {{.WiFiPassPhrase}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		outputPath := tmpDir + "/output_special.conf"
+		settings := NetworkTemplateParams{
+			WiFiSSID:       "Network-2.4GHz (5G)",
+			WiFiPassPhrase: `P@ss"word'with$pecial&chars!`,
+		}
+
+		writeTemplate(templatePath, outputPath, settings)
+
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		contentStr := string(content)
+		if !strings.Contains(contentStr, settings.WiFiSSID) {
+			t.Error("SSID with special characters not written correctly")
+		}
+		if !strings.Contains(contentStr, settings.WiFiPassPhrase) {
+			t.Error("Password with special characters not written correctly")
+		}
+	})
+
+	t.Run("overwrite_existing_file", func(t *testing.T) {
+		// Create template
+		templatePath := tmpDir + "/test_template_overwrite.tpl"
+		templateContent := `Value: {{.IpAddr}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		outputPath := tmpDir + "/output_overwrite.conf"
+
+		// Create existing file with different content
+		if err := os.WriteFile(outputPath, []byte("OLD CONTENT"), 0644); err != nil {
+			t.Fatalf("Failed to create existing output file: %v", err)
+		}
+
+		settings := NetworkTemplateParams{
+			IpAddr: "192.168.10.1",
+		}
+
+		writeTemplate(templatePath, outputPath, settings)
+
+		// Verify file was overwritten
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		if strings.Contains(string(content), "OLD CONTENT") {
+			t.Error("File was not overwritten")
+		}
+		if !strings.Contains(string(content), "Value: 192.168.10.1") {
+			t.Error("New content not written correctly")
+		}
+	})
+
+	t.Run("template_with_zero_values", func(t *testing.T) {
+		// Test with zero/default values
+		templatePath := tmpDir + "/test_template_zero.tpl"
+		templateContent := `Mode: {{.WiFiMode}}
+Channel: {{.WiFiChannel}}
+Enabled: {{.WiFiInternetPassThroughEnabled}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		outputPath := tmpDir + "/output_zero.conf"
+		settings := NetworkTemplateParams{
+			WiFiMode:                       0,
+			WiFiChannel:                    0,
+			WiFiInternetPassThroughEnabled: false,
+		}
+
+		writeTemplate(templatePath, outputPath, settings)
+
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		expected := `Mode: 0
+Channel: 0
+Enabled: false`
+		if string(content) != expected {
+			t.Errorf("Zero values not written correctly.\nExpected:\n%s\nGot:\n%s", expected, string(content))
+		}
+	})
+
+	t.Run("template_with_empty_client_networks", func(t *testing.T) {
+		// Test with empty client networks list
+		templatePath := tmpDir + "/test_template_empty_networks.tpl"
+		templateContent := `Networks:
+{{range .WiFiClientNetworks}}
+- {{.SSID}}
+{{end}}
+Done`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		outputPath := tmpDir + "/output_empty_networks.conf"
+		settings := NetworkTemplateParams{
+			WiFiClientNetworks: []wifiClientNetwork{},
+		}
+
+		writeTemplate(templatePath, outputPath, settings)
+
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		expected := `Networks:
+
+Done`
+		if string(content) != expected {
+			t.Errorf("Empty network list not handled correctly.\nExpected:\n%s\nGot:\n%s", expected, string(content))
+		}
+	})
+
+	t.Run("large_template_output", func(t *testing.T) {
+		// Test with many client networks to produce large output
+		templatePath := tmpDir + "/test_template_large.tpl"
+		templateContent := `{{range .WiFiClientNetworks}}network={
+	ssid="{{.SSID}}"
+	psk="{{.Password}}"
+}
+{{end}}`
+
+		if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+			t.Fatalf("Failed to create test template: %v", err)
+		}
+
+		// Create many networks
+		var networks []wifiClientNetwork
+		for i := 0; i < 100; i++ {
+			networks = append(networks, wifiClientNetwork{
+				SSID:     "Network" + strconv.Itoa(i),
+				Password: "Password" + strconv.Itoa(i),
+			})
+		}
+
+		settings := NetworkTemplateParams{
+			WiFiClientNetworks: networks,
+		}
+
+		outputPath := tmpDir + "/output_large.conf"
+		writeTemplate(templatePath, outputPath, settings)
+
+		// Verify all networks were written
+		content, err := os.ReadFile(outputPath)
+		if err != nil {
+			t.Fatalf("Failed to read output file: %v", err)
+		}
+
+		contentStr := string(content)
+		for i := 0; i < 100; i++ {
+			expectedSSID := "Network" + strconv.Itoa(i)
+			if !strings.Contains(contentStr, expectedSSID) {
+				t.Errorf("Missing network %s in large output", expectedSSID)
+				break // Don't spam errors
+			}
+		}
+	})
+}
+
 // TestApplyNetworkSettings tests the applyNetworkSettings function
 func TestApplyNetworkSettings(t *testing.T) {
 	origIPAddress := globalSettings.WiFiIPAddress

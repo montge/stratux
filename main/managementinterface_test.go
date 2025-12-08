@@ -911,7 +911,7 @@ func TestHandleSatellitesRequestMarshalError(t *testing.T) {
 	}
 }
 
-// TestHandleSettingsGetRequest tests the /getSettings endpoint
+// TestHandleSettingsGetRequest tests the /getSettings endpoint happy path
 func TestHandleSettingsGetRequest(t *testing.T) {
 	// Save and restore global settings
 	origSettings := globalSettings
@@ -920,6 +920,8 @@ func TestHandleSettingsGetRequest(t *testing.T) {
 	// Set some test values
 	globalSettings.UAT_Enabled = true
 	globalSettings.ES_Enabled = true
+	globalSettings.DeveloperMode = false
+	globalSettings.Dump1090Gain = 48.0 // Valid float64 value
 
 	req := httptest.NewRequest("GET", "/getSettings", nil)
 	w := httptest.NewRecorder()
@@ -933,9 +935,15 @@ func TestHandleSettingsGetRequest(t *testing.T) {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
 	}
 
+	// Verify headers set by setNoCache and setJSONHeaders
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		t.Errorf("Expected application/json content type, got %s", contentType)
+	}
+
+	cacheControl := resp.Header.Get("Cache-Control")
+	if cacheControl != "no-cache, no-store, must-revalidate" {
+		t.Errorf("Expected no-cache header, got %s", cacheControl)
 	}
 
 	bodyStr := string(body)
@@ -943,99 +951,88 @@ func TestHandleSettingsGetRequest(t *testing.T) {
 	if !strings.Contains(bodyStr, "UAT_Enabled") {
 		t.Error("Expected UAT_Enabled field in settings response")
 	}
+
+	// Verify valid JSON can be unmarshaled
+	var settings settings
+	if err := json.Unmarshal(body, &settings); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+
+	// Verify values match what we set
+	if settings.UAT_Enabled != true {
+		t.Error("Expected UAT_Enabled to be true")
+	}
+	if settings.ES_Enabled != true {
+		t.Error("Expected ES_Enabled to be true")
+	}
+	if settings.Dump1090Gain != 48.0 {
+		t.Errorf("Expected Dump1090Gain to be 48.0, got %f", settings.Dump1090Gain)
+	}
 }
 
-// TestHandleSettingsGetRequestMarshalError documents why the error handling path
-// in handleSettingsGetRequest (lines 305-307) cannot be practically tested to achieve 100% coverage.
+// TestHandleSettingsGetRequestMarshalError tests the error handling path
+// when json.Marshal fails. This can happen when float64 fields contain
+// special values like NaN or Infinity, which are not valid JSON values.
 //
-// Comprehensive analysis of why json.Marshal(&globalSettings) cannot fail:
+// The Go json package returns an error for IEEE 754 special values:
+// - NaN (Not a Number)
+// - +Inf (Positive Infinity)
+// - -Inf (Negative Infinity)
 //
-// 1. STRUCT FIELD ANALYSIS (gen_gdl90.go:1208-1276):
-//    All fields in the settings struct are JSON-marshalable:
-//    - Primitives: bool, int, string, float64 (always marshalable)
-//    - Arrays: [2]int, [3]float64, [4]float64 (marshalable if elements are)
-//    - Slices: []string, []networkConnection, []bleConnection, []wifiClientNetwork
-//    - Map: map[string]serialConnection (marshalable if keys are strings and values are marshalable)
-//
-// 2. NESTED STRUCT ANALYSIS:
-//    - networkConnection: only has marshalable fields (*net.UDPConn, string, uint32, uint8, time.Time, bool)
-//      *MessageQueue is marked `json:"-"` so it's skipped
-//    - serialConnection: only has marshalable fields (string, int, uint8, *serial.Port)
-//      *MessageQueue is marked `json:"-"` so it's skipped
-//    - bleConnection, wifiClientNetwork: also only contain marshalable types
-//
-// 3. WHY JSON.MARSHAL COULD FAIL (none apply here):
-//    a) Channels - settings has none
-//    b) Functions - settings has none
-//    c) complex64/complex128 - settings has none
-//    d) Cyclic references - impossible with this struct design (no recursive types)
-//    e) Custom MarshalJSON returning error - none of the nested types implement this
-//
-// 4. TESTING ATTEMPTS MADE:
-//    - Unsafe.Pointer to inject channels: Doesn't work because JSON marshaler uses reflection
-//      on the TARGET type definition, not the actual memory contents
-//    - Creating bad nested structs: Either causes segfaults or gets ignored by marshaler
-//    - Reflection manipulation: Can't change struct field types at runtime
-//
-// 5. CONCLUSION:
-//    The error handling at lines 305-307 exists as defensive programming but is unreachable.
-//    Achieving 100% coverage would require modifying the production settings struct to add
-//    unmarshalable fields, which would break the application.
-//
-//    Current coverage: 83.3% (5 of 6 lines)
-//    Line 306 (error log) is practically unreachable without breaking production code.
+// These values can theoretically occur in the settings struct's float64 fields:
+// - Dump1090Gain
+// - SensorQuaternion [4]float64
+// - C, D [3]float64
 func TestHandleSettingsGetRequestMarshalError(t *testing.T) {
-	t.Log("=== JSON Marshal Error Path Analysis ===")
-	t.Log("")
-	t.Log("The settings struct (gen_gdl90.go:1208-1276) contains ONLY marshalable types:")
-	t.Log("  ✓ Primitives: bool, int, string, float64")
-	t.Log("  ✓ Arrays: [2]int, [3]float64, [4]float64")
-	t.Log("  ✓ Slices of marshalable types")
-	t.Log("  ✓ Map with string keys and marshalable values")
-	t.Log("  ✓ No channels, functions, or complex numbers")
-	t.Log("  ✓ No cyclic references possible")
-	t.Log("  ✓ No custom MarshalJSON methods that could fail")
-	t.Log("")
-	t.Log("Testing attempts made:")
-	t.Log("  ✗ unsafe.Pointer injection - JSON uses target type, not memory")
-	t.Log("  ✗ Cyclic references - impossible with struct design")
-	t.Log("  ✗ Runtime type modification - not supported in Go")
-	t.Log("")
-	t.Log("Result: Error path at line 306 is unreachable in practice")
-	t.Log("Coverage: 83.3% (5 of 6 lines) - line 306 is defensive programming")
-	t.Log("")
-	t.Log("See test documentation for full analysis")
-
-	// Verify the happy path works correctly
-	origSettings := globalSettings
-	defer func() { globalSettings = origSettings }()
-
-	globalSettings.UAT_Enabled = true
-	globalSettings.ES_Enabled = true
-	globalSettings.DeveloperMode = true
-
-	req := httptest.NewRequest("GET", "/getSettings", nil)
-	w := httptest.NewRecorder()
-
-	handleSettingsGetRequest(w, req)
-
-	resp := w.Result()
-	body, _ := io.ReadAll(resp.Body)
-
-	// Verify response
-	if len(body) == 0 {
-		t.Fatal("Expected non-empty response body")
+	testCases := []struct {
+		name  string
+		value float64
+	}{
+		{"NaN", math.NaN()},
+		{"Positive Infinity", math.Inf(1)},
+		{"Negative Infinity", math.Inf(-1)},
 	}
 
-	bodyStr := string(body)
-	if !strings.Contains(bodyStr, "UAT_Enabled") {
-		t.Error("Expected UAT_Enabled in response")
-	}
-	if !strings.Contains(bodyStr, "DeveloperMode") {
-		t.Error("Expected DeveloperMode in response")
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Save and restore global settings
+			origSettings := globalSettings
+			defer func() { globalSettings = origSettings }()
 
-	t.Logf("✓ Happy path confirmed: %d bytes returned with valid JSON", len(body))
+			// Set Dump1090Gain to a special value that causes json.Marshal to fail
+			globalSettings.Dump1090Gain = tc.value
+
+			// Capture log output to verify the error is logged
+			var logBuf bytes.Buffer
+			origLogOutput := log.Writer()
+			log.SetOutput(&logBuf)
+			defer log.SetOutput(origLogOutput)
+
+			req := httptest.NewRequest("GET", "/getSettings", nil)
+			w := httptest.NewRecorder()
+
+			handleSettingsGetRequest(w, req)
+
+			resp := w.Result()
+			body, _ := io.ReadAll(resp.Body)
+
+			// The response should still be written (with status 200)
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status 200, got %d", resp.StatusCode)
+			}
+
+			// Verify that the error was logged
+			logOutput := logBuf.String()
+			if !strings.Contains(logOutput, "unsupported value") {
+				t.Errorf("Expected error log containing 'unsupported value', got: %s", logOutput)
+			}
+
+			// The response body should be empty or contain just "\n" because settingsJSON will be nil
+			if len(body) > 1 {
+				t.Errorf("Expected empty or minimal response body due to marshal error, got %d bytes: %s", len(body), string(body))
+			}
+		})
+	}
 }
 
 // TestHandleRegionGet tests the /getRegion endpoint

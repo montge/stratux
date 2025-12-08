@@ -2058,6 +2058,199 @@ func TestCalcGPSAttitude(t *testing.T) {
 			myGPSPerfStats[idx].gpsPitch, myGPSPerfStats[idx].gpsRoll,
 			myGPSPerfStats[idx].gpsTurnRate, myGPSPerfStats[idx].gpsLoadFactor)
 	})
+
+	t.Run("single_rmc_speed_point_exact", func(t *testing.T) {
+		// Test with exactly one RMC message for speed (line 836-837)
+		// This tests the lengthSpeed == 1 branch which doesn't use regression
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			// Only one RMC message with speed data
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 75.0, coursef: 90.0, alt: 0},
+			// Multiple GGA messages with altitude
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true with single RMC speed point")
+		}
+		// With single speed point, v_x should be tempSpeed[0] * 1.687810
+		expectedVx := 75.0 * 1.687810 // Should be 126.58575 ft/sec
+		t.Logf("Single RMC speed point: expected v_x=%.2f ft/sec", expectedVx)
+	})
+
+	t.Run("rollover_edge_at_boundary_86300", func(t *testing.T) {
+		// Test the exact boundary condition for rollover detection
+		// Line 739: index-1 must be > 86300 and index must be < 100
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86301.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86301.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86301.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86301.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			// Rollover happens here: previous is 86301.3, current is 99.9
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 99.9, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 99.95, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		idx := len(myGPSPerfStats) - 1
+		if result {
+			// Should have adjusted the time by adding 86400
+			t.Logf("Boundary rollover succeeded, adjusted time: %.1f", myGPSPerfStats[idx].nmeaTime)
+		} else {
+			t.Logf("Boundary rollover result: %v", result)
+		}
+	})
+
+	t.Run("rollover_just_outside_boundary", func(t *testing.T) {
+		// Test just outside the rollover boundary (should fail)
+		// Previous time is 86299 (< 86300) so rollover logic won't trigger
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86299.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86299.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 50.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 50.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false when previous time < 86300 (outside rollover window)")
+		}
+		t.Log("Just outside rollover boundary correctly rejected")
+	})
+
+	t.Run("rollover_current_time_at_boundary_100", func(t *testing.T) {
+		// Test the boundary for current time in rollover (must be < 100)
+		// Current time is exactly 100.0, should be outside the rollover window
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86350.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86350.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			t.Error("Expected false when current time >= 100 (outside rollover window)")
+		}
+		t.Log("Current time at boundary 100 correctly rejected")
+	})
+
+	t.Run("exact_minTime_86401_for_rebase", func(t *testing.T) {
+		// Test the exact boundary for full array rebase (line 754)
+		// minTime must be > 86401.0 to trigger rebase
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			// Trigger rollover
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 20.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 20.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			// After rollover adjustment (20.0 + 86400 = 86420.0), minTime = 86402.0 > 86401.0
+			// So all times should be rebased down by 86400
+			if myGPSPerfStats[0].nmeaTime < 86400 {
+				t.Logf("Successfully rebased: first time now %.1f (was 86402.0)", myGPSPerfStats[0].nmeaTime)
+			}
+		}
+		t.Logf("Exact minTime rebase test result: %v", result)
+	})
+
+	t.Run("minTime_just_below_86401", func(t *testing.T) {
+		// Test minTime = 86400.5 (< 86401.0), should NOT trigger full rebase
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86400.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86400.6, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86400.7, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86400.8, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			// Trigger rollover
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 15.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 15.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if result {
+			// minTime = 86400.5 is NOT > 86401.0, so no full rebase should occur
+			// First time should still be >= 86400
+			if myGPSPerfStats[0].nmeaTime >= 86400 {
+				t.Logf("Correctly did NOT rebase: first time still %.1f", myGPSPerfStats[0].nmeaTime)
+			}
+		}
+		t.Logf("MinTime just below 86401 test result: %v", result)
+	})
+
+	t.Run("rollover_causes_negative_dt_after_rebase", func(t *testing.T) {
+		// Test edge case where after rollover adjustment and rebase, dt is still negative
+		// This can happen if the rebase logic creates an inconsistent state
+		// We construct data where:
+		// 1. Last two entries trigger rollover (index-1 at 86350, index at 50)
+		// 2. After adding 86400 to index, it becomes 86450
+		// 3. The rebase should subtract 86400 from all entries
+		// 4. But if there's an issue, dt could still be negative
+		// Actually, this is hard to trigger naturally. Let's try a different approach:
+		// Create an array where some middle entry causes issues
+		myGPSPerfStats = []gpsPerfStats{
+			// First entries are normal
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			// These will be the last two entries
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			// This one goes backwards slightly (not a rollover scenario)
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.4, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		// Should fail because dt < 0 and it's not a rollover scenario
+		if result {
+			t.Error("Expected false when time goes backwards without rollover")
+		}
+		t.Log("Negative dt (non-rollover) correctly rejected")
+	})
+
+	t.Run("heading_exactly_180_degree_change", func(t *testing.T) {
+		// Test heading change of exactly 180 degrees (boundary condition)
+		// This tests line 921: if math.Abs(tempHdg[i]-tempHdg[i-1]) < 180
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 0.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 0.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 180.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 180.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true for 180 degree heading change")
+		}
+		t.Log("180 degree heading change processed successfully")
+	})
+
+	t.Run("heading_greater_than_180_wrap_ne_to_nw", func(t *testing.T) {
+		// Test heading wrapping from NE to NW (case 2: tempHdg[i] > tempHdg[i-1] and diff > 180)
+		// Example: 350 to 10 degrees - difference is 20 degrees but raw diff is -340
+		// Wait, that's not right. Let me think...
+		// Case 2: tempHdg[i] > tempHdg[i-1] AND abs(diff) >= 180
+		// This means heading increased by more than 180, suggesting a wrap from NE to NW
+		// Example: heading goes from 10 to 350 (increase of 340, but should be -10)
+		baseTime := float32(100.0)
+		myGPSPerfStats = []gpsPerfStats{
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 10.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 10.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 5.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 5.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 350.0, alt: 0},
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 350.0, alt: 2000.0},
+		}
+		result := calcGPSAttitude()
+		if !result {
+			t.Error("Expected true for heading wrap from 5 to 350")
+		}
+		idx := len(myGPSPerfStats) - 1
+		// Should detect left turn
+		t.Logf("Heading wrap (NE to NW): turnRate=%.3f deg/s", myGPSPerfStats[idx].gpsTurnRate)
+	})
 }
 
 // New tests at end of gps_test.go

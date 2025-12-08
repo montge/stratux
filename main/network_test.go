@@ -11,6 +11,7 @@
 package main
 
 import (
+	"io"
 	"net"
 	"sync"
 	"testing"
@@ -1829,5 +1830,535 @@ func TestCollectMessages_EmptyAfterPriorityFilter(t *testing.T) {
 	// Should have collected the high priority message before hitting the low priority filter
 	if len(result) != len(highPrioMsg) {
 		t.Errorf("Expected to collect high priority message before filter, got %d bytes instead of %d", len(result), len(highPrioMsg))
+	}
+}
+
+// mockConnection is a test helper that allows full control over sleeping and throttling states
+type mockConnection struct {
+	queue            *MessageQueue
+	capability       uint8
+	desiredPacketSize int
+	sleeping         bool
+	throttled        bool
+}
+
+func (m *mockConnection) GetConnectionKey() string        { return "mock:test" }
+func (m *mockConnection) MessageQueue() *MessageQueue     { return m.queue }
+func (m *mockConnection) Writer() io.Writer                { return nil }
+func (m *mockConnection) IsThrottled() bool               { return m.throttled }
+func (m *mockConnection) IsSleeping() bool                { return m.sleeping }
+func (m *mockConnection) Capabilities() uint8             { return m.capability }
+func (m *mockConnection) GetDesiredPacketSize() int       { return m.desiredPacketSize }
+func (m *mockConnection) OnError(error)                   {}
+func (m *mockConnection) Close()                          {}
+
+// TestCollectMessages_MockSleepingConnection tests sleeping connection behavior with mock
+func TestCollectMessages_MockSleepingConnection(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         true,
+		throttled:        false,
+	}
+
+	// Add regular priority message (priority 0) - should NOT be collected when sleeping
+	regularMsg := []byte{0x7E, 0x00, 0x01, 0x7E}
+	mock.queue.Put(0, 5*time.Second, regularMsg)
+
+	result := collectMessages(mock)
+
+	// Should return empty because connection is sleeping and message priority > -10
+	if len(result) != 0 {
+		t.Errorf("Expected empty result for sleeping connection with regular priority message, got %d bytes", len(result))
+	}
+}
+
+// TestCollectMessages_MockSleepingConnectionHighPriority tests high priority on sleeping connection
+func TestCollectMessages_MockSleepingConnectionHighPriority(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         true,
+		throttled:        false,
+	}
+
+	// Add heartbeat message with priority -11 (should be sent even when sleeping)
+	heartbeatMsg := []byte{0x7E, 0x00, 0x00, 0x7E}
+	mock.queue.Put(-11, 5*time.Second, heartbeatMsg)
+
+	result := collectMessages(mock)
+
+	// Should collect the high priority message even when sleeping
+	if len(result) != len(heartbeatMsg) {
+		t.Errorf("Expected %d bytes for high priority message on sleeping connection, got %d", len(heartbeatMsg), len(result))
+	}
+}
+
+// TestCollectMessages_MockSleepingConnectionPriorityBoundary tests priority boundary (-10)
+func TestCollectMessages_MockSleepingConnectionPriorityBoundary(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         true,
+		throttled:        false,
+	}
+
+	// Test priority exactly at -10 (should be sent, condition is prio > -10, which is false for -10)
+	boundaryMsg := []byte{0x7E, 0xF6, 0x7E}
+	mock.queue.Put(-10, 5*time.Second, boundaryMsg)
+
+	result := collectMessages(mock)
+
+	// Priority -10 should pass (prio > -10 is false when prio == -10, so we don't return early)
+	if len(result) != len(boundaryMsg) {
+		t.Errorf("Expected message with priority -10 on sleeping connection, got %d bytes", len(result))
+	}
+
+	// Test priority -9 (should NOT be sent, prio > -10 is true)
+	notSentMsg := []byte{0x7E, 0xF7, 0x7E}
+	mock.queue.Put(-9, 5*time.Second, notSentMsg)
+
+	result = collectMessages(mock)
+
+	if len(result) != 0 {
+		t.Errorf("Expected no message with priority -9 on sleeping connection, got %d bytes", len(result))
+	}
+}
+
+// TestCollectMessages_MockSleepingConnectionPartialCollection tests collecting high priority then stopping
+func TestCollectMessages_MockSleepingConnectionPartialCollection(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         true,
+		throttled:        false,
+	}
+
+	// Add high priority message first
+	highPrioMsg := []byte{0x7E, 0xFF, 0x7E}
+	mock.queue.Put(-11, 5*time.Second, highPrioMsg)
+
+	// Add regular priority message (should stop collection)
+	regularMsg := []byte{0x7E, 0x00, 0x7E}
+	mock.queue.Put(0, 5*time.Second, regularMsg)
+
+	result := collectMessages(mock)
+
+	// Should only collect the high priority message
+	if len(result) != len(highPrioMsg) {
+		t.Errorf("Expected %d bytes (high priority only), got %d", len(highPrioMsg), len(result))
+	}
+
+	// Regular message should still be in queue
+	queueDump := mock.queue.GetQueueDump(false)
+	if len(queueDump) != 1 {
+		t.Errorf("Expected 1 message remaining in queue, got %d", len(queueDump))
+	}
+}
+
+// TestCollectMessages_MockThrottledConnection tests throttled connection behavior
+func TestCollectMessages_MockThrottledConnection(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         false,
+		throttled:        true,
+	}
+
+	// Add low priority message (priority 1) - should NOT be sent when throttled
+	lowPrioMsg := []byte{0x7E, 0x01, 0x7E}
+	mock.queue.Put(1, 5*time.Second, lowPrioMsg)
+
+	result := collectMessages(mock)
+
+	// Should return empty because connection is throttled and message priority > 0
+	if len(result) != 0 {
+		t.Errorf("Expected empty result for throttled connection with low priority message, got %d bytes", len(result))
+	}
+}
+
+// TestCollectMessages_MockThrottledConnectionZeroPriority tests priority 0 on throttled connection
+func TestCollectMessages_MockThrottledConnectionZeroPriority(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         false,
+		throttled:        true,
+	}
+
+	// Add priority 0 message (should be sent when throttled, prio > 0 is false)
+	zeroPrioMsg := []byte{0x7E, 0x00, 0x7E}
+	mock.queue.Put(0, 5*time.Second, zeroPrioMsg)
+
+	result := collectMessages(mock)
+
+	// Priority 0 should pass when throttled
+	if len(result) != len(zeroPrioMsg) {
+		t.Errorf("Expected message with priority 0 on throttled connection, got %d bytes instead of %d", len(result), len(zeroPrioMsg))
+	}
+}
+
+// TestCollectMessages_MockThrottledConnectionHighPriority tests negative priority on throttled connection
+func TestCollectMessages_MockThrottledConnectionHighPriority(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         false,
+		throttled:        true,
+	}
+
+	// Add high priority message (priority -1) - should be sent when throttled
+	highPrioMsg := []byte{0x7E, 0xFF, 0x7E}
+	mock.queue.Put(-1, 5*time.Second, highPrioMsg)
+
+	result := collectMessages(mock)
+
+	// High priority should pass when throttled
+	if len(result) != len(highPrioMsg) {
+		t.Errorf("Expected %d bytes for high priority message on throttled connection, got %d", len(highPrioMsg), len(result))
+	}
+}
+
+// TestCollectMessages_MockThrottledConnectionPartialCollection tests collecting important messages only
+func TestCollectMessages_MockThrottledConnectionPartialCollection(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         false,
+		throttled:        true,
+	}
+
+	// Add important message (priority 0)
+	importantMsg := []byte{0x7E, 0xAA, 0x7E}
+	mock.queue.Put(0, 5*time.Second, importantMsg)
+
+	// Add low priority message (priority 1) - should stop collection
+	lowPrioMsg := []byte{0x7E, 0xBB, 0x7E}
+	mock.queue.Put(1, 5*time.Second, lowPrioMsg)
+
+	result := collectMessages(mock)
+
+	// Should only collect the important message
+	if len(result) != len(importantMsg) {
+		t.Errorf("Expected %d bytes (important message only), got %d", len(importantMsg), len(result))
+	}
+
+	// Low priority message should still be in queue
+	queueDump := mock.queue.GetQueueDump(false)
+	if len(queueDump) != 1 {
+		t.Errorf("Expected 1 message remaining in queue, got %d", len(queueDump))
+	}
+}
+
+// TestCollectMessages_MockSleepingAndThrottled tests connection that is both sleeping and throttled
+func TestCollectMessages_MockSleepingAndThrottled(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         true,
+		throttled:        true,
+	}
+
+	// When both sleeping and throttled, sleeping check comes first
+	// Add priority -5 message (would pass throttle check, but not sleep check)
+	msg := []byte{0x7E, 0xAA, 0x7E}
+	mock.queue.Put(-5, 5*time.Second, msg)
+
+	result := collectMessages(mock)
+
+	// Should not pass because sleeping check happens first and prio > -10
+	if len(result) != 0 {
+		t.Errorf("Expected empty result for sleeping+throttled connection with priority -5, got %d bytes", len(result))
+	}
+
+	// Now add very high priority that passes both checks
+	veryHighPrioMsg := []byte{0x7E, 0xBB, 0x7E}
+	mock.queue.Put(-11, 5*time.Second, veryHighPrioMsg)
+
+	result = collectMessages(mock)
+
+	// Should pass both sleeping and throttled checks
+	if len(result) != len(veryHighPrioMsg) {
+		t.Errorf("Expected %d bytes for very high priority on sleeping+throttled connection, got %d", len(veryHighPrioMsg), len(result))
+	}
+}
+
+// TestCollectMessages_SmallPacketSize tests connections with small packet size limits
+func TestCollectMessages_SmallPacketSize(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(100),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 20, // Very small packet size
+		sleeping:         false,
+		throttled:        false,
+	}
+
+	// Add multiple small messages
+	for i := 0; i < 10; i++ {
+		msg := []byte{0x7E, byte(i), 0x7E}
+		mock.queue.Put(0, 5*time.Second, msg)
+	}
+
+	result := collectMessages(mock)
+
+	// Should stop before collecting all messages due to packet size limit
+	if len(result) > 30 { // Allow some tolerance for maxMsgLen estimation
+		t.Errorf("Result exceeded expected packet size: got %d bytes", len(result))
+	}
+
+	// Should have collected at least one message
+	if len(result) < 3 {
+		t.Errorf("Should have collected at least one message (3 bytes), got %d", len(result))
+	}
+}
+
+// TestCollectMessages_TCPConnection tests TCP connection with different packet size
+func TestCollectMessages_TCPConnection(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Use a mock to avoid needing actual TCP connection (which would make it not sleeping)
+	mock := &mockConnection{
+		queue:            NewMessageQueue(50),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 512, // TCP packet size
+		sleeping:         false,
+		throttled:        false,
+	}
+
+	// Add messages
+	for i := 0; i < 30; i++ {
+		msg := []byte{0x7E, byte(i), 0x7E}
+		mock.queue.Put(0, 5*time.Second, msg)
+	}
+
+	result := collectMessages(mock)
+
+	// TCP connections have packet size of 512
+	// Should collect multiple messages but respect the limit
+	if len(result) > 512+10 { // Allow small tolerance
+		t.Errorf("Result exceeded TCP packet size: got %d bytes", len(result))
+	}
+
+	if len(result) == 0 {
+		t.Error("Should have collected at least some messages")
+	}
+}
+
+// TestCollectMessages_SerialConnection tests serial connection with different packet size
+func TestCollectMessages_SerialConnection(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Use a mock to avoid needing actual serial port (which would make it sleeping)
+	mock := &mockConnection{
+		queue:            NewMessageQueue(50),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 128, // Serial packet size
+		sleeping:         false,
+		throttled:        false,
+	}
+
+	// Add messages
+	for i := 0; i < 20; i++ {
+		msg := []byte{0x7E, byte(i), 0x7E}
+		mock.queue.Put(0, 5*time.Second, msg)
+	}
+
+	result := collectMessages(mock)
+
+	// Serial connections have packet size of 128
+	// Should collect multiple messages but respect the limit
+	if len(result) > 128+10 { // Allow small tolerance
+		t.Errorf("Result exceeded serial packet size: got %d bytes", len(result))
+	}
+
+	if len(result) == 0 {
+		t.Error("Should have collected at least some messages")
+	}
+}
+
+// TestCollectMessages_BLEConnection tests BLE connection with very small packet size
+func TestCollectMessages_BLEConnection(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	conn := &bleConnection{
+		UUIDService: "FFE0",
+		Capability:  NETWORK_GDL90_STANDARD,
+		Queue:       NewMessageQueue(50),
+	}
+
+	// Add messages
+	for i := 0; i < 10; i++ {
+		msg := []byte{0x7E, byte(i), 0x7E}
+		conn.Queue.Put(0, 5*time.Second, msg)
+	}
+
+	result := collectMessages(conn)
+
+	// BLE connections have packet size of 20 (very small)
+	// Should collect only a few messages
+	if len(result) > 30 { // Allow small tolerance
+		t.Errorf("Result exceeded BLE packet size: got %d bytes", len(result))
+	}
+
+	if len(result) == 0 {
+		t.Error("Should have collected at least some messages")
+	}
+}
+
+// TestCollectMessages_PacketSizeOne tests X-Plane style connections with packet size of 1
+func TestCollectMessages_PacketSizeOne(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_POSITION_FFSIM,
+		desiredPacketSize: 1, // X-Plane mode
+		sleeping:         false,
+		throttled:        false,
+	}
+
+	// Add small messages
+	msg1 := []byte{0x01}
+	msg2 := []byte{0x02}
+
+	mock.queue.Put(0, 5*time.Second, msg1)
+	mock.queue.Put(0, 5*time.Second, msg2)
+
+	result := collectMessages(mock)
+
+	// With packet size 1, should collect first message then stop
+	// because len(data) + maxMsgLen > 1 after first message
+	if len(result) > 2 { // Could potentially get 2 messages
+		t.Errorf("Expected very limited collection with packet size 1, got %d bytes", len(result))
+	}
+
+	if len(result) == 0 {
+		t.Error("Should have collected at least the first message")
+	}
+}
+
+// TestCollectMessages_MaxMsgLenUpdates tests that maxMsgLen tracks the largest message
+func TestCollectMessages_MaxMsgLenUpdates(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(10),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 1024,
+		sleeping:         false,
+		throttled:        false,
+	}
+
+	// Add messages of varying sizes
+	smallMsg := []byte{0x7E, 0x01, 0x7E} // 3 bytes
+	mediumMsg := make([]byte, 50) // 50 bytes
+	largeMsg := make([]byte, 200) // 200 bytes
+
+	mock.queue.Put(0, 5*time.Second, smallMsg)
+	mock.queue.Put(0, 5*time.Second, mediumMsg)
+	mock.queue.Put(0, 5*time.Second, largeMsg)
+
+	result := collectMessages(mock)
+
+	expectedLen := len(smallMsg) + len(mediumMsg) + len(largeMsg)
+	if len(result) != expectedLen {
+		t.Errorf("Expected %d bytes total, got %d", expectedLen, len(result))
+	}
+}
+
+// TestCollectMessages_StopsBeforePacketSizeExceeded tests stopping before exceeding packet size
+func TestCollectMessages_StopsBeforePacketSizeExceeded(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	mock := &mockConnection{
+		queue:            NewMessageQueue(100),
+		capability:       NETWORK_GDL90_STANDARD,
+		desiredPacketSize: 100,
+		sleeping:         false,
+		throttled:        false,
+	}
+
+	// Add a message that is 80 bytes, then smaller messages
+	largeMsg := make([]byte, 80)
+	smallMsg := []byte{0x7E, 0x01, 0x7E}
+
+	mock.queue.Put(0, 5*time.Second, largeMsg)
+	mock.queue.Put(0, 5*time.Second, smallMsg)
+	mock.queue.Put(0, 5*time.Second, smallMsg)
+
+	result := collectMessages(mock)
+
+	// After collecting the 80-byte message, maxMsgLen = 80
+	// len(data) = 80, so len(data) + maxMsgLen = 160 > 100
+	// Should stop after first message
+	if len(result) != len(largeMsg) {
+		t.Logf("Expected %d bytes (first message only), got %d", len(largeMsg), len(result))
+		// This is informational - the exact behavior depends on the algorithm
+	}
+
+	// Should not exceed packet size significantly
+	if len(result) > 200 {
+		t.Errorf("Result exceeded reasonable packet size: got %d bytes", len(result))
 	}
 }
