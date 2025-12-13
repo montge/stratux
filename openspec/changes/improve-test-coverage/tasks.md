@@ -41,12 +41,31 @@
 - [x] Test connectMbTilesArchive (92.9% coverage)
 - [x] Test handleTilesets (50% coverage)
 - [x] Test handleTile validation
+- [x] Test readMbTilesMetadata (82.1% → 89.3% coverage)
+  - Bounds calculation when not present
+  - PBF format detection
+  - Empty value filtering
 
 ### 1.8 Remaining to reach 60% (~3.5% needed)
-- [ ] sendTrafficUpdates (45.1%) - blocked by network operations
-- [ ] handleDownloadAHRSLogsRequest (36.1%) - file I/O heavy
-- [ ] processNMEALineLow (84.2%) - already heavily tested
+
+**Blockers for remaining functions:**
+- [ ] sendTrafficUpdates (45.1%) - blocked by network operations (WebSocket broadcasting)
+- [ ] handleDownloadAHRSLogsRequest (36.1%) - requires files in /var/log/
+- [ ] processNMEALineLow (84.2%) - already heavily tested (91 test calls)
 - [ ] sdrKill (66.7%) - requires mock SDR device
+- [ ] rotateLogs (33.3%) - reads from const logDir="/var/log/"
+- [ ] deleteOldestLog (27.3%) - reads from const logDir="/var/log/"
+- [ ] lookupOgnTailNumber (42.9%) - reads from STRATUX_HOME constant
+- [ ] handleTilesets (50%) - reads from STRATUX_HOME constant
+- [ ] loadTile (9.5%) - reads from STRATUX_HOME constant
+
+**Note:** Many remaining functions have dependencies on:
+1. Constants (STRATUX_HOME, varLogDir, logDir) that can't be overridden in tests
+2. Hardware (SDR, GPS, sensors) that isn't available in test environment
+3. Network operations (real sockets, DHCP leases)
+4. Infinite loops (watchers, listeners)
+
+**Recommendation:** To reach 60%+ coverage, consider Phase 2 interface mocking approach.
 
 ## 2. Phase 2: Interface Mocking (Target: 75%)
 
