@@ -710,3 +710,172 @@ func TestTileToDegree_ExtendedCoverage(t *testing.T) {
 		})
 	}
 }
+
+// TestReadMbTilesMetadata_BoundsCalculation tests the bounds calculation path
+// This exercises lines 1146-1159 when bounds metadata is not present
+func TestReadMbTilesMetadata_BoundsCalculation(t *testing.T) {
+	// Create temporary database
+	tmpDir, err := os.MkdirTemp("", "stratux-bounds-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath := filepath.Join(tmpDir, "test-bounds.mbtiles")
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	// Create schema WITHOUT bounds metadata to trigger bounds calculation
+	_, err = db.Exec(`
+		CREATE TABLE tiles (
+			zoom_level INTEGER,
+			tile_column INTEGER,
+			tile_row INTEGER,
+			tile_data BLOB
+		);
+		CREATE TABLE metadata (name TEXT, value TEXT);
+		INSERT INTO metadata (name, value) VALUES ('format', 'png');
+		INSERT INTO metadata (name, value) VALUES ('minzoom', '5');
+		INSERT INTO metadata (name, value) VALUES ('maxzoom', '10');
+		-- Note: NO 'bounds' entry, so readMbTilesMetadata will calculate it
+		INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data)
+		VALUES (10, 500, 400, X'89504E47'),
+		       (10, 510, 410, X'89504E47'),
+		       (10, 505, 405, X'89504E47');
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create schema: %v", err)
+	}
+
+	// Read metadata - should calculate bounds
+	metadata := readMbTilesMetadata(dbPath, db)
+	if metadata == nil {
+		t.Fatal("readMbTilesMetadata returned nil")
+	}
+
+	// Verify bounds was calculated
+	if bounds, ok := metadata["bounds"]; !ok {
+		t.Error("Expected bounds to be calculated")
+	} else {
+		t.Logf("Calculated bounds: %s", bounds)
+		// Bounds should contain comma-separated values
+		if len(bounds) == 0 {
+			t.Error("Bounds should not be empty")
+		}
+	}
+}
+
+// TestReadMbTilesMetadata_PBFFormat tests that PBF format metadata is correctly read
+// The style URL detection requires STRATUX_HOME to be writable (typically /opt/stratux)
+func TestReadMbTilesMetadata_PBFFormat(t *testing.T) {
+	// Create temporary database
+	tmpDir, err := os.MkdirTemp("", "stratux-pbf-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath := filepath.Join(tmpDir, "test-vector.mbtiles")
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	// Create schema with PBF format
+	_, err = db.Exec(`
+		CREATE TABLE tiles (
+			zoom_level INTEGER,
+			tile_column INTEGER,
+			tile_row INTEGER,
+			tile_data BLOB
+		);
+		CREATE TABLE metadata (name TEXT, value TEXT);
+		INSERT INTO metadata (name, value) VALUES ('format', 'pbf');
+		INSERT INTO metadata (name, value) VALUES ('bounds', '-180,-90,180,90');
+		INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data)
+		VALUES (5, 10, 10, X'00000000');
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create schema: %v", err)
+	}
+
+	// Read metadata
+	metadata := readMbTilesMetadata(dbPath, db)
+	if metadata == nil {
+		t.Fatal("readMbTilesMetadata returned nil")
+	}
+
+	// Verify format is pbf (exercises line 1162 format check)
+	if format, ok := metadata["format"]; !ok || format != "pbf" {
+		t.Errorf("Expected format 'pbf', got %q", format)
+	}
+
+	// Note: Style URL detection (lines 1164-1167) requires style file at
+	// STRATUX_HOME/mapdata/styles/<filename>/style.json which we can't
+	// easily test without modifying the constant STRATUX_HOME
+	t.Log("PBF format metadata test complete")
+}
+
+// TestReadMbTilesMetadata_EmptyValue tests that empty metadata values are skipped
+// This exercises line 1140 where len(val) > 0 check filters empty values
+func TestReadMbTilesMetadata_EmptyValue(t *testing.T) {
+	// Create temporary database
+	tmpDir, err := os.MkdirTemp("", "stratux-emptyval-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath := filepath.Join(tmpDir, "test-empty.mbtiles")
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	// Create schema with some empty metadata values
+	_, err = db.Exec(`
+		CREATE TABLE tiles (
+			zoom_level INTEGER,
+			tile_column INTEGER,
+			tile_row INTEGER,
+			tile_data BLOB
+		);
+		CREATE TABLE metadata (name TEXT, value TEXT);
+		INSERT INTO metadata (name, value) VALUES ('format', 'png');
+		INSERT INTO metadata (name, value) VALUES ('empty_field', '');
+		INSERT INTO metadata (name, value) VALUES ('bounds', '-180,-90,180,90');
+		INSERT INTO metadata (name, value) VALUES ('another_empty', '');
+		INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data)
+		VALUES (5, 10, 10, X'89504E47');
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create schema: %v", err)
+	}
+
+	// Read metadata
+	metadata := readMbTilesMetadata(dbPath, db)
+	if metadata == nil {
+		t.Fatal("readMbTilesMetadata returned nil")
+	}
+
+	// Verify empty values were not added
+	if _, ok := metadata["empty_field"]; ok {
+		t.Error("Empty field should not be in metadata")
+	}
+	if _, ok := metadata["another_empty"]; ok {
+		t.Error("Another empty field should not be in metadata")
+	}
+
+	// Verify non-empty values are present
+	if _, ok := metadata["format"]; !ok {
+		t.Error("Expected 'format' in metadata")
+	}
+	if _, ok := metadata["bounds"]; !ok {
+		t.Error("Expected 'bounds' in metadata")
+	}
+}
