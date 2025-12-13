@@ -3585,6 +3585,447 @@ func TestHandleDeleteAHRSLogFiles_NoMatchingFiles(t *testing.T) {
 	t.Logf("Directory /var/log processed successfully (had %d sensor files)", len(existingFiles))
 }
 
+// TestHandleDeleteAHRSLogFiles_WithConfigurablePath tests with configurable varLogDirPath
+func TestHandleDeleteAHRSLogFiles_WithConfigurablePath(t *testing.T) {
+	// Save original path
+	origVarLogDirPath := varLogDirPath
+	defer func() { varLogDirPath = origVarLogDirPath }()
+
+	t.Run("deletes_matching_sensor_files", func(t *testing.T) {
+		// Create temp directory
+		tmpDir, err := os.MkdirTemp("", "test-ahrs-delete-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		varLogDirPath = tmpDir
+
+		// Create test sensor files
+		testFiles := []string{
+			filepath.Join(tmpDir, "sensors_2024-01-01_test.csv"),
+			filepath.Join(tmpDir, "sensors_2024-01-02_test.csv"),
+			filepath.Join(tmpDir, "sensors_2024-01-03_test.csv"),
+		}
+		for _, f := range testFiles {
+			if err := os.WriteFile(f, []byte("sensor,data\n1,2"), 0644); err != nil {
+				t.Fatalf("Failed to create test file: %v", err)
+			}
+		}
+
+		// Create non-matching files (should not be deleted)
+		otherFiles := []string{
+			filepath.Join(tmpDir, "stratux.log"),
+			filepath.Join(tmpDir, "other.txt"),
+		}
+		for _, f := range otherFiles {
+			os.WriteFile(f, []byte("content"), 0644)
+		}
+
+		req := httptest.NewRequest("POST", "/deleteahrslogfiles", nil)
+		w := httptest.NewRecorder()
+
+		handleDeleteAHRSLogFiles(w, req)
+
+		// Verify sensor files were deleted
+		for _, f := range testFiles {
+			if _, err := os.Stat(f); err == nil {
+				t.Errorf("Sensor file %s should be deleted", filepath.Base(f))
+			}
+		}
+
+		// Verify other files still exist
+		for _, f := range otherFiles {
+			if _, err := os.Stat(f); err != nil {
+				t.Errorf("Non-sensor file %s should still exist", filepath.Base(f))
+			}
+		}
+	})
+
+	t.Run("handles_directory_read_error", func(t *testing.T) {
+		varLogDirPath = "/nonexistent/directory/path"
+
+		req := httptest.NewRequest("POST", "/deleteahrslogfiles", nil)
+		w := httptest.NewRecorder()
+
+		handleDeleteAHRSLogFiles(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("handles_empty_directory", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-ahrs-empty-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("POST", "/deleteahrslogfiles", nil)
+		w := httptest.NewRecorder()
+
+		handleDeleteAHRSLogFiles(w, req)
+
+		resp := w.Result()
+		// Should succeed even with no files
+		if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200 or 0, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// TestHandleDownloadAHRSLogsRequest_WithConfigurablePath tests the AHRS logs download with configurable paths
+func TestHandleDownloadAHRSLogsRequest_WithConfigurablePath(t *testing.T) {
+	// Save and restore original path
+	originalVarLogDirPath := varLogDirPath
+	defer func() { varLogDirPath = originalVarLogDirPath }()
+
+	t.Run("successfully_zips_matching_files", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-ahrs-download-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Create matching files
+		sensorFile := filepath.Join(tmpDir, "sensors_20240101.csv")
+		if err := os.WriteFile(sensorFile, []byte("timestamp,roll,pitch\n1,2,3\n"), 0644); err != nil {
+			t.Fatalf("Failed to create sensor file: %v", err)
+		}
+
+		stratuxLogFile := filepath.Join(tmpDir, "stratux.log")
+		if err := os.WriteFile(stratuxLogFile, []byte("2024/01/01 12:00:00 Test log\n"), 0644); err != nil {
+			t.Fatalf("Failed to create stratux.log: %v", err)
+		}
+
+		// Create a non-matching file (should not be included)
+		otherFile := filepath.Join(tmpDir, "other.txt")
+		if err := os.WriteFile(otherFile, []byte("other content"), 0644); err != nil {
+			t.Fatalf("Failed to create other file: %v", err)
+		}
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("GET", "/downloadAHRSlogs", nil)
+		w := httptest.NewRecorder()
+
+		handleDownloadAHRSLogsRequest(w, req)
+
+		resp := w.Result()
+		body, _ := io.ReadAll(resp.Body)
+
+		// The zip is written directly to response body
+		// Verify we got valid zip content
+		if len(body) == 0 {
+			t.Error("Expected non-empty response body")
+		}
+
+		// Parse the zip to verify contents
+		zipReader, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+		if err != nil {
+			t.Fatalf("Failed to read zip: %v", err)
+		}
+
+		// Should have 2 files (sensors_*.csv and stratux.log)
+		if len(zipReader.File) != 2 {
+			t.Errorf("Expected 2 files in zip, got %d", len(zipReader.File))
+		}
+
+		// Verify file names
+		fileNames := make(map[string]bool)
+		for _, f := range zipReader.File {
+			fileNames[f.Name] = true
+		}
+
+		if !fileNames["sensors_20240101.csv"] {
+			t.Error("Expected sensors_20240101.csv in zip")
+		}
+		if !fileNames["stratux.log"] {
+			t.Error("Expected stratux.log in zip")
+		}
+		if fileNames["other.txt"] {
+			t.Error("Did not expect other.txt in zip")
+		}
+	})
+
+	t.Run("handles_directory_read_error", func(t *testing.T) {
+		varLogDirPath = "/nonexistent/path/for/test"
+
+		req := httptest.NewRequest("GET", "/downloadAHRSlogs", nil)
+		w := httptest.NewRecorder()
+
+		handleDownloadAHRSLogsRequest(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(string(body), "error zipping AHRS logs") {
+			t.Errorf("Expected error message about zipping AHRS logs, got: %s", string(body))
+		}
+	})
+
+	t.Run("handles_empty_directory", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-ahrs-empty-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("GET", "/downloadAHRSlogs", nil)
+		w := httptest.NewRecorder()
+
+		handleDownloadAHRSLogsRequest(w, req)
+
+		resp := w.Result()
+		body, _ := io.ReadAll(resp.Body)
+
+		// Empty zip should still be valid
+		if len(body) == 0 {
+			// Empty directory means no files matched, which is fine
+			t.Log("Empty response for directory with no matching files")
+		}
+	})
+
+	t.Run("handles_multiple_sensor_files", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-ahrs-multi-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Create multiple sensor files
+		for i := 1; i <= 3; i++ {
+			sensorFile := filepath.Join(tmpDir, fmt.Sprintf("sensors_%d.csv", i))
+			if err := os.WriteFile(sensorFile, []byte(fmt.Sprintf("data%d\n", i)), 0644); err != nil {
+				t.Fatalf("Failed to create sensor file: %v", err)
+			}
+		}
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("GET", "/downloadAHRSlogs", nil)
+		w := httptest.NewRecorder()
+
+		handleDownloadAHRSLogsRequest(w, req)
+
+		resp := w.Result()
+		body, _ := io.ReadAll(resp.Body)
+
+		zipReader, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+		if err != nil {
+			t.Fatalf("Failed to read zip: %v", err)
+		}
+
+		if len(zipReader.File) != 3 {
+			t.Errorf("Expected 3 files in zip, got %d", len(zipReader.File))
+		}
+	})
+}
+
+// TestViewLogs_WithConfigurablePath tests the viewLogs handler with configurable paths
+func TestViewLogs_WithConfigurablePath(t *testing.T) {
+	// Save and restore original path
+	originalVarLogDirPath := varLogDirPath
+	defer func() { varLogDirPath = originalVarLogDirPath }()
+
+	t.Run("serves_file_successfully", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-viewlogs-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		testContent := "test log content\nline 2\n"
+		testFile := filepath.Join(tmpDir, "test.log")
+		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("GET", "/logs/test.log", nil)
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		body, _ := io.ReadAll(resp.Body)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		if string(body) != testContent {
+			t.Errorf("Expected content %q, got %q", testContent, string(body))
+		}
+	})
+
+	t.Run("lists_directory", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-viewlogs-dir-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Create some files
+		if err := os.WriteFile(filepath.Join(tmpDir, "file1.log"), []byte("content1"), 0644); err != nil {
+			t.Fatalf("Failed to create file1: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, "file2.log"), []byte("content2"), 0644); err != nil {
+			t.Fatalf("Failed to create file2: %v", err)
+		}
+		if err := os.Mkdir(filepath.Join(tmpDir, "subdir"), 0755); err != nil {
+			t.Fatalf("Failed to create subdir: %v", err)
+		}
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("GET", "/logs/", nil)
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		body, _ := io.ReadAll(resp.Body)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		// Check that the directory listing contains our files
+		bodyStr := string(body)
+		if !strings.Contains(bodyStr, "file1.log") {
+			t.Error("Expected file1.log in directory listing")
+		}
+		if !strings.Contains(bodyStr, "file2.log") {
+			t.Error("Expected file2.log in directory listing")
+		}
+		if !strings.Contains(bodyStr, "subdir") {
+			t.Error("Expected subdir in directory listing")
+		}
+	})
+
+	t.Run("blocks_path_traversal", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-viewlogs-traversal-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		varLogDirPath = tmpDir
+
+		// Try to access parent directory
+		req := httptest.NewRequest("GET", "/logs/../etc/passwd", nil)
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("Expected status 403 for path traversal, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("handles_file_not_found", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-viewlogs-notfound-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("GET", "/logs/nonexistent.log", nil)
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("filters_hidden_files", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-viewlogs-hidden-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Create visible and hidden files
+		if err := os.WriteFile(filepath.Join(tmpDir, "visible.log"), []byte("visible"), 0644); err != nil {
+			t.Fatalf("Failed to create visible file: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, ".hidden.log"), []byte("hidden"), 0644); err != nil {
+			t.Fatalf("Failed to create hidden file: %v", err)
+		}
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("GET", "/logs/", nil)
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		body, _ := io.ReadAll(resp.Body)
+
+		bodyStr := string(body)
+		if !strings.Contains(bodyStr, "visible.log") {
+			t.Error("Expected visible.log in directory listing")
+		}
+		if strings.Contains(bodyStr, ".hidden.log") {
+			t.Error("Did not expect .hidden.log in directory listing")
+		}
+	})
+
+	t.Run("serves_subdirectory_file", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "test-viewlogs-subdir-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Create subdirectory with file
+		subDir := filepath.Join(tmpDir, "subdir")
+		if err := os.Mkdir(subDir, 0755); err != nil {
+			t.Fatalf("Failed to create subdir: %v", err)
+		}
+		subFile := filepath.Join(subDir, "nested.log")
+		if err := os.WriteFile(subFile, []byte("nested content"), 0644); err != nil {
+			t.Fatalf("Failed to create nested file: %v", err)
+		}
+
+		varLogDirPath = tmpDir
+
+		req := httptest.NewRequest("GET", "/logs/subdir/nested.log", nil)
+		w := httptest.NewRecorder()
+
+		viewLogs(w, req)
+
+		resp := w.Result()
+		body, _ := io.ReadAll(resp.Body)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		if string(body) != "nested content" {
+			t.Errorf("Expected 'nested content', got %q", string(body))
+		}
+	})
+}
+
 // TestSetPersistentLogging tests the setPersistentLogging function
 func TestSetPersistentLogging(t *testing.T) {
 	testCases := []struct {

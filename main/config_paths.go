@@ -23,6 +23,10 @@ var (
 	// logDirPath is the directory for log files used by getStratuxLogFiles
 	// Default: /var/log/
 	logDirPath = "/var/log/"
+
+	// varLogDirPath is the directory for log files used by managementinterface
+	// Default: /var/log
+	varLogDirPath = "/var/log"
 )
 
 // resetPathsToDefaults restores all path variables to their default values
@@ -30,4 +34,5 @@ var (
 func resetPathsToDefaults() {
 	stratuxHome = "/opt/stratux"
 	logDirPath = "/var/log/"
+	varLogDirPath = "/var/log"
 }
