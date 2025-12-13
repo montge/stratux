@@ -10,122 +10,182 @@
 - [x] Test makeOwnshipGeometricAltitudeReport (100% coverage)
 - [x] Test makeTrafficReportMsg variants (100% coverage)
 - [x] Test makeAHRS* functions (all 100% coverage)
-  - makeAHRSSimReport: 0% → 100%
-  - makeFFAHRSMessage: 0% → 100%
-  - makeAHRSGDL90Report: 0% → 100%
 
 ### 1.3 Message Parsing
 - [x] Test parseDownlinkReport edge cases
 - [x] Test parseDump1090Message edge cases
 - [x] Test parseAprsMessage edge cases (91.5% coverage)
 
-### 1.4 Logging Functions (NEW)
-- [x] Test getStratuxLogFiles (77.8% → 100% via configurable paths)
-- [x] Test logFileSize (100% coverage)
-- [x] Test clearDebugLogFile (100% coverage)
-- [x] Test openLogFile (90.9% coverage)
-- [x] Test logInf/logErr/logDbg (100% coverage each)
+### 1.4 Logging & OGN Functions
+- [x] Test logging functions (logInf/logErr/logDbg)
+- [x] Test OGN/APRS functions
 
-### 1.5 OGN/APRS Functions (NEW)
-- [x] Test importOgnTrafficMessage (100% coverage)
-- [x] Test getTailNumber (100% coverage)
-- [x] Test lookupOgnTailNumber (42.9% - limited by file I/O)
-- [x] Test importOgnStatusMessage (100% coverage)
-
-### 1.6 Traffic/Demo Functions (NEW)
-- [x] Test updateDemoTraffic (100% coverage) - ADSR upgrade path
-- [x] Test pingKill (100% coverage) - wait loop path
-- [x] Test pongKill (100% coverage) - wait loop path
-
-### 1.7 MBTiles/Map Functions (NEW)
+### 1.5 MBTiles/Map Functions
 - [x] Test connectMbTilesArchive (92.9% coverage)
-- [x] Test handleTilesets (50% coverage)
-- [x] Test handleTile validation
-- [x] Test readMbTilesMetadata (82.1% → 89.3% coverage)
-  - Bounds calculation when not present
-  - PBF format detection
-  - Empty value filtering
+- [x] Test readMbTilesMetadata (89.3% coverage)
 
-## 2. Phase 2: Configurable Paths (Current: 57.0%, Target: 60%)
+## 2. Phase 2: Configurable Paths (Complete: 57.0%)
 
-**Status: IN PROGRESS**
-
-### 2.1 Created config_paths.go for Testability
-- [x] Added stratuxHome variable (replaces STRATUX_HOME constant)
-- [x] Added logDirPath variable (replaces logDir constant)
-- [x] Added varLogDirPath variable (replaces varLogDir constant)
+### 2.1 Created config_paths.go
+- [x] Added stratuxHome variable
+- [x] Added logDirPath variable
+- [x] Added varLogDirPath variable
 - [x] Added resetPathsToDefaults() function (100% coverage)
 
 ### 2.2 Logging Function Improvements
-- [x] Refactored getStratuxLogFiles to use logDirPath (77.8% → 100%)
-- [x] Refactored rotateLogs to use configurable paths (33.3% → 100%)
-- [x] Refactored deleteOldestLog to use configurable paths (27.3% → 81.8%)
+- [x] getStratuxLogFiles: 77.8% → 100%
+- [x] rotateLogs: 33.3% → 100%
+- [x] deleteOldestLog: 27.3% → 81.8%
 
 ### 2.3 Management Interface Improvements
-- [x] Refactored managementinterface.go to use varLogDirPath
-- [x] handleDeleteAHRSLogFiles tests with configurable paths (100%)
-- [x] handleDownloadAHRSLogsRequest tests (36.1% → 72.2%)
-- [x] viewLogs tests with configurable paths (77.5% → 85.0%)
+- [x] handleDownloadAHRSLogsRequest: 36.1% → 72.2%
+- [x] viewLogs: 77.5% → 85.0%
+- [x] handleDeleteAHRSLogFiles: 100%
 
-### 2.4 Remaining to reach 60% (~3% needed)
+## 3. Phase 3: Hardware Interface Mocking (Target: 70%)
 
-**Blockers for remaining functions:**
-- [ ] sendTrafficUpdates (45.1%) - blocked by network operations (WebSocket broadcasting)
-- [ ] processNMEALineLow (84.2%) - already heavily tested (91 test calls)
-- [ ] sdrKill (66.7%) - requires mock SDR device
-- [ ] lookupOgnTailNumber (42.9%) - reads from STRATUX_HOME constant
-- [ ] handleTilesets (50%) - reads from STRATUX_HOME constant
-- [ ] loadTile (9.5%) - reads from STRATUX_HOME constant
+### 3.1 Define GPS Interface
+- [ ] Create `SerialPortInterface` in gps.go
+- [ ] Define methods: Open, Read, Write, Close, SetReadDeadline
+- [ ] Create mock implementation for tests
+- [ ] Refactor gpsSerialReader to use interface
 
-**Note:** Many remaining functions have dependencies on:
-1. Hardware (SDR, GPS, sensors) that isn't available in test environment
-2. Network operations (real sockets, DHCP leases)
-3. Infinite loops (watchers, listeners)
+### 3.2 Define SDR Interface
+- [ ] Create `SDRDeviceInterface` in sdr.go
+- [ ] Define methods: Start, Stop, Kill, Status
+- [ ] Create mock implementation for tests
+- [ ] Refactor sdrWatcher to use interface
 
-**Next steps:** Consider making STRATUX_HOME configurable or adding more HTTP handler tests.
+### 3.3 Define Network Interface
+- [ ] Create `UDPWriterInterface` in network.go
+- [ ] Define methods: Write, Close, SetWriteDeadline
+- [ ] Create mock implementation for tests
+- [ ] Refactor network output functions to use interface
 
-## 3. Phase 3: Interface Mocking (Target: 75%)
+### 3.4 Expected Coverage Gains
+- [ ] gpsSerialReader: 0% → 80%+ (large function, ~200 lines)
+- [ ] sdrWatcher: 0% → 80%
+- [ ] networkOutWatcher: 0% → 80%
 
-### 3.1 Create Hardware Interfaces
-- [ ] Define GPSReader interface
-- [ ] Define SDRDevice interface
-- [ ] Define SensorReader interface
+## 4. Phase 4: Configurable Constants (Target: 75%)
 
-### 3.2 Create Network Interfaces
-- [ ] Define UDPSender interface
-- [ ] Define ConnectionManager interface
+### 4.1 Make STRATUX_HOME Configurable
+- [ ] Add stratuxHomePath variable to config_paths.go
+- [ ] Modify handleTilesets to use stratuxHomePath
+- [ ] Modify loadTile to use stratuxHomePath
+- [ ] Modify readMbTilesMetadata style URL detection
+- [ ] Modify lookupOgnTailNumber to use stratuxHomePath
+- [ ] Modify connectMbTilesArchive to use stratuxHomePath
 
-### 3.3 Refactor for Dependency Injection
-- [ ] Refactor GPS functions to use interfaces
-- [ ] Refactor network functions to use interfaces
+### 4.2 Test Tile Handlers
+- [ ] handleTilesets: 50% → 100%
+- [ ] handleTile: 80% → 100%
+- [ ] loadTile: 9.5% → 90%+
 
-## 4. Phase 4: Integration Tests (Target: 85%)
+### 4.3 Test OGN Functions
+- [ ] lookupOgnTailNumber: 42.9% → 90%+
+- [ ] Test OGN device database parsing
 
-### 4.1 Traffic Flow Tests
-- [ ] SDR input → parsing → traffic map → GDL90 output
-- [ ] Multi-source fusion (1090ES + UAT + OGN)
+## 5. Phase 5: Loop Extraction (Target: 82%)
 
-### 4.2 GPS Flow Tests
-- [ ] NMEA input → position update → ownship report
+### 5.1 Extract Heartbeat Logic
+- [ ] Create heartBeatOnce() function with all heartbeat logic
+- [ ] heartBeatSender calls heartBeatOnce in loop
+- [ ] Test heartBeatOnce with mock clock
+- [ ] heartBeatSender: 0% → 90%+
 
-### 4.3 Network Output Tests
-- [ ] Client connection lifecycle
-- [ ] Message queuing and throttling
+### 5.2 Extract Network Output Logic
+- [ ] Create processNetworkOutput() for single iteration
+- [ ] networkOutWatcher calls processNetworkOutput in loop
+- [ ] Test processNetworkOutput with mock connections
+- [ ] networkOutWatcher: 0% → 80%+
 
-## 5. Phase 5: Edge Cases (Target: 90%)
+### 5.3 Extract GPS Serial Logic
+- [ ] Create processSerialData() for single read
+- [ ] gpsSerialReader calls processSerialData in loop
+- [ ] Test processSerialData with mock serial port
+- [ ] gpsSerialReader: 0% → 80%+
 
-### 5.1 Error Path Testing
-- [ ] Network errors, timeouts
-- [ ] Invalid input data
-- [ ] Resource exhaustion
+### 5.4 Extract Other Watchers
+- [ ] logFileWatcher: Extract single iteration
+- [ ] dataLogWatchdog: Extract single iteration
+- [ ] monitorDHCPLeases: Extract single iteration
 
-### 5.2 Boundary Conditions
-- [ ] Max/min values
-- [ ] Empty inputs
-- [ ] Concurrent access
+## 6. Phase 6: Integration Tests (Target: 88%)
+
+### 6.1 Traffic Flow Tests
+- [ ] Create test_integration.go file
+- [ ] Test: SDR message → parseInput → traffic map update
+- [ ] Test: Traffic map → makeTrafficReport → GDL90 message
+- [ ] Test: Multi-source traffic fusion (1090ES + UAT + OGN)
+- [ ] Test: Traffic aging and expiration
+
+### 6.2 GPS Flow Tests
+- [ ] Test: NMEA sentence → processNMEALineLow → mySituation update
+- [ ] Test: Position update → makeOwnshipReport → GDL90 message
+- [ ] Test: GPS fix validation and filtering
+
+### 6.3 Network Output Tests
+- [ ] Test: Message queuing per client
+- [ ] Test: Client throttling behavior
+- [ ] Test: Client connection/disconnection lifecycle
+- [ ] Test: Broadcast to multiple clients
+
+### 6.4 WebSocket Tests
+- [ ] Test: Traffic WebSocket message format
+- [ ] Test: Weather WebSocket message format
+- [ ] Test: Radar WebSocket message format
+- [ ] Test: Client subscription lifecycle
+
+## 7. Phase 7: Edge Cases & Error Paths (Target: 90%+)
+
+### 7.1 Network Error Handling
+- [ ] Test UDP write failure recovery
+- [ ] Test TCP connection timeout
+- [ ] Test WebSocket disconnect handling
+- [ ] Test ICMP permission errors
+
+### 7.2 Input Validation
+- [ ] Test malformed NMEA sentences
+- [ ] Test invalid ADS-B messages
+- [ ] Test corrupted MBTiles databases
+- [ ] Test invalid JSON settings
+
+### 7.3 Resource Limits
+- [ ] Test max traffic targets limit
+- [ ] Test message queue overflow
+- [ ] Test log rotation under pressure
+- [ ] Test database write failures
+
+### 7.4 Concurrent Access
+- [ ] Test concurrent traffic map updates
+- [ ] Test concurrent settings changes
+- [ ] Test concurrent client connections
+- [ ] Test mutex deadlock prevention
+
+### 7.5 Boundary Conditions
+- [ ] Test latitude/longitude at limits (±90°, ±180°)
+- [ ] Test altitude at extremes (0, FL600)
+- [ ] Test speed at limits (0, Mach 3)
+- [ ] Test timestamp edge cases
 
 ## Success Criteria
-- [ ] Coverage reaches 60% (minimum)
+- [ ] Coverage reaches 90%+
 - [x] All tests pass in CI
-- [ ] No flaky tests
+- [ ] No flaky tests (TestMonotonicTimeAdvancement needs fixing)
 - [ ] Test execution time < 120 seconds
+- [ ] No hardware dependencies in unit tests
+
+## Estimated Coverage by Phase
+
+| Phase | Target | Estimated Coverage | LOC Change |
+|-------|--------|-------------------|------------|
+| Phase 1 | 60% | 56.5% (Complete) | +6,000 |
+| Phase 2 | 60% | 57.0% (Complete) | +500 |
+| Phase 3 | 70% | ~70% | +1,500 |
+| Phase 4 | 75% | ~75% | +800 |
+| Phase 5 | 82% | ~82% | +1,200 |
+| Phase 6 | 88% | ~88% | +2,000 |
+| Phase 7 | 90%+ | ~90%+ | +1,500 |
+
+Total estimated new test code: ~7,500 lines
