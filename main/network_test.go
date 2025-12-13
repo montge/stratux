@@ -1041,10 +1041,12 @@ func TestCollectMessages_SingleMessage(t *testing.T) {
 	}
 
 	conn := &networkConnection{
-		Ip:         "192.168.10.100",
-		Port:       4000,
-		Capability: NETWORK_GDL90_STANDARD,
-		Queue:      NewMessageQueue(10),
+		Ip:               "192.168.10.100",
+		Port:             4000,
+		Capability:       NETWORK_GDL90_STANDARD,
+		Queue:            NewMessageQueue(10),
+		LastPongResponse: stratuxClock.Time, // Set to prevent IsSleeping() from returning true
+		LastPingResponse: stratuxClock.Time,
 	}
 
 	testMsg := []byte{0x7E, 0x00, 0x01, 0x02, 0x03, 0x7E}
@@ -1070,10 +1072,12 @@ func TestCollectMessages_MultipleMessages(t *testing.T) {
 	}
 
 	conn := &networkConnection{
-		Ip:         "192.168.10.100",
-		Port:       4000,
-		Capability: NETWORK_GDL90_STANDARD,
-		Queue:      NewMessageQueue(10),
+		Ip:               "192.168.10.100",
+		Port:             4000,
+		Capability:       NETWORK_GDL90_STANDARD,
+		Queue:            NewMessageQueue(10),
+		LastPongResponse: stratuxClock.Time, // Set to prevent IsSleeping() from returning true
+		LastPingResponse: stratuxClock.Time,
 	}
 
 	msg1 := []byte{0x7E, 0x00, 0x01, 0x7E}
