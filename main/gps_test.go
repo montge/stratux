@@ -481,8 +481,8 @@ func TestUpdateConstellation(t *testing.T) {
 		SatelliteID:      "G01",
 		Signal:           45,
 		InSolution:       true,
-		TimeLastTracked:  stratuxClock.Time,
-		TimeLastSolution: stratuxClock.Time,
+		TimeLastTracked:  stratuxClock.GetTime(),
+		TimeLastSolution: stratuxClock.GetTime(),
 	}
 
 	// Add another fresh satellite with no signal
@@ -490,7 +490,7 @@ func TestUpdateConstellation(t *testing.T) {
 		SatelliteID:     "G02",
 		Signal:          0,
 		InSolution:      false,
-		TimeLastTracked: stratuxClock.Time,
+		TimeLastTracked: stratuxClock.GetTime(),
 	}
 
 	updateConstellation()
@@ -543,7 +543,7 @@ func TestUpdateConstellation_StaleSatellites(t *testing.T) {
 	Satellites = make(map[string]SatelliteInfo)
 
 	// Add a stale satellite (tracked more than 10 seconds ago)
-	staleTime := stratuxClock.Time.Add(-15 * time.Second)
+	staleTime := stratuxClock.GetTime().Add(-15 * time.Second)
 	Satellites["G05"] = SatelliteInfo{
 		SatelliteID:     "G05",
 		Signal:          30,
@@ -556,8 +556,8 @@ func TestUpdateConstellation_StaleSatellites(t *testing.T) {
 		SatelliteID:      "G06",
 		Signal:           40,
 		InSolution:       true,
-		TimeLastTracked:  stratuxClock.Time,
-		TimeLastSolution: stratuxClock.Time,
+		TimeLastTracked:  stratuxClock.GetTime(),
+		TimeLastSolution: stratuxClock.GetTime(),
 	}
 
 	// Verify we have 2 satellites before update
@@ -610,12 +610,12 @@ func TestUpdateConstellation_SolutionTimeout(t *testing.T) {
 	Satellites = make(map[string]SatelliteInfo)
 
 	// Add a satellite with old solution time (more than 5 seconds ago)
-	oldSolutionTime := stratuxClock.Time.Add(-8 * time.Second)
+	oldSolutionTime := stratuxClock.GetTime().Add(-8 * time.Second)
 	Satellites["G10"] = SatelliteInfo{
 		SatelliteID:      "G10",
 		Signal:           50,
 		InSolution:       true, // Currently marked as in solution
-		TimeLastTracked:  stratuxClock.Time,
+		TimeLastTracked:  stratuxClock.GetTime(),
 		TimeLastSolution: oldSolutionTime, // 8 seconds ago
 	}
 
@@ -1400,7 +1400,7 @@ func TestCalcGPSAttitude(t *testing.T) {
 	t.Run("single_point", func(t *testing.T) {
 		myGPSPerfStats = []gpsPerfStats{
 			{
-				stratuxTime: stratuxClock.Milliseconds,
+				stratuxTime: stratuxClock.GetMilliseconds(),
 				nmeaTime:    100.0,
 				msgType:     "GPRMC",
 				gsf:         50.0,
@@ -1421,7 +1421,7 @@ func TestCalcGPSAttitude(t *testing.T) {
 
 	t.Run("stale_data", func(t *testing.T) {
 		// Create data that's more than 3 seconds old
-		oldTime := stratuxClock.Milliseconds - 4000
+		oldTime := stratuxClock.GetMilliseconds() - 4000
 		myGPSPerfStats = []gpsPerfStats{
 			{stratuxTime: oldTime, nmeaTime: 100.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
 			{stratuxTime: oldTime, nmeaTime: 100.5, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
@@ -1435,8 +1435,8 @@ func TestCalcGPSAttitude(t *testing.T) {
 
 	t.Run("time_jump_forward", func(t *testing.T) {
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 105.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 105.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 1000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -1448,8 +1448,8 @@ func TestCalcGPSAttitude(t *testing.T) {
 	t.Run("no_speed_data", func(t *testing.T) {
 		// Only GGA messages, no RMC (which have speed)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPGGA", gsf: 0, coursef: -1, alt: 1000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.5, msgType: "GPGGA", gsf: 0, coursef: -1, alt: 1010.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.0, msgType: "GPGGA", gsf: 0, coursef: -1, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.5, msgType: "GPGGA", gsf: 0, coursef: -1, alt: 1010.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -1461,8 +1461,8 @@ func TestCalcGPSAttitude(t *testing.T) {
 	t.Run("insufficient_altitude_data", func(t *testing.T) {
 		// Only one GGA message - not enough for vertical velocity calculation
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.2, msgType: "GPGGA", gsf: 50.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.0, msgType: "GPRMC", gsf: 50.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.2, msgType: "GPGGA", gsf: 50.0, coursef: 90.0, alt: 1000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -1475,10 +1475,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Speed < 6 ft/sec (~3.55 knots) should return true with zero attitude
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.6, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.6, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1498,12 +1498,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Medium speed, level flight
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 60.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 60.0, coursef: 90.0, alt: 1000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1526,12 +1526,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Climbing at constant speed and heading
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1020.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1040.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1020.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1040.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1551,12 +1551,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Descending at constant speed and heading
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1980.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1960.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1980.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 1960.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1576,12 +1576,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Turning right at constant speed and altitude
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 100.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 100.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 100.0, coursef: 93.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 100.0, coursef: 93.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 100.0, coursef: 96.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 100.0, coursef: 96.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 100.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 100.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 100.0, coursef: 93.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 100.0, coursef: 93.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 100.0, coursef: 96.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 100.0, coursef: 96.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1609,10 +1609,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// High speed flight (>20 ft/sec) should calculate pitch and roll
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 120.0, coursef: 180.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 120.0, coursef: 180.0, alt: 3000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 120.0, coursef: 180.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 120.0, coursef: 180.0, alt: 3000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 120.0, coursef: 180.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 120.0, coursef: 180.0, alt: 3000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 120.0, coursef: 180.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 120.0, coursef: 180.0, alt: 3000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1625,12 +1625,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test heading wrapping from 359 to 1 (crossing north)
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 358.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 358.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 1.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 1.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 4.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 4.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 358.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 358.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 1.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 1.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 4.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 4.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1648,10 +1648,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Only one valid heading data point
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: -1, alt: 0}, // invalid course
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // only one valid
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: -1, alt: 0}, // invalid course
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // only one valid
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -1665,12 +1665,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// The function should detect rollover and adjust time or handle it gracefully
 		// Need enough data points for altitude regression (at least 2 GGA messages)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86389.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:49.8
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86389.9, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86390.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:50
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86390.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 10.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 00:00:10 next day
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 10.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86389.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:49.8
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86389.9, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86390.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:50
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86390.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 10.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 00:00:10 next day
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 10.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		// The function should either succeed after rollover adjustment or gracefully handle the rollover
@@ -1694,14 +1694,14 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Create a proper rollover scenario that should succeed
 		baseTime := float32(86395.0) // 23:59:55
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 5.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 00:00:05 next day
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 5.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 5.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 00:00:05 next day
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 5.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		// Should succeed and adjust time
@@ -1713,14 +1713,14 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test full array rebase when all times > 86401 after rollover adjustment
 		// Create scenario where last entry crosses midnight and triggers rebase
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86395.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86395.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86395.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86395.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86395.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86395.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 10.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 00:00:10 - triggers rollover
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 10.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86395.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86395.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86395.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86395.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86395.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86395.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 10.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 00:00:10 - triggers rollover
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 10.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		idx := len(myGPSPerfStats) - 1
@@ -1739,10 +1739,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 	t.Run("negative_time_non_rollover", func(t *testing.T) {
 		// Test dt < 0 but NOT at midnight (should fail)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 50000.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 50000.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 49995.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // time went backwards
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 49995.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 50000.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 50000.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 49995.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // time went backwards
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 49995.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -1754,10 +1754,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 	t.Run("rollover_with_dt_still_too_large", func(t *testing.T) {
 		// Test rollover adjustment but dt still > 3 after adjustment
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86390.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86390.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 20.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Big gap even after rollover
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 20.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86390.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86390.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 20.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Big gap even after rollover
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 20.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -1770,9 +1770,9 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test with exactly one RMC message (single speed point)
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1786,10 +1786,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Use extreme or inconsistent speed values
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0}, // Same time
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 0, coursef: 90.0, alt: 0},      // Same time
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0}, // Same time
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0}, // Same time
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 0, coursef: 90.0, alt: 0},      // Same time
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0}, // Same time
 		}
 		result := calcGPSAttitude()
 		// This might fail due to regression issues with identical timestamps
@@ -1800,10 +1800,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Create a scenario that causes invalid vertical velocity regression
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // Same time
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2010.0}, // Same time as first GGA
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // Same time
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2010.0}, // Same time as first GGA
 		}
 		result := calcGPSAttitude()
 		// This might fail due to regression issues
@@ -1814,10 +1814,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Create a scenario that causes invalid heading regression
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // Same time
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},      // Same heading/time
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // Same time
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},      // Same heading/time
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		// This might fail due to regression issues with identical timestamps
@@ -1829,12 +1829,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// 10 ft/sec = ~5.9 knots, so use 8 knots
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 8.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 8.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 8.0, coursef: 95.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 8.0, coursef: 95.0, alt: 2010.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 8.0, coursef: 100.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 8.0, coursef: 100.0, alt: 2020.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 8.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 8.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 8.0, coursef: 95.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 8.0, coursef: 95.0, alt: 2010.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 8.0, coursef: 100.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 8.0, coursef: 100.0, alt: 2020.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1859,12 +1859,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test heading wrapping from NW to NE (e.g., 350 to 10)
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 350.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 350.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 355.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 355.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 2.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 2.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 350.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 350.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 355.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 355.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 2.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 2.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1878,12 +1878,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test heading wrapping backward from NE to NW (e.g., 10 to 350) - left turn
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 10.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 10.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 5.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 5.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 358.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 358.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 10.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 10.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 5.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 5.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 358.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 358.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1901,10 +1901,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test with GNSS messages (GNRMC/GNGGA) instead of GPS (GPRMC/GPGGA)
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GNRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GNGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GNRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GNGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GNRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GNGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GNRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GNGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1917,10 +1917,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test with mixed GP and GN messages
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GNGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GNRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GNGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GNRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1937,10 +1937,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1957,10 +1957,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.6, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 2.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.6, msgType: "GPGGA", gsf: 2.0, coursef: 90.0, alt: 1000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -1977,10 +1977,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: -1, alt: 0}, // invalid course
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // only one valid
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: -1, alt: 0}, // invalid course
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // only one valid
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: -1, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -1993,12 +1993,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test heading unwrapping with small changes (< 180 degrees)
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 120.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 120.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 150.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 150.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 120.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 120.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 150.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 150.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -2011,16 +2011,16 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Create a scenario that successfully goes through full rollover with rebase
 		// All old times near midnight, then one crosses over, then all get rebased
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 5.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Crosses midnight
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 5.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 5.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Crosses midnight
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 5.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		// This should succeed: time gets adjusted to 86405, minTime > 86401, all times rebased down
@@ -2036,10 +2036,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// 6 ft/sec / 1.687810 = 3.555 knots
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 3.555, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 3.555, coursef: 90.0, alt: 1000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 3.555, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.6, msgType: "GPGGA", gsf: 3.555, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 3.555, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 3.555, coursef: 90.0, alt: 1000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 3.555, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.6, msgType: "GPGGA", gsf: 3.555, coursef: 90.0, alt: 1000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -2054,12 +2054,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// 20 ft/sec / 1.687810 = 11.85 knots
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 11.85, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 11.85, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 11.85, coursef: 95.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 11.85, coursef: 95.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 11.85, coursef: 100.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 11.85, coursef: 100.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 11.85, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 11.85, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 11.85, coursef: 95.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 11.85, coursef: 95.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 11.85, coursef: 100.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 11.85, coursef: 100.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -2074,12 +2074,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// 21 ft/sec / 1.687810 = 12.44 knots
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 12.5, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 12.5, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 12.5, coursef: 95.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 12.5, coursef: 95.0, alt: 2010.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 12.5, coursef: 100.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 12.5, coursef: 100.0, alt: 2020.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 12.5, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 12.5, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 12.5, coursef: 95.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 12.5, coursef: 95.0, alt: 2010.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 12.5, coursef: 100.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 12.5, coursef: 100.0, alt: 2020.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -2095,12 +2095,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test left turn at high speed (negative turn rate, negative roll)
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 100.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 100.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 100.0, coursef: 87.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 100.0, coursef: 87.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 100.0, coursef: 84.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 100.0, coursef: 84.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 100.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 100.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 100.0, coursef: 87.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 100.0, coursef: 87.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 100.0, coursef: 84.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 100.0, coursef: 84.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -2125,11 +2125,11 @@ func TestCalcGPSAttitude(t *testing.T) {
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
 			// Only one RMC message with speed data
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 75.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 75.0, coursef: 90.0, alt: 0},
 			// Multiple GGA messages with altitude
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -2144,13 +2144,13 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test the exact boundary condition for rollover detection
 		// Line 739: index-1 must be > 86300 and index must be < 100
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86301.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86301.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86301.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86301.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86301.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86301.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86301.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86301.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 			// Rollover happens here: previous is 86301.3, current is 99.9
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 99.9, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 99.95, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 99.9, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 99.95, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		idx := len(myGPSPerfStats) - 1
@@ -2166,10 +2166,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test just outside the rollover boundary (should fail)
 		// Previous time is 86299 (< 86300) so rollover logic won't trigger
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86299.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86299.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 50.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 50.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86299.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86299.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 50.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 50.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -2182,10 +2182,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test the boundary for current time in rollover (must be < 100)
 		// Current time is exactly 100.0, should be outside the rollover window
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86350.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86350.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86350.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86350.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -2198,13 +2198,13 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test the exact boundary for full array rebase (line 754)
 		// minTime must be > 86401.0 to trigger rebase
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86402.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86402.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86402.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86402.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 			// Trigger rollover
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 20.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 20.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 20.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 20.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -2220,13 +2220,13 @@ func TestCalcGPSAttitude(t *testing.T) {
 	t.Run("minTime_just_below_86401", func(t *testing.T) {
 		// Test minTime = 86400.5 (< 86401.0), should NOT trigger full rebase
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86400.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86400.6, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86400.7, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86400.8, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86400.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86400.6, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86400.7, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86400.8, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 			// Trigger rollover
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 15.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 15.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 15.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 15.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -2251,14 +2251,14 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Create an array where some middle entry causes issues
 		myGPSPerfStats = []gpsPerfStats{
 			// First entries are normal
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 			// These will be the last two entries
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
 			// This one goes backwards slightly (not a rollover scenario)
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 100.4, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 100.4, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		// Should fail because dt < 0 and it's not a rollover scenario
@@ -2273,12 +2273,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// This tests line 921: if math.Abs(tempHdg[i]-tempHdg[i-1]) < 180
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 0.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 0.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 180.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 180.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 0.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 0.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 180.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 180.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -2296,12 +2296,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Example: heading goes from 10 to 350 (increase of 340, but should be -10)
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 10.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 10.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 5.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 5.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 350.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 350.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 10.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 10.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 5.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 5.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 350.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 350.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if !result {
@@ -2319,16 +2319,16 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// to trigger dt < 0
 		baseTime := float32(86399.0) // 23:59:59
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:59.8
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 0.9, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},       // 00:00:00.9 - THIS triggers dt < 0
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:59.8
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 0.9, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},       // 00:00:00.9 - THIS triggers dt < 0
 		}
 		result := calcGPSAttitude()
 		idx := len(myGPSPerfStats) - 1
@@ -2346,16 +2346,16 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// and now we get a new entry that crosses midnight again
 		// After adding 86400 to the last entry, ALL entries will be > 86401, triggering rebase
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Already adjusted from previous rollover
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.6, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.7, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.8, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86401.9, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.0, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86402.3, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 2.4, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // New data after "midnight" - will become 86402.4, minTime=86401.5 > 86401
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86401.5, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Already adjusted from previous rollover
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86401.6, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86401.7, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86401.8, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86401.9, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86402.0, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86402.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86402.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86402.3, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 2.4, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // New data after "midnight" - will become 86402.4, minTime=86401.5 > 86401
 		}
 		result := calcGPSAttitude()
 		idx := len(myGPSPerfStats) - 1
@@ -2368,14 +2368,14 @@ func TestCalcGPSAttitude(t *testing.T) {
 	t.Run("rollover_dt_exactly_3_seconds", func(t *testing.T) {
 		// Test the boundary condition where dt == 3 after rollover (should pass the > 3 check)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86397.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // dt after adjustment = 3.0
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86397.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86397.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86397.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86397.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86397.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86397.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 0.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // dt after adjustment = 3.0
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 0.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		t.Logf("dt=3 boundary test: result=%v", result)
@@ -2385,10 +2385,10 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test the case where after rollover adjustment, dt is still negative (line 767-770)
 		// This is a pathological case but should be handled
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86398.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86350.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Older time (strange GPS behavior)
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86350.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86398.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86350.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // Older time (strange GPS behavior)
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86350.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -2401,12 +2401,12 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test heading regression with all identical timestamps to trigger invalid regression (line 940)
 		baseTime := float32(100.0)
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2010.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2020.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2010.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.1, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: baseTime + 0.2, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2020.0},
 		}
 		result := calcGPSAttitude()
 		// May fail due to heading regression issues with duplicate timestamps
@@ -2417,16 +2417,16 @@ func TestCalcGPSAttitude(t *testing.T) {
 		// Test rollover where after adjustment, dt is > 3 seconds (line 764-766)
 		// Last entry is way ahead after adjustment
 		myGPSPerfStats = []gpsPerfStats{
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 86399.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 5.0, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // After adjustment: 86405.0, dt = 5.2 seconds
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.0, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.1, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.2, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.3, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.4, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.5, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 86399.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
+			{stratuxTime: stratuxClock.GetMilliseconds(), nmeaTime: 5.0, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // After adjustment: 86405.0, dt = 5.2 seconds
 		}
 		result := calcGPSAttitude()
 		if result {
@@ -3065,7 +3065,7 @@ func TestProcessNMEALineLow_PGRMZ(t *testing.T) {
 
 			// For BMP280/OGNTRACKER tests, set recent time to make isTempPressValid() return true
 			if tc.baroSourceType == BARO_TYPE_BMP280 || tc.baroSourceType == BARO_TYPE_OGNTRACKER {
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			} else {
 				mySituation.BaroLastMeasurementTime = time.Time{}
 			}
@@ -3868,7 +3868,7 @@ func TestProcessNMEALineLow_Comprehensive(t *testing.T) {
 
 	t.Run("GPGSA skips accuracy when GST recent", func(t *testing.T) {
 		Satellites = make(map[string]SatelliteInfo)
-		mySituation.GPSLastAccuracyTime = stratuxClock.Time // Recent GST
+		mySituation.GPSLastAccuracyTime = stratuxClock.GetTime() // Recent GST
 		mySituation.GPSHorizontalAccuracy = 99.0
 		result := processNMEALineLow("$GPGSA,A,3,01,02,03,04,,,,,,,,,2.0,1.5,1.3*32", false)
 		if !result {
@@ -4110,7 +4110,7 @@ func TestProcessNMEALineLow_Comprehensive(t *testing.T) {
 	t.Run("POGNB ignored when BMP280 present", func(t *testing.T) {
 		origAlt := mySituation.BaroPressureAltitude
 		mySituation.BaroSourceType = BARO_TYPE_BMP280
-		mySituation.BaroLastMeasurementTime = stratuxClock.Time
+		mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 		result := processNMEALineLow("$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,-0.04,+32.6*47", false)
 		if !result {
 			t.Error("Expected POGNB to be processed but ignored")
@@ -4916,28 +4916,28 @@ func TestIsGPSConnected(t *testing.T) {
 	}
 
 	t.Run("GPS connected - recent message", func(t *testing.T) {
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
 		if !isGPSConnected() {
 			t.Error("Expected GPS to be connected with recent NMEA message")
 		}
 	})
 
 	t.Run("GPS not connected - old message", func(t *testing.T) {
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time.Add(-10 * time.Second)
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime().Add(-10 * time.Second)
 		if isGPSConnected() {
 			t.Error("Expected GPS to not be connected with old NMEA message")
 		}
 	})
 
 	t.Run("GPS connected - exactly 4 seconds ago", func(t *testing.T) {
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time.Add(-4 * time.Second)
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime().Add(-4 * time.Second)
 		if !isGPSConnected() {
 			t.Error("Expected GPS to be connected at 4 seconds")
 		}
 	})
 
 	t.Run("GPS not connected - exactly 5 seconds ago", func(t *testing.T) {
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time.Add(-5 * time.Second)
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime().Add(-5 * time.Second)
 		if isGPSConnected() {
 			t.Error("Expected GPS to not be connected at 5 seconds")
 		}
@@ -4951,14 +4951,14 @@ func TestIsGPSClockValid(t *testing.T) {
 	}
 
 	t.Run("GPS clock valid - recent time", func(t *testing.T) {
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 		if !isGPSClockValid() {
 			t.Error("Expected GPS clock to be valid with recent GPS time")
 		}
 	})
 
 	t.Run("GPS clock invalid - old time", func(t *testing.T) {
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time.Add(-20 * time.Second)
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime().Add(-20 * time.Second)
 		if isGPSClockValid() {
 			t.Error("Expected GPS clock to be invalid with old GPS time")
 		}
@@ -4972,14 +4972,14 @@ func TestIsGPSClockValid(t *testing.T) {
 	})
 
 	t.Run("GPS clock valid - exactly 14 seconds ago", func(t *testing.T) {
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time.Add(-14 * time.Second)
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime().Add(-14 * time.Second)
 		if !isGPSClockValid() {
 			t.Error("Expected GPS clock to be valid at 14 seconds")
 		}
 	})
 
 	t.Run("GPS clock invalid - exactly 15 seconds ago", func(t *testing.T) {
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time.Add(-15 * time.Second)
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime().Add(-15 * time.Second)
 		if isGPSClockValid() {
 			t.Error("Expected GPS clock to be invalid at 15 seconds")
 		}

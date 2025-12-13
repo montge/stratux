@@ -172,9 +172,9 @@ func TestUpdateMessageStats(t *testing.T) {
 		// Add UAT messages
 		msgLogMutex.Lock()
 		msgLog = []msg{
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT},
 		}
 		msgLogMutex.Unlock()
 
@@ -188,8 +188,8 @@ func TestUpdateMessageStats(t *testing.T) {
 	t.Run("es_messages", func(t *testing.T) {
 		msgLogMutex.Lock()
 		msgLog = []msg{
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_ES},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_ES},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_ES},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_ES},
 		}
 		msgLogMutex.Unlock()
 
@@ -203,7 +203,7 @@ func TestUpdateMessageStats(t *testing.T) {
 	t.Run("ogn_messages", func(t *testing.T) {
 		msgLogMutex.Lock()
 		msgLog = []msg{
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_OGN},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_OGN},
 		}
 		msgLogMutex.Unlock()
 
@@ -217,10 +217,10 @@ func TestUpdateMessageStats(t *testing.T) {
 	t.Run("ais_messages", func(t *testing.T) {
 		msgLogMutex.Lock()
 		msgLog = []msg{
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_AIS},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_AIS},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_AIS},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_AIS},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_AIS},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_AIS},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_AIS},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_AIS},
 		}
 		msgLogMutex.Unlock()
 
@@ -234,11 +234,11 @@ func TestUpdateMessageStats(t *testing.T) {
 	t.Run("mixed_messages", func(t *testing.T) {
 		msgLogMutex.Lock()
 		msgLog = []msg{
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_ES},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_OGN},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_AIS},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_ES},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_OGN},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_AIS},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT},
 		}
 		msgLogMutex.Unlock()
 
@@ -260,12 +260,12 @@ func TestUpdateMessageStats(t *testing.T) {
 
 	t.Run("old_messages_filtered", func(t *testing.T) {
 		// Add old messages (> 1 minute old)
-		oldTime := stratuxClock.Time.Add(-2 * time.Minute)
+		oldTime := stratuxClock.GetTime().Add(-2 * time.Minute)
 		msgLogMutex.Lock()
 		msgLog = []msg{
 			{TimeReceived: oldTime, MessageClass: MSGCLASS_UAT},
 			{TimeReceived: oldTime, MessageClass: MSGCLASS_ES},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT}, // Recent
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT}, // Recent
 		}
 		msgLogMutex.Unlock()
 
@@ -286,11 +286,11 @@ func TestUpdateMessageStats(t *testing.T) {
 
 		msgLogMutex.Lock()
 		msgLog = []msg{
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_UAT},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_ES},
-			{TimeReceived: stratuxClock.Time, MessageClass: MSGCLASS_ES},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_UAT},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_ES},
+			{TimeReceived: stratuxClock.GetTime(), MessageClass: MSGCLASS_ES},
 		}
 		msgLogMutex.Unlock()
 
@@ -312,7 +312,7 @@ func TestUpdateMessageStats(t *testing.T) {
 		msgLogMutex.Lock()
 		msgLog = []msg{
 			{
-				TimeReceived:     stratuxClock.Time,
+				TimeReceived:     stratuxClock.GetTime(),
 				MessageClass:     MSGCLASS_UAT,
 				ADSBTowerID:      "TOWER1",
 				Signal_strength:  -20.0,
@@ -320,7 +320,7 @@ func TestUpdateMessageStats(t *testing.T) {
 				uatMsg:           &uatparse.UATMsg{Lat: 40.0, Lon: -75.0},
 			},
 			{
-				TimeReceived:     stratuxClock.Time,
+				TimeReceived:     stratuxClock.GetTime(),
 				MessageClass:     MSGCLASS_UAT,
 				ADSBTowerID:      "TOWER1",
 				Signal_strength:  -15.0,
@@ -357,7 +357,7 @@ func TestUpdateMessageStats(t *testing.T) {
 		msgLogMutex.Lock()
 		msgLog = []msg{
 			{
-				TimeReceived:     stratuxClock.Time,
+				TimeReceived:     stratuxClock.GetTime(),
 				MessageClass:     MSGCLASS_UAT,
 				ADSBTowerID:      "TOWER2",
 				Signal_strength:  -25.0,
@@ -365,7 +365,7 @@ func TestUpdateMessageStats(t *testing.T) {
 				uatMsg:           &uatparse.UATMsg{Lat: 41.0, Lon: -76.0},
 			},
 			{
-				TimeReceived:     stratuxClock.Time,
+				TimeReceived:     stratuxClock.GetTime(),
 				MessageClass:     MSGCLASS_UAT,
 				ADSBTowerID:      "TOWER2",
 				Signal_strength:  -30.0,
@@ -464,7 +464,7 @@ func TestUpdateStatus(t *testing.T) {
 	// Set GPS as connected for these tests
 	globalStatus.GPS_connected = true
 	// Also set recent NMEA message time so isGPSConnected() returns true
-	mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+	mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
 
 	testCases := []struct {
 		name           string
@@ -596,7 +596,7 @@ func TestUpdateStatus_AHRSLogFiles(t *testing.T) {
 
 	// Set GPS as connected
 	globalStatus.GPS_connected = true
-	mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+	mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 1
 
 	// Create test sensor log files in /var/log
@@ -667,7 +667,7 @@ func TestUpdateStatus_CompleteCoverage(t *testing.T) {
 	t.Run("AHRS log files scanning without root", func(t *testing.T) {
 		// Set GPS as connected
 		globalStatus.GPS_connected = true
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
 		mySituation.GPSFixQuality = 1
 
 		// This tests the AHRS log file scanning code (lines 1011-1021)
@@ -691,7 +691,7 @@ func TestUpdateStatus_CompleteCoverage(t *testing.T) {
 		// Set GPS_connected to true but make isGPSConnected() return false
 		// by setting an old NMEA message time
 		globalStatus.GPS_connected = true
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time.Add(-10 * time.Minute)
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime().Add(-10 * time.Minute)
 		mySituation.GPSFixQuality = 2
 		mySituation.GPSSatellites = 5
 		mySituation.GPSSatellitesSeen = 10
@@ -714,7 +714,7 @@ func TestUpdateStatus_CompleteCoverage(t *testing.T) {
 	t.Run("GPS_connected false initially", func(t *testing.T) {
 		// Test the first condition in line 984: !(globalStatus.GPS_connected)
 		globalStatus.GPS_connected = false
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time // Valid time but GPS_connected is false
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime() // Valid time but GPS_connected is false
 		mySituation.GPSFixQuality = 2
 		mySituation.GPSSatellites = 5
 
@@ -732,7 +732,7 @@ func TestUpdateStatus_CompleteCoverage(t *testing.T) {
 	t.Run("All GPS status fields updated", func(t *testing.T) {
 		// Test that all GPS status fields are properly copied from mySituation
 		globalStatus.GPS_connected = true
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
 		mySituation.GPSFixQuality = 1
 		mySituation.GPSSatellites = 7
 		mySituation.GPSSatellitesSeen = 12
@@ -759,7 +759,7 @@ func TestUpdateStatus_CompleteCoverage(t *testing.T) {
 	t.Run("Uptime and disk usage updated", func(t *testing.T) {
 		// Test that uptime and disk usage fields are updated (lines 1004-1009)
 		globalStatus.GPS_connected = true
-		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
 		mySituation.GPSFixQuality = 1
 
 		beforeUptime := globalStatus.Uptime
@@ -767,13 +767,13 @@ func TestUpdateStatus_CompleteCoverage(t *testing.T) {
 		updateStatus()
 
 		// Uptime should be set to current clock value (line 1004)
-		if globalStatus.Uptime != int64(stratuxClock.Milliseconds) {
-			t.Errorf("Expected Uptime to match stratuxClock.Milliseconds")
+		if globalStatus.Uptime != int64(stratuxClock.GetMilliseconds()) {
+			t.Errorf("Expected Uptime to match stratuxClock.GetMilliseconds()")
 		}
 
 		// UptimeClock should be set (line 1005)
-		if globalStatus.UptimeClock != stratuxClock.Time {
-			t.Errorf("Expected UptimeClock to match stratuxClock.Time")
+		if globalStatus.UptimeClock != stratuxClock.GetTime() {
+			t.Errorf("Expected UptimeClock to match stratuxClock.GetTime()")
 		}
 
 		// DiskBytesFree should be set (line 1008)

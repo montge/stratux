@@ -64,7 +64,7 @@ func resetAISState() {
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSAltitudeMSL = 0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
 }
@@ -178,7 +178,7 @@ func TestAISTrafficSource(t *testing.T) {
 		TargetType:       TARGET_TYPE_AIS,
 		Emitter_category: 18, // Ground vehicle for AIS
 		Addr_type:        1,  // Non-ICAO
-		Last_seen:        stratuxClock.Time,
+		Last_seen:        stratuxClock.GetTime(),
 		Lat:              37.78,
 		Lng:              -122.42,
 		Position_valid:   true,
@@ -227,8 +227,8 @@ func TestAISTrafficFields(t *testing.T) {
 		Alt:              0,    // AIS vessels at sea level
 		OnGround:         true, // AIS is always "on ground"
 		AltIsGNSS:        false,
-		Last_seen:        stratuxClock.Time,
-		Last_alt:         stratuxClock.Time,
+		Last_seen:        stratuxClock.GetTime(),
+		Last_alt:         stratuxClock.GetTime(),
 		Lat:              37.78,
 		Lng:              -122.42,
 		Speed:            12,
@@ -285,7 +285,7 @@ func TestAISDistanceFiltering(t *testing.T) {
 		Position_valid:    true,
 		BearingDist_valid: true,
 		Distance:          1000, // 1km away
-		Last_seen:         stratuxClock.Time,
+		Last_seen:         stratuxClock.GetTime(),
 	}
 	trafficMutex.Unlock()
 
@@ -370,7 +370,7 @@ func TestAISTrafficUpdate(t *testing.T) {
 		Speed:          10,
 		Track:          45.0,
 		Position_valid: true,
-		Last_seen:      stratuxClock.Time.Add(-5 * time.Second), // 5 seconds ago
+		Last_seen:      stratuxClock.GetTime().Add(-5 * time.Second), // 5 seconds ago
 	}
 	trafficMutex.Unlock()
 
@@ -381,7 +381,7 @@ func TestAISTrafficUpdate(t *testing.T) {
 	ti.Lng = -122.43
 	ti.Speed = 12
 	ti.Track = 50.0
-	ti.Last_seen = stratuxClock.Time
+	ti.Last_seen = stratuxClock.GetTime()
 	traffic[key] = ti
 	trafficMutex.Unlock()
 
@@ -448,7 +448,7 @@ func TestAISVesselStaticData(t *testing.T) {
 		Last_source:        TRAFFIC_SOURCE_AIS,
 		TargetType:         TARGET_TYPE_AIS,
 		SurfaceVehicleType: 70, // Cargo vessel
-		Last_seen:          stratuxClock.Time,
+		Last_seen:          stratuxClock.GetTime(),
 	}
 	trafficMutex.Unlock()
 
@@ -497,7 +497,7 @@ func TestAISSpeedAndCourseHandling(t *testing.T) {
 				Speed:       tc.sog,
 				Speed_valid: tc.expectValid,
 				Track:       tc.cog,
-				Last_seen:   stratuxClock.Time,
+				Last_seen:   stratuxClock.GetTime(),
 			}
 			trafficMutex.Unlock()
 
@@ -529,7 +529,7 @@ func TestAISLongRangeBroadcast(t *testing.T) {
 		Speed_valid:    true,
 		Track:          90.0,
 		Position_valid: true,
-		Last_seen:      stratuxClock.Time,
+		Last_seen:      stratuxClock.GetTime(),
 	}
 	trafficMutex.Unlock()
 
@@ -755,7 +755,7 @@ func TestImportAISTrafficMessage_DEBUG(t *testing.T) {
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSAltitudeMSL = 0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Valid Type 1 position report
@@ -779,7 +779,7 @@ func TestImportAISTrafficMessage_Type2PositionReport(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 4.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 2 position report (scheduled class A) - similar to Type 1
@@ -799,7 +799,7 @@ func TestImportAISTrafficMessage_Type3PositionReportITDMA(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 4.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 3 position report (interrogated class A)
@@ -818,7 +818,7 @@ func TestImportAISTrafficMessage_HighSpeed(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 4.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Standard AIS message - the high speed case (>102.3) is an internal flag
@@ -838,7 +838,7 @@ func TestImportAISTrafficMessage_InvalidROT(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 4.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// The RateOfTurn = -128 means "not available"
@@ -858,7 +858,7 @@ func TestImportAISTrafficMessage_Cog360(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 4.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// COG = 360 means "not available", so cog should be 0
@@ -877,7 +877,7 @@ func TestImportAISTrafficMessage_Heading511(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 4.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// TrueHeading = 511 means "not available"
@@ -896,7 +896,7 @@ func TestImportAISTrafficMessage_Type27Cog511(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 27 long range message
@@ -915,7 +915,7 @@ func TestImportAISTrafficMessage_Type27Sog63(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 27 long range message
@@ -934,7 +934,7 @@ func TestImportAISTrafficMessage_DistanceFilter(t *testing.T) {
 	mySituation.GPSLatitude = -33.8688 // Sydney, Australia
 	mySituation.GPSLongitude = 151.2093
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Valid Type 1 message - target in Netherlands (52.5, 5.0)
@@ -986,7 +986,7 @@ func TestImportAISTrafficMessage_Type5ShipStatic(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 4.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// First send a Type 1 to create the target
@@ -1012,7 +1012,7 @@ func TestParseAisMessage_RealWorldMessages(t *testing.T) {
 	mySituation.GPSLatitude = 37.7749
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Real AIS messages from the user's examples (with corrected checksums)
@@ -1051,7 +1051,7 @@ func TestImportAISTrafficMessage_CompletePositionReport(t *testing.T) {
 	mySituation.GPSLatitude = 37.7749
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Use a real AIS message from the examples (with corrected checksum)
@@ -1080,7 +1080,7 @@ func TestImportAISTrafficMessage_ZeroLatLng(t *testing.T) {
 	mySituation.GPSLatitude = 37.7749
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// The code checks: if (ti.Lat != 0 && ti.Lng != 0)
@@ -1103,7 +1103,7 @@ func TestImportAISTrafficMessage_AllMessageTypes(t *testing.T) {
 	mySituation.GPSLatitude = 37.7749
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	testCases := []struct {
@@ -1142,7 +1142,7 @@ func TestImportAISTrafficMessage_SpeedCourseEdgeCases(t *testing.T) {
 	mySituation.GPSLatitude = 37.7749
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// The code has these checks:
@@ -1167,7 +1167,7 @@ func TestImportAISTrafficMessage_TurnRateCalculation(t *testing.T) {
 	mySituation.GPSLatitude = 37.7749
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// The turn rate formula is: ti.TurnRate = (rot / 4.733) * (rot / 4.733)
@@ -1189,7 +1189,7 @@ func TestImportAISTrafficMessage_Type27ValidCog(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 27 message - this covers the COG != 511 branch
@@ -1208,7 +1208,7 @@ func TestImportAISTrafficMessage_Type27ValidSpeed(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 27 message - this covers the Sog < 63 branch
@@ -1231,7 +1231,7 @@ func TestImportAISTrafficMessage_Comprehensive_Type1Moving(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 1 with SOG > 0 - should use COG for track
@@ -1255,7 +1255,7 @@ func TestImportAISTrafficMessage_Comprehensive_Type1Stationary(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 1 with SOG = 0 - uses else branch for heading
@@ -1274,7 +1274,7 @@ func TestImportAISTrafficMessage_Comprehensive_Type2(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 2 position report - tests MessageID == 2 branch
@@ -1293,7 +1293,7 @@ func TestImportAISTrafficMessage_Comprehensive_Type3(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 3 position report - tests MessageID == 3 branch
@@ -1312,7 +1312,7 @@ func TestImportAISTrafficMessage_Comprehensive_Type5Update(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Send Type 1 first to create the traffic entry
@@ -1338,7 +1338,7 @@ func TestImportAISTrafficMessage_Comprehensive_Type27(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 27 long range broadcast
@@ -1358,7 +1358,7 @@ func TestImportAISTrafficMessage_Comprehensive_DistanceOver150km(t *testing.T) {
 	mySituation.GPSLatitude = -33.8688
 	mySituation.GPSLongitude = 151.2093
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 1 message - target in Netherlands
@@ -1415,7 +1415,7 @@ func TestImportAISTrafficMessage_Comprehensive_DEBUGMode(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 1 message
@@ -1435,7 +1435,7 @@ func TestImportAISTrafficMessage_Comprehensive_UpdateExisting(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Send same message twice
@@ -1456,7 +1456,7 @@ func TestImportAISTrafficMessage_Comprehensive_NewTarget(t *testing.T) {
 	mySituation.GPSLatitude = 52.0
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Type 1 message creates new traffic
@@ -1476,7 +1476,7 @@ func TestImportAISTrafficMessage_Comprehensive_MultipleTargets(t *testing.T) {
 	mySituation.GPSLatitude = 37.7749
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Multiple different vessels
@@ -1632,7 +1632,7 @@ func TestImportAISTrafficMessage_Comprehensive_Validated(t *testing.T) {
 				mySituation.GPSLatitude = tc.gpsLat
 				mySituation.GPSLongitude = tc.gpsLon
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.muGPS.Unlock()
 				globalStatus.GPS_connected = true
 			} else {
@@ -1677,7 +1677,7 @@ func TestImportAISTrafficMessage_DirectCall_Type27_Cog511(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 27 message with Cog = 511 (not available)
@@ -1714,7 +1714,7 @@ func TestImportAISTrafficMessage_DirectCall_Type27_Sog63Plus(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 27 message with Sog >= 63 (not available)
@@ -1751,7 +1751,7 @@ func TestImportAISTrafficMessage_DirectCall_Type1_Cog360(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 1 message with SOG > 0 and COG = 360 (not available)
@@ -1790,7 +1790,7 @@ func TestImportAISTrafficMessage_DirectCall_Type1_Heading511(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 1 message with SOG = 0 (else branch) and TrueHeading = 511 (not available)
@@ -1829,7 +1829,7 @@ func TestImportAISTrafficMessage_DirectCall_Type1_ROT_Minus128(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 1 message with RateOfTurn = -128 (not available)
@@ -1868,7 +1868,7 @@ func TestImportAISTrafficMessage_DirectCall_Type2(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 2 message
@@ -1907,7 +1907,7 @@ func TestImportAISTrafficMessage_DirectCall_Type3(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 3 message
@@ -1946,7 +1946,7 @@ func TestImportAISTrafficMessage_DirectCall_Type5_NewTarget(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 5 message (ship static data)
@@ -1988,7 +1988,7 @@ func TestImportAISTrafficMessage_DirectCall_Type5_UpdateExisting(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// First create the target with Type 1
@@ -2049,7 +2049,7 @@ func TestImportAISTrafficMessage_DirectCall_InvalidCoordinates(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 1 message with invalid coordinates (> 360)
@@ -2093,7 +2093,7 @@ func TestImportAISTrafficMessage_DirectCall_ZeroLatLng(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 1 message with zero coordinates
@@ -2142,7 +2142,7 @@ func TestImportAISTrafficMessage_DirectCall_DEBUGLogging(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 1 message
@@ -2181,7 +2181,7 @@ func TestImportAISTrafficMessage_DirectCall_HighSpeed(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// Construct a Type 1 message with high speed (>= 102.3)
@@ -2227,7 +2227,7 @@ func TestImportAISTrafficMessage_DirectCall_UpdateExisting(t *testing.T) {
 	mySituation.GPSLatitude = 37.0
 	mySituation.GPSLongitude = -122.0
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	// First message creates the target
@@ -2297,7 +2297,7 @@ func TestImportAISTrafficMessage_DirectCall_AllBranches(t *testing.T) {
 				mySituation.GPSLatitude = 37.0
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.muGPS.Unlock()
 			},
 			createMsg: func() *aisnmea.VdmPacket {
@@ -2320,7 +2320,7 @@ func TestImportAISTrafficMessage_DirectCall_AllBranches(t *testing.T) {
 				mySituation.GPSLatitude = 37.0
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.muGPS.Unlock()
 			},
 			createMsg: func() *aisnmea.VdmPacket {
@@ -2345,7 +2345,7 @@ func TestImportAISTrafficMessage_DirectCall_AllBranches(t *testing.T) {
 				mySituation.GPSLatitude = 37.0
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.muGPS.Unlock()
 			},
 			createMsg: func() *aisnmea.VdmPacket {

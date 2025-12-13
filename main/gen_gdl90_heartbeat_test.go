@@ -152,7 +152,7 @@ func TestMakeHeartbeatWithGPS(t *testing.T) {
 
 	// Set up valid GPS situation
 	mySituation.GPSLastFixSinceMidnightUTC = 3600.0
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-1 * time.Second)
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-1 * time.Second)
 
 	msg := makeHeartbeat()
 
@@ -225,32 +225,32 @@ func TestMakeStratuxHeartbeatWithGPSAndAHRS(t *testing.T) {
 		{
 			name: "GPS_Invalid_AHRS_Invalid",
 			setupFunc: func() {
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-60 * time.Second)
-				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-60 * time.Second)
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-60 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime().Add(-60 * time.Second)
 			},
 			description: "Both GPS and AHRS invalid",
 		},
 		{
 			name: "GPS_Valid_AHRS_Invalid",
 			setupFunc: func() {
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-1 * time.Second)
-				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-60 * time.Second)
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-1 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime().Add(-60 * time.Second)
 			},
 			description: "GPS valid, AHRS invalid",
 		},
 		{
 			name: "GPS_Invalid_AHRS_Valid",
 			setupFunc: func() {
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-60 * time.Second)
-				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-1 * time.Second)
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-60 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime().Add(-1 * time.Second)
 			},
 			description: "GPS invalid, AHRS valid",
 		},
 		{
 			name: "GPS_Valid_AHRS_Valid",
 			setupFunc: func() {
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-1 * time.Second)
-				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-1 * time.Second)
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-1 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime().Add(-1 * time.Second)
 			},
 			description: "Both GPS and AHRS valid",
 		},
@@ -341,14 +341,14 @@ func TestMakeStratuxHeartbeat_WithValidAHRS(t *testing.T) {
 
 	// Set GPS valid: recent fix, connected, fix quality > 0
 	mySituation.muGPS.Lock()
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Very recent
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime() // Very recent
 	mySituation.GPSFixQuality = 1
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
 
 	// Set AHRS valid: recent attitude time
 	mySituation.muAttitude.Lock()
-	mySituation.AHRSLastAttitudeTime = stratuxClock.Time // Very recent (< 1 second)
+	mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime() // Very recent (< 1 second)
 	mySituation.muAttitude.Unlock()
 
 	// Generate heartbeat
@@ -394,7 +394,7 @@ func TestMakeHeartbeat_WithErrors(t *testing.T) {
 
 	// Set GPS valid
 	mySituation.muGPS.Lock()
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 1
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true

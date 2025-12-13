@@ -260,7 +260,7 @@ func TestExtrapolateTraffic(t *testing.T) {
 	}
 
 	// Record start time
-	startTime := stratuxClock.Time
+	startTime := stratuxClock.GetTime()
 
 	ti := TrafficInfo{
 		Lat:                  43.99,
@@ -414,7 +414,7 @@ func TestIsOwnshipICAO_Match(t *testing.T) {
 	mySituation.GPSAltitudeMSL = 5000
 	mySituation.GPSHorizontalAccuracy = 5
 	mySituation.GPSGroundSpeed = 0
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 2 // 3D fix
 	globalStatus.GPS_connected = true
 
@@ -837,7 +837,7 @@ func TestExtrapolateTraffic_ValidHeading(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	startTime := stratuxClock.Time
+	startTime := stratuxClock.GetTime()
 
 	ti := TrafficInfo{
 		Lat:                  40.0,
@@ -887,7 +887,7 @@ func TestExtrapolateTraffic_TurnRate(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	startTime := stratuxClock.Time
+	startTime := stratuxClock.GetTime()
 
 	ti := TrafficInfo{
 		Lat:                  40.0,
@@ -1019,7 +1019,7 @@ func TestIsOwnshipTrafficInfo_MultipleICAO(t *testing.T) {
 	mySituation.BaroPressureAltitude = 5000
 	mySituation.GPSHorizontalAccuracy = 5
 	mySituation.GPSGroundSpeed = 0
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 	globalStatus.GPS_connected = true
 
 	// Test second ICAO in list
@@ -1069,7 +1069,7 @@ func TestExtrapolateTraffic_NegativeVvel(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	startTime := stratuxClock.Time
+	startTime := stratuxClock.GetTime()
 
 	ti := TrafficInfo{
 		Lat:                  40.0,
@@ -1113,7 +1113,7 @@ func TestExtrapolateTraffic_TrackWrapAround(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	startTime := stratuxClock.Time
+	startTime := stratuxClock.GetTime()
 
 	// Test track wrapping from 350 degrees with right turn (should wrap to > 360, then normalize)
 	ti := TrafficInfo{
@@ -1249,7 +1249,7 @@ func TestCleanupOldEntries_NonAIS(t *testing.T) {
 	traffic = make(map[uint32]TrafficInfo)
 	trafficMutex.Unlock()
 
-	oldTime := stratuxClock.Time.Add(-65 * time.Second) // More than 60 seconds old
+	oldTime := stratuxClock.GetTime().Add(-65 * time.Second) // More than 60 seconds old
 
 	// Add old non-AIS traffic
 	icao := uint32(0xABCDEF)
@@ -1297,7 +1297,7 @@ func TestCleanupOldEntries_AIS(t *testing.T) {
 
 	// Add AIS traffic that's 10 minutes old (should NOT be removed)
 	recentAISIcao := uint32(0x111111)
-	recentTime := stratuxClock.Time.Add(-10 * time.Minute)
+	recentTime := stratuxClock.GetTime().Add(-10 * time.Minute)
 
 	trafficMutex.Lock()
 	traffic[recentAISIcao] = TrafficInfo{
@@ -1323,7 +1323,7 @@ func TestCleanupOldEntries_AIS(t *testing.T) {
 
 	// Now add very old AIS traffic (>15 minutes, should be removed)
 	oldAISIcao := uint32(0x222222)
-	oldTime := stratuxClock.Time.Add(-16 * time.Minute)
+	oldTime := stratuxClock.GetTime().Add(-16 * time.Minute)
 
 	trafficMutex.Lock()
 	traffic[oldAISIcao] = TrafficInfo{
@@ -1367,7 +1367,7 @@ func TestCleanupOldEntries_RecentTraffic(t *testing.T) {
 	traffic = make(map[uint32]TrafficInfo)
 	trafficMutex.Unlock()
 
-	recentTime := stratuxClock.Time.Add(-30 * time.Second) // 30 seconds old
+	recentTime := stratuxClock.GetTime().Add(-30 * time.Second) // 30 seconds old
 
 	// Add recent non-AIS traffic
 	icao := uint32(0xABCDEF)
@@ -1473,7 +1473,7 @@ func TestIsOwnshipTrafficInfo_GNSSAltitude(t *testing.T) {
 	mySituation.GPSHeightAboveEllipsoid = 5100 // GNSS altitude (100ft above MSL)
 	mySituation.GPSHorizontalAccuracy = 5
 	mySituation.GPSGroundSpeed = 0
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 2
 	globalStatus.GPS_connected = true
 
@@ -1516,7 +1516,7 @@ func TestIsOwnshipTrafficInfo_FarAway(t *testing.T) {
 	mySituation.GPSAltitudeMSL = 5000
 	mySituation.GPSHorizontalAccuracy = 5
 	mySituation.GPSGroundSpeed = 0
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 2
 	globalStatus.GPS_connected = true
 
@@ -1560,7 +1560,7 @@ func TestIsOwnshipTrafficInfo_AltitudeTooHigh(t *testing.T) {
 	mySituation.BaroPressureAltitude = 5000
 	mySituation.GPSHorizontalAccuracy = 5
 	mySituation.GPSGroundSpeed = 0
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 2
 	globalStatus.GPS_connected = true
 
@@ -1830,8 +1830,8 @@ func TestIsOwnshipTrafficInfo_OGNTrackerWithValidGPS(t *testing.T) {
 	mySituation.GPSFixQuality = 2
 	mySituation.GPSHorizontalAccuracy = 5
 	mySituation.GPSGroundSpeed = 0
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Must be recent for isGPSValid()
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime() // Must be recent for isGPSValid()
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
 
@@ -1873,7 +1873,7 @@ func TestIsOwnshipTrafficInfo_NoAltitudeVerification(t *testing.T) {
 	mySituation.BaroPressureAltitude = 99999 // Invalid
 	mySituation.GPSHorizontalAccuracy = 5
 	mySituation.GPSGroundSpeed = 0
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 2
 	globalStatus.GPS_connected = true
 
@@ -1918,8 +1918,8 @@ func TestIsOwnshipTrafficInfo_ValidSpeed(t *testing.T) {
 	mySituation.GPSAltitudeMSL = 5000
 	mySituation.GPSGroundSpeed = 100 // Our ground speed
 	mySituation.GPSHorizontalAccuracy = 10
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 1
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
@@ -1927,7 +1927,7 @@ func TestIsOwnshipTrafficInfo_ValidSpeed(t *testing.T) {
 	// Set up baro for altitude verification
 	mySituation.muBaro.Lock()
 	mySituation.BaroPressureAltitude = 5000
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 	mySituation.muBaro.Unlock()
 
 	// Traffic matching ownship with valid speed
@@ -1974,8 +1974,8 @@ func TestIsOwnshipTrafficInfo_TooFarDistance(t *testing.T) {
 	mySituation.GPSAltitudeMSL = 5000
 	mySituation.GPSGroundSpeed = 50 // Low speed
 	mySituation.GPSHorizontalAccuracy = 10
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 1
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
@@ -1983,7 +1983,7 @@ func TestIsOwnshipTrafficInfo_TooFarDistance(t *testing.T) {
 	// Set up baro for altitude verification
 	mySituation.muBaro.Lock()
 	mySituation.BaroPressureAltitude = 5000
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 	mySituation.muBaro.Unlock()
 
 	// Traffic at matching ICAO but very far away (multiple km)
@@ -2042,8 +2042,8 @@ func TestIsOwnshipTrafficInfo_DEBUGMode(t *testing.T) {
 	mySituation.GPSAltitudeMSL = 5000
 	mySituation.GPSGroundSpeed = 100
 	mySituation.GPSHorizontalAccuracy = 10
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.GPSFixQuality = 1
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
@@ -2051,7 +2051,7 @@ func TestIsOwnshipTrafficInfo_DEBUGMode(t *testing.T) {
 	// Set up baro for altitude verification
 	mySituation.muBaro.Lock()
 	mySituation.BaroPressureAltitude = 5000
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 	mySituation.muBaro.Unlock()
 
 	// Traffic matching ownship, close by
@@ -2093,7 +2093,7 @@ func TestMakeTrafficReportMsg_GNSSAltitudeConversion(t *testing.T) {
 
 	// Setup valid baro pressure
 	mySituation.muBaro.Lock()
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 	mySituation.BaroPressureAltitude = 5200
 	mySituation.muBaro.Unlock()
 
@@ -2913,7 +2913,7 @@ func TestMakeTrafficReportMsg_GNSSAltitudeNoBaroPress(t *testing.T) {
 
 	// Setup INVALID baro pressure (old timestamp)
 	mySituation.muBaro.Lock()
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-1 * time.Hour) // Very old
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime().Add(-1 * time.Hour) // Very old
 	mySituation.muBaro.Unlock()
 
 	ti := TrafficInfo{
@@ -2956,8 +2956,8 @@ func TestExtrapolateTraffic_BasicPositionExtrapolation(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	// Wait for time to pass
@@ -3011,8 +3011,8 @@ func TestExtrapolateTraffic_NorthHeading(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3048,8 +3048,8 @@ func TestExtrapolateTraffic_SouthHeading(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3085,8 +3085,8 @@ func TestExtrapolateTraffic_WestHeading(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3122,8 +3122,8 @@ func TestExtrapolateTraffic_StationaryTarget(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3162,8 +3162,8 @@ func TestExtrapolateTraffic_AltitudeChange(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3198,8 +3198,8 @@ func TestExtrapolateTraffic_Descent(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3230,8 +3230,8 @@ func TestExtrapolateTraffic_RightTurn(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3266,8 +3266,8 @@ func TestExtrapolateTraffic_LeftTurn(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3302,8 +3302,8 @@ func TestExtrapolateTraffic_TrackWraparound360(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3339,8 +3339,8 @@ func TestExtrapolateTraffic_TrackWraparound0(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3376,8 +3376,8 @@ func TestExtrapolateTraffic_MultipleExtrapolations(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	// First extrapolation
@@ -3421,8 +3421,8 @@ func TestExtrapolateTraffic_JetSpeed(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3460,8 +3460,8 @@ func TestExtrapolateTraffic_LowSpeed(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3498,8 +3498,8 @@ func TestExtrapolateTraffic_DiagonalHeading(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(1 * time.Second)
@@ -3547,8 +3547,8 @@ func TestExtrapolateTraffic_FirstExtrapolationSavesOriginal(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false, // Not yet extrapolated
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -3594,8 +3594,8 @@ func TestExtrapolateTraffic_SubsequentExtrapolationKeepsOriginal(t *testing.T) {
 		Speed_valid:          true,
 		Position_valid:       true,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
-		Last_extrapolation:   stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
+		Last_extrapolation:   stratuxClock.GetTime(),
 	}
 
 	// First extrapolation
@@ -3630,7 +3630,7 @@ func TestExtrapolateTraffic_TimestampUpdate(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	initialTime := stratuxClock.Time
+	initialTime := stratuxClock.GetTime()
 	ti := TrafficInfo{
 		Lat:                  43.99,
 		Lng:                  -88.56,
@@ -3654,8 +3654,8 @@ func TestExtrapolateTraffic_TimestampUpdate(t *testing.T) {
 		t.Error("Expected Last_extrapolation to be updated after extrapolation")
 	}
 
-	// It should be close to current stratuxClock.Time
-	timeDiff := stratuxClock.Time.Sub(ti.Last_extrapolation)
+	// It should be close to current stratuxClock.GetTime()
+	timeDiff := stratuxClock.GetTime().Sub(ti.Last_extrapolation)
 	if timeDiff < 0 || timeDiff > 100*time.Millisecond {
 		t.Errorf("Expected Last_extrapolation to be updated to current time, diff=%v", timeDiff)
 	}
@@ -3694,7 +3694,7 @@ func TestSendTrafficUpdates_BearingDistanceCalculation(t *testing.T) {
 	mySituation.GPSAltitudeMSL = 1000
 	mySituation.BaroPressureAltitude = 1000
 	mySituation.GPSFixQuality = 2
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	globalStatus.GPS_connected = true
 
 	// Create traffic map with one target
@@ -3705,8 +3705,8 @@ func TestSendTrafficUpdates_BearingDistanceCalculation(t *testing.T) {
 		Lng:            -88.56, // Same longitude
 		Alt:            2000,
 		Position_valid: true,
-		Last_seen:      stratuxClock.Time,
-		Last_alt:       stratuxClock.Time,
+		Last_seen:      stratuxClock.GetTime(),
+		Last_alt:       stratuxClock.GetTime(),
 		Speed:          100,
 		Speed_valid:    true,
 		Track:          180,
@@ -3744,42 +3744,42 @@ func TestSendTrafficUpdates_TrafficSourceCounting(t *testing.T) {
 	traffic[0x111111] = TrafficInfo{
 		Icao_addr:   0x111111,
 		Last_source: TRAFFIC_SOURCE_UAT,
-		Last_seen:   stratuxClock.Time,
-		Last_alt:    stratuxClock.Time,
+		Last_seen:   stratuxClock.GetTime(),
+		Last_alt:    stratuxClock.GetTime(),
 	}
 	traffic[0x222222] = TrafficInfo{
 		Icao_addr:   0x222222,
 		Last_source: TRAFFIC_SOURCE_UAT,
-		Last_seen:   stratuxClock.Time,
-		Last_alt:    stratuxClock.Time,
+		Last_seen:   stratuxClock.GetTime(),
+		Last_alt:    stratuxClock.GetTime(),
 	}
 
 	// 3 1090ES targets
 	traffic[0x333333] = TrafficInfo{
 		Icao_addr:   0x333333,
 		Last_source: TRAFFIC_SOURCE_1090ES,
-		Last_seen:   stratuxClock.Time,
-		Last_alt:    stratuxClock.Time,
+		Last_seen:   stratuxClock.GetTime(),
+		Last_alt:    stratuxClock.GetTime(),
 	}
 	traffic[0x444444] = TrafficInfo{
 		Icao_addr:   0x444444,
 		Last_source: TRAFFIC_SOURCE_1090ES,
-		Last_seen:   stratuxClock.Time,
-		Last_alt:    stratuxClock.Time,
+		Last_seen:   stratuxClock.GetTime(),
+		Last_alt:    stratuxClock.GetTime(),
 	}
 	traffic[0x555555] = TrafficInfo{
 		Icao_addr:   0x555555,
 		Last_source: TRAFFIC_SOURCE_1090ES,
-		Last_seen:   stratuxClock.Time,
-		Last_alt:    stratuxClock.Time,
+		Last_seen:   stratuxClock.GetTime(),
+		Last_alt:    stratuxClock.GetTime(),
 	}
 
 	// 1 OGN target (should not be counted)
 	traffic[0x666666] = TrafficInfo{
 		Icao_addr:   0x666666,
 		Last_source: TRAFFIC_SOURCE_OGN,
-		Last_seen:   stratuxClock.Time,
-		Last_alt:    stratuxClock.Time,
+		Last_seen:   stratuxClock.GetTime(),
+		Last_alt:    stratuxClock.GetTime(),
 	}
 
 	sendTrafficUpdates()
@@ -3805,40 +3805,40 @@ func TestSendTrafficUpdates_CleanupOldEntries(t *testing.T) {
 	traffic[0x111111] = TrafficInfo{
 		Icao_addr:   0x111111,
 		Last_source: TRAFFIC_SOURCE_1090ES,
-		Last_seen:   stratuxClock.Time,
-		Last_alt:    stratuxClock.Time,
+		Last_seen:   stratuxClock.GetTime(),
+		Last_alt:    stratuxClock.GetTime(),
 	}
 
 	// Old 1090ES traffic (should be removed - >60 seconds)
 	traffic[0x222222] = TrafficInfo{
 		Icao_addr:   0x222222,
 		Last_source: TRAFFIC_SOURCE_1090ES,
-		Last_seen:   stratuxClock.Time.Add(-65 * time.Second),
-		Last_alt:    stratuxClock.Time.Add(-65 * time.Second),
+		Last_seen:   stratuxClock.GetTime().Add(-65 * time.Second),
+		Last_alt:    stratuxClock.GetTime().Add(-65 * time.Second),
 	}
 
 	// Old UAT traffic (should be removed - >60 seconds)
 	traffic[0x333333] = TrafficInfo{
 		Icao_addr:   0x333333,
 		Last_source: TRAFFIC_SOURCE_UAT,
-		Last_seen:   stratuxClock.Time.Add(-65 * time.Second),
-		Last_alt:    stratuxClock.Time.Add(-65 * time.Second),
+		Last_seen:   stratuxClock.GetTime().Add(-65 * time.Second),
+		Last_alt:    stratuxClock.GetTime().Add(-65 * time.Second),
 	}
 
 	// Recent AIS traffic (should remain - <15 minutes)
 	traffic[0x444444] = TrafficInfo{
 		Icao_addr:   0x444444,
 		Last_source: TRAFFIC_SOURCE_AIS,
-		Last_seen:   stratuxClock.Time.Add(-5 * time.Minute),
-		Last_alt:    stratuxClock.Time.Add(-5 * time.Minute),
+		Last_seen:   stratuxClock.GetTime().Add(-5 * time.Minute),
+		Last_alt:    stratuxClock.GetTime().Add(-5 * time.Minute),
 	}
 
 	// Old AIS traffic (should be removed - >15 minutes)
 	traffic[0x555555] = TrafficInfo{
 		Icao_addr:   0x555555,
 		Last_source: TRAFFIC_SOURCE_AIS,
-		Last_seen:   stratuxClock.Time.Add(-20 * time.Minute),
-		Last_alt:    stratuxClock.Time.Add(-20 * time.Minute),
+		Last_seen:   stratuxClock.GetTime().Add(-20 * time.Minute),
+		Last_alt:    stratuxClock.GetTime().Add(-20 * time.Minute),
 	}
 
 	sendTrafficUpdates()

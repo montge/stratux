@@ -719,7 +719,7 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSTrueCourse = 90.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -748,7 +748,7 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSTrueCourse = 0.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -804,12 +804,12 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSTrueCourse = 45.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.muGPS.Unlock()
 
 				mySituation.muBaro.Lock()
 				mySituation.BaroPressureAltitude = 1500.0
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 				mySituation.muBaro.Unlock()
 			},
 			setupGlobalStatus: func() {
@@ -840,7 +840,7 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSTrueCourse = 350.0 // Heading nearly north
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -868,12 +868,12 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSTrueCourse = 10.0 // Heading nearly north
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.muGPS.Unlock()
 
 				mySituation.muBaro.Lock()
 				mySituation.BaroPressureAltitude = 1000.0
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 				mySituation.muBaro.Unlock()
 			},
 			setupGlobalStatus: func() {
@@ -902,12 +902,12 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSTrueCourse = 200.0 // Heading nearly south
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.muGPS.Unlock()
 
 				mySituation.muBaro.Lock()
 				mySituation.BaroPressureAltitude = 1000.0
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 				mySituation.muBaro.Unlock()
 			},
 			setupGlobalStatus: func() {
@@ -1017,7 +1017,7 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSFixQuality = 1
 				mySituation.BaroPressureAltitude = 1000.0 // Same level
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Icao_addr:        0xAABBCC,
@@ -1048,7 +1048,7 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSFixQuality = 1
 				mySituation.BaroPressureAltitude = 2000.0 // Same level
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Icao_addr:        0x123456,
@@ -1102,7 +1102,7 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSFixQuality = 1
 				mySituation.BaroPressureAltitude = 1500.0 // Same level
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Icao_addr:        0xABC123,
@@ -1134,7 +1134,7 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSFixQuality = 1
 				mySituation.BaroPressureAltitude = 2000.0 // Same level
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Icao_addr:        0x999999,
@@ -1192,7 +1192,7 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 				mySituation.GPSLongitude = -122.0
 				mySituation.GPSFixQuality = 1
 				mySituation.BaroPressureAltitude = 1000.0
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Icao_addr:        0xDEB001,
@@ -1309,7 +1309,7 @@ func TestMakeGPRMCString(t *testing.T) {
 				mySituation.GPSTrueCourse = 90.0
 				mySituation.GPSLastFixSinceMidnightUTC = 43519.5 // 12:05:19.5 UTC
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1329,7 +1329,7 @@ func TestMakeGPRMCString(t *testing.T) {
 				mySituation.GPSTrueCourse = 0.0
 				mySituation.GPSLastFixSinceMidnightUTC = 0.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1349,7 +1349,7 @@ func TestMakeGPRMCString(t *testing.T) {
 				mySituation.GPSTrueCourse = 180.0
 				mySituation.GPSLastFixSinceMidnightUTC = 3600.0 // 01:00:00 UTC
 				mySituation.GPSFixQuality = 2                   // DGPS
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1388,7 +1388,7 @@ func TestMakeGPRMCString(t *testing.T) {
 				mySituation.GPSTrueCourse = 359.9
 				mySituation.GPSLastFixSinceMidnightUTC = 86399.0 // 23:59:59 UTC
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1488,7 +1488,7 @@ func TestMakeGPGGAString(t *testing.T) {
 				mySituation.GPSSatellites = 8
 				mySituation.GPSLastFixSinceMidnightUTC = 43200.0 // 12:00:00 UTC
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1511,7 +1511,7 @@ func TestMakeGPGGAString(t *testing.T) {
 				mySituation.GPSSatellites = 12
 				mySituation.GPSLastFixSinceMidnightUTC = 0.0
 				mySituation.GPSFixQuality = 2
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1534,7 +1534,7 @@ func TestMakeGPGGAString(t *testing.T) {
 				mySituation.GPSSatellites = 10
 				mySituation.GPSLastFixSinceMidnightUTC = 50000.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1578,7 +1578,7 @@ func TestMakeGPGGAString(t *testing.T) {
 				mySituation.GPSSatellites = 9
 				mySituation.GPSLastFixSinceMidnightUTC = 7200.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1750,7 +1750,7 @@ func TestMakeAHRSLevilReport(t *testing.T) {
 				mySituation.muGPS.Lock()
 				defer mySituation.muGPS.Unlock()
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1770,7 +1770,7 @@ func TestMakeAHRSLevilReport(t *testing.T) {
 				mySituation.AHRSRoll = 10.0
 				mySituation.AHRSPitch = 5.0
 				mySituation.AHRSGyroHeading = 90.0
-				mySituation.AHRSLastAttitudeTime = stratuxClock.Time
+				mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = false
@@ -1787,12 +1787,12 @@ func TestMakeAHRSLevilReport(t *testing.T) {
 				defer mySituation.muAttitude.Unlock()
 
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.AHRSRoll = 10.0
 				mySituation.AHRSPitch = 5.0
 				mySituation.AHRSGyroHeading = 90.0
 				// AHRS data too old (> 1 second)
-				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-2 * time.Second)
+				mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime().Add(-2 * time.Second)
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1809,7 +1809,7 @@ func TestMakeAHRSLevilReport(t *testing.T) {
 				defer mySituation.muAttitude.Unlock()
 
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.GPSTrueCourse = 180.0
 				mySituation.GPSTurnRate = 5.0
 				mySituation.AHRSRoll = 10.0
@@ -1819,7 +1819,7 @@ func TestMakeAHRSLevilReport(t *testing.T) {
 				mySituation.AHRSTurnRate = 3.0
 				mySituation.AHRSGLoad = 1.2
 				// Recent AHRS data (within 1 second)
-				mySituation.AHRSLastAttitudeTime = stratuxClock.Time
+				mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1836,7 +1836,7 @@ func TestMakeAHRSLevilReport(t *testing.T) {
 				defer mySituation.muAttitude.Unlock()
 
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.GPSTrueCourse = 90.0
 				mySituation.GPSTurnRate = 0.0
 				mySituation.AHRSRoll = 15.0
@@ -1845,7 +1845,7 @@ func TestMakeAHRSLevilReport(t *testing.T) {
 				mySituation.AHRSSlipSkid = 3276.7 // Invalid marker
 				mySituation.AHRSTurnRate = 3276.7 // Invalid marker
 				mySituation.AHRSGLoad = 1.0
-				mySituation.AHRSLastAttitudeTime = stratuxClock.Time
+				mySituation.AHRSLastAttitudeTime = stratuxClock.GetTime()
 			},
 			setupGlobalStatus: func() {
 				globalStatus.GPS_connected = true
@@ -1921,7 +1921,7 @@ func TestComputeRelativeVertical(t *testing.T) {
 				mySituation.muBaro.Lock()
 				defer mySituation.muBaro.Unlock()
 				mySituation.BaroPressureAltitude = 5000.0
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Alt:       6000,
@@ -1935,7 +1935,7 @@ func TestComputeRelativeVertical(t *testing.T) {
 				mySituation.muBaro.Lock()
 				defer mySituation.muBaro.Unlock()
 				mySituation.BaroPressureAltitude = 5000.0
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Alt:       4000,
@@ -1949,7 +1949,7 @@ func TestComputeRelativeVertical(t *testing.T) {
 				mySituation.muBaro.Lock()
 				defer mySituation.muBaro.Unlock()
 				mySituation.BaroPressureAltitude = 3000.0
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Alt:       3000,
@@ -1964,7 +1964,7 @@ func TestComputeRelativeVertical(t *testing.T) {
 				defer mySituation.muGPS.Unlock()
 				mySituation.GPSHeightAboveEllipsoid = 1000.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 			},
 			ti: TrafficInfo{
 				Alt:       1500,
@@ -1981,9 +1981,9 @@ func TestComputeRelativeVertical(t *testing.T) {
 				defer mySituation.muBaro.Unlock()
 				mySituation.GPSAltitudeMSL = 2000.0
 				mySituation.GPSFixQuality = 1
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				// Make baro invalid by setting old time
-				mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-20 * time.Second)
+				mySituation.BaroLastMeasurementTime = stratuxClock.GetTime().Add(-20 * time.Second)
 			},
 			ti: TrafficInfo{
 				Alt:       3000,
@@ -2049,7 +2049,7 @@ func TestParseFlarmNmeaMessage(t *testing.T) {
 		mySituation.GPSAltitudeMSL = 500
 		mySituation.GPSTrueCourse = 90.0
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.muGPS.Unlock()
 		globalStatus.GPS_connected = true
 
@@ -2079,7 +2079,7 @@ func TestParseFlarmNmeaMessage(t *testing.T) {
 		mySituation.GPSLongitude = -122.3
 		mySituation.GPSAltitudeMSL = 500
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.muGPS.Unlock()
 		globalStatus.GPS_connected = true
 
@@ -2156,7 +2156,7 @@ func TestParseFlarmNmeaMessage(t *testing.T) {
 				mySituation.GPSLongitude = -122.3
 				mySituation.GPSAltitudeMSL = 500
 				mySituation.GPSFixQuality = 2
-				mySituation.GPSLastFixLocalTime = stratuxClock.Time
+				mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 				mySituation.muGPS.Unlock()
 				globalStatus.GPS_connected = true
 
@@ -2282,7 +2282,7 @@ func TestParseFlarmNmeaMessage(t *testing.T) {
 		mySituation.GPSLongitude = -122.3
 		mySituation.GPSAltitudeMSL = 500
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.muGPS.Unlock()
 		globalStatus.GPS_connected = true
 
@@ -2323,7 +2323,7 @@ func TestParseFlarmNmeaMessage(t *testing.T) {
 		mySituation.GPSLongitude = -122.3
 		mySituation.GPSAltitudeMSL = 500
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.muGPS.Unlock()
 		globalStatus.GPS_connected = true
 
@@ -2386,7 +2386,7 @@ func TestParseFlarmNmeaMessage(t *testing.T) {
 		mySituation.GPSLongitude = -122.3
 		mySituation.GPSAltitudeMSL = 500
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.muGPS.Unlock()
 		globalStatus.GPS_connected = true
 
@@ -2475,7 +2475,7 @@ func TestParseFlarmNmeaMessage(t *testing.T) {
 		mySituation.GPSLongitude = -122.3
 		mySituation.GPSAltitudeMSL = 500
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.muGPS.Unlock()
 		globalStatus.GPS_connected = true
 

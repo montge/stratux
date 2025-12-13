@@ -235,7 +235,7 @@ func TestE2EGDL90OutputGeneration(t *testing.T) {
 	mySituation.GPSTrueCourse = 0
 	mySituation.GPSVerticalSpeed = 0
 	mySituation.GPSNACp = 10
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Recent GPS fix
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime() // Recent GPS fix
 	globalStatus.GPS_connected = true
 	mySituation.muGPS.Unlock()
 

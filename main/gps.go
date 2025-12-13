@@ -712,7 +712,7 @@ func calcGPSAttitude() bool {
 	}
 
 	// check if GPS data was put in the structure more than three seconds ago -- this shouldn't happen unless something is wrong.
-	if (stratuxClock.Milliseconds - myGPSPerfStats[index].stratuxTime) > 3000 {
+	if (stratuxClock.GetMilliseconds() - myGPSPerfStats[index].stratuxTime) > 3000 {
 		myGPSPerfStats[index].gpsTurnRate = 0
 		myGPSPerfStats[index].gpsPitch = 0
 		myGPSPerfStats[index].gpsRoll = 0
@@ -885,7 +885,7 @@ func calcGPSAttitude() bool {
 		mySituation.GPSTurnRate = 0
 
 		// Output format:GPSAtttiude,seconds,nmeaTime,msg_type,GS,Course,Alt,VV,filtered_GS,filtered_course,turn rate,filtered_vv,pitch, roll,load_factor
-		buf := fmt.Sprintf("GPSAttitude,%.1f,%.2f,%s,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f\n", float64(stratuxClock.Milliseconds)/1000, myGPSPerfStats[index].nmeaTime, myGPSPerfStats[index].msgType, myGPSPerfStats[index].gsf, myGPSPerfStats[index].coursef, myGPSPerfStats[index].alt, myGPSPerfStats[index].vv, v_x/1.687810, headingAvg, myGPSPerfStats[index].gpsTurnRate, v_z, myGPSPerfStats[index].gpsPitch, myGPSPerfStats[index].gpsRoll, myGPSPerfStats[index].gpsLoadFactor)
+		buf := fmt.Sprintf("GPSAttitude,%.1f,%.2f,%s,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f\n", float64(stratuxClock.GetMilliseconds())/1000, myGPSPerfStats[index].nmeaTime, myGPSPerfStats[index].msgType, myGPSPerfStats[index].gsf, myGPSPerfStats[index].coursef, myGPSPerfStats[index].alt, myGPSPerfStats[index].vv, v_x/1.687810, headingAvg, myGPSPerfStats[index].gpsTurnRate, v_z, myGPSPerfStats[index].gpsPitch, myGPSPerfStats[index].gpsRoll, myGPSPerfStats[index].gpsLoadFactor)
 		if globalSettings.DEBUG {
 			log.Printf("%s", buf) // FIXME. Send to sqlite log or other file?
 		}
@@ -999,7 +999,7 @@ func calcGPSAttitude() bool {
 
 	if globalSettings.DEBUG {
 		// Output format:GPSAtttiude,seconds,nmeaTime,msg_type,GS,Course,Alt,VV,filtered_GS,filtered_course,turn rate,filtered_vv,pitch, roll,load_factor
-		buf := fmt.Sprintf("GPSAttitude,%.1f,%.2f,%s,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f\n", float64(stratuxClock.Milliseconds)/1000, myGPSPerfStats[index].nmeaTime, myGPSPerfStats[index].msgType, myGPSPerfStats[index].gsf, myGPSPerfStats[index].coursef, myGPSPerfStats[index].alt, myGPSPerfStats[index].vv, v_x/1.687810, headingAvg, myGPSPerfStats[index].gpsTurnRate, v_z, myGPSPerfStats[index].gpsPitch, myGPSPerfStats[index].gpsRoll, myGPSPerfStats[index].gpsLoadFactor)
+		buf := fmt.Sprintf("GPSAttitude,%.1f,%.2f,%s,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f\n", float64(stratuxClock.GetMilliseconds())/1000, myGPSPerfStats[index].nmeaTime, myGPSPerfStats[index].msgType, myGPSPerfStats[index].gsf, myGPSPerfStats[index].coursef, myGPSPerfStats[index].alt, myGPSPerfStats[index].vv, v_x/1.687810, headingAvg, myGPSPerfStats[index].gpsTurnRate, v_z, myGPSPerfStats[index].gpsPitch, myGPSPerfStats[index].gpsRoll, myGPSPerfStats[index].gpsLoadFactor)
 		log.Printf("%s", buf) // FIXME. Send to sqlite log or other file?
 	}
 
@@ -1108,10 +1108,10 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 	}()*/
 
 	// Local variables for GPS attitude estimation
-	thisGpsPerf := gpsPerf                              // write to myGPSPerfStats at end of function IFF
-	thisGpsPerf.coursef = -999.9                        // default value of -999.9 indicates invalid heading to regression calculation
-	thisGpsPerf.stratuxTime = stratuxClock.Milliseconds // used for gross indexing
-	updateGPSPerf := false                              // change to true when position or vector info is read
+	thisGpsPerf := gpsPerf                                   // write to myGPSPerfStats at end of function IFF
+	thisGpsPerf.coursef = -999.9                             // default value of -999.9 indicates invalid heading to regression calculation
+	thisGpsPerf.stratuxTime = stratuxClock.GetMilliseconds() // used for gross indexing
+	updateGPSPerf := false                                   // change to true when position or vector info is read
 
 	l_valid, validNMEAcs := validateNMEAChecksum(l)
 	if !validNMEAcs {
@@ -1503,9 +1503,9 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 					//log.Printf("Creating new satellite %s from GSA message\n", svStr) // DEBUG
 				}
 				thisSatellite.InSolution = true
-				thisSatellite.TimeLastSolution = stratuxClock.Time
-				thisSatellite.TimeLastSeen = stratuxClock.Time    // implied, since this satellite is used in the position solution
-				thisSatellite.TimeLastTracked = stratuxClock.Time // implied, since this satellite is used in the position solution
+				thisSatellite.TimeLastSolution = stratuxClock.GetTime()
+				thisSatellite.TimeLastSeen = stratuxClock.GetTime()    // implied, since this satellite is used in the position solution
+				thisSatellite.TimeLastTracked = stratuxClock.GetTime() // implied, since this satellite is used in the position solution
 
 				Satellites[thisSatellite.SatelliteID] = thisSatellite // Update constellation with this satellite
 			}
@@ -1726,7 +1726,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 				thisSatellite.InSolution = false // resets the "InSolution" status if the satellite disappears out of solution due to no signal. FIXME
 				//log.Printf("Satellite %s is no longer in solution due to cno parse error - GSV\n", svStr) // DEBUG
 			} else if cno > 0 {
-				thisSatellite.TimeLastSeen = stratuxClock.Time // Is this needed?
+				thisSatellite.TimeLastSeen = stratuxClock.GetTime() // Is this needed?
 			}
 			// Bounds checking: ensure signal fits in int8 range (-128 to 127)
 			// Clamp and convert to int8 in single expression for data flow analysis
@@ -1813,9 +1813,9 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 				globalStatus.GPS_detected_type = tracker.getGpsHardwareType()
 				gpsTimeOffsetPpsMs = tracker.gpsTimeOffsetPps()
 				tracker.requestTrackerConfig(serialPort)
-				timelimit := stratuxClock.Time.Add(5 * time.Second)
+				timelimit := stratuxClock.GetTime().Add(5 * time.Second)
 				go func() {
-					for stratuxClock.Time.Before(timelimit) && serialPort != nil && detectedTracker == tracker {
+					for stratuxClock.GetTime().Before(timelimit) && serialPort != nil && detectedTracker == tracker {
 						if tracker.isConfigRead() {
 							tracker.writeInitialConfig(serialPort)
 							break

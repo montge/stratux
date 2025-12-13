@@ -1045,8 +1045,8 @@ func TestCollectMessages_SingleMessage(t *testing.T) {
 		Port:             4000,
 		Capability:       NETWORK_GDL90_STANDARD,
 		Queue:            NewMessageQueue(10),
-		LastPongResponse: stratuxClock.Time, // Set to prevent IsSleeping() from returning true
-		LastPingResponse: stratuxClock.Time,
+		LastPongResponse: stratuxClock.GetTime(), // Set to prevent IsSleeping() from returning true
+		LastPingResponse: stratuxClock.GetTime(),
 	}
 
 	testMsg := []byte{0x7E, 0x00, 0x01, 0x02, 0x03, 0x7E}
@@ -1076,8 +1076,8 @@ func TestCollectMessages_MultipleMessages(t *testing.T) {
 		Port:             4000,
 		Capability:       NETWORK_GDL90_STANDARD,
 		Queue:            NewMessageQueue(10),
-		LastPongResponse: stratuxClock.Time, // Set to prevent IsSleeping() from returning true
-		LastPingResponse: stratuxClock.Time,
+		LastPongResponse: stratuxClock.GetTime(), // Set to prevent IsSleeping() from returning true
+		LastPingResponse: stratuxClock.GetTime(),
 	}
 
 	msg1 := []byte{0x7E, 0x00, 0x01, 0x7E}

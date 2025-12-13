@@ -15,7 +15,7 @@ func TestMonotonicHumanizeTime(t *testing.T) {
 	time.Sleep(50 * time.Millisecond) // Let clock start
 
 	// Test with a past time
-	pastTime := m.Time.Add(-5 * time.Second)
+	pastTime := m.GetTime().Add(-5 * time.Second)
 	humanized := m.HumanizeTime(pastTime)
 
 	// Should contain "ago"
@@ -26,7 +26,7 @@ func TestMonotonicHumanizeTime(t *testing.T) {
 	t.Logf("Past time humanized: %s", humanized)
 
 	// Test with a future time
-	futureTime := m.Time.Add(10 * time.Second)
+	futureTime := m.GetTime().Add(10 * time.Second)
 	humanized = m.HumanizeTime(futureTime)
 
 	// Should contain "from now"
@@ -37,7 +37,7 @@ func TestMonotonicHumanizeTime(t *testing.T) {
 	t.Logf("Future time humanized: %s", humanized)
 
 	// Test with current time
-	humanized = m.HumanizeTime(m.Time)
+	humanized = m.HumanizeTime(m.GetTime())
 	t.Logf("Current time humanized: %s", humanized)
 }
 
@@ -115,7 +115,7 @@ func TestMonotonicCombined(t *testing.T) {
 	}
 
 	// Set real time reference
-	refTime := m.Time // Use current monotonic time
+	refTime := m.GetTime() // Use current monotonic time
 	m.SetRealTimeReference(refTime)
 
 	if !m.HasRealTimeReference() {
@@ -126,7 +126,7 @@ func TestMonotonicCombined(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Test humanize time with a past time
-	pastTime := m.Time.Add(-2 * time.Second)
+	pastTime := m.GetTime().Add(-2 * time.Second)
 	humanized := m.HumanizeTime(pastTime)
 	t.Logf("Past time humanized: %s", humanized)
 

@@ -502,7 +502,7 @@ func TestIsDetectedOwnshipValid(t *testing.T) {
 	}
 
 	// Set ownship as recently seen
-	OwnshipTrafficInfo.Last_seen = stratuxClock.Time
+	OwnshipTrafficInfo.Last_seen = stratuxClock.GetTime()
 	result1 := isDetectedOwnshipValid()
 
 	if !result1 {
@@ -510,7 +510,7 @@ func TestIsDetectedOwnshipValid(t *testing.T) {
 	}
 
 	// Set ownship as old (>10 seconds)
-	OwnshipTrafficInfo.Last_seen = stratuxClock.Time.Add(-15 * time.Second)
+	OwnshipTrafficInfo.Last_seen = stratuxClock.GetTime().Add(-15 * time.Second)
 	result2 := isDetectedOwnshipValid()
 
 	if result2 {
@@ -688,7 +688,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_valid_GPS", func(t *testing.T) {
 		// Set up valid GPS data
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 43.99       // Oshkosh area
 		mySituation.GPSLongitude = -88.56     // Oshkosh area
 		mySituation.GPSAltitudeMSL = 1000.0   // feet
@@ -714,11 +714,11 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("without_GPS_fix", func(t *testing.T) {
 		// Set GPS as invalid
 		mySituation.GPSFixQuality = 0
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-10 * time.Second)
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-10 * time.Second)
 		globalStatus.GPS_connected = false
 
 		// Also set detected ownship as invalid
-		OwnshipTrafficInfo.Last_seen = stratuxClock.Time.Add(-15 * time.Second)
+		OwnshipTrafficInfo.Last_seen = stratuxClock.GetTime().Add(-15 * time.Second)
 
 		result := makeOwnshipReport()
 
@@ -730,7 +730,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_zero_coordinates", func(t *testing.T) {
 		// Valid GPS but at 0,0
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 0.0
 		mySituation.GPSLongitude = 0.0
 		mySituation.GPSAltitudeMSL = 0.0
@@ -753,7 +753,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_high_altitude", func(t *testing.T) {
 		// Test with high altitude (near max)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 45.0
 		mySituation.GPSLongitude = -90.0
 		mySituation.GPSAltitudeMSL = 50000.0 // Very high altitude
@@ -776,7 +776,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_max_speed", func(t *testing.T) {
 		// Test with maximum speed
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 40.0
 		mySituation.GPSLongitude = -100.0
 		mySituation.GPSAltitudeMSL = 10000.0
@@ -799,7 +799,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_negative_coordinates", func(t *testing.T) {
 		// Test with negative lat/lng (southern hemisphere, western longitude)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = -33.86  // Sydney area
 		mySituation.GPSLongitude = 151.21 // Sydney area (positive longitude)
 		mySituation.GPSAltitudeMSL = 500.0
@@ -822,12 +822,12 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_baro_altitude", func(t *testing.T) {
 		// Test with barometric pressure altitude (no GPS altitude)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 44.0
 		mySituation.GPSLongitude = -92.0
 		mySituation.GPSAltitudeMSL = 0.0 // No GPS altitude
 		mySituation.BaroPressureAltitude = 5000.0
-		mySituation.BaroLastMeasurementTime = stratuxClock.Time
+		mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 		mySituation.GPSTrueCourse = 120.0
 		mySituation.GPSGroundSpeed = 150.0
 		mySituation.GPSHorizontalAccuracy = 5
@@ -847,7 +847,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_self_assigned_code", func(t *testing.T) {
 		// Test with self-assigned ICAO code (0xF00000)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 35.0
 		mySituation.GPSLongitude = -110.0
 		mySituation.GPSAltitudeMSL = 7000.0
@@ -870,11 +870,11 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_detected_ownship", func(t *testing.T) {
 		// Test with detected ownship (no GPS) - this uses received ADS-B ownship data
 		mySituation.GPSFixQuality = 0
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-10 * time.Second)
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-10 * time.Second)
 		globalStatus.GPS_connected = false
 
 		// Set up detected ownship as valid
-		OwnshipTrafficInfo.Last_seen = stratuxClock.Time
+		OwnshipTrafficInfo.Last_seen = stratuxClock.GetTime()
 		OwnshipTrafficInfo.Lat = 42.0
 		OwnshipTrafficInfo.Lng = -95.0
 		OwnshipTrafficInfo.Alt = 3000
@@ -895,7 +895,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_track_wraparound_positive", func(t *testing.T) {
 		// Test track angle wraparound (> 360)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 40.0
 		mySituation.GPSLongitude = -100.0
 		mySituation.GPSAltitudeMSL = 5000.0
@@ -918,7 +918,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_track_wraparound_negative", func(t *testing.T) {
 		// Test track angle wraparound (< 0)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 40.0
 		mySituation.GPSLongitude = -100.0
 		mySituation.GPSAltitudeMSL = 5000.0
@@ -941,11 +941,11 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_detected_ownship_long_tail", func(t *testing.T) {
 		// Test detected ownship with tail number > 7 characters
 		mySituation.GPSFixQuality = 0
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-10 * time.Second)
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-10 * time.Second)
 		globalStatus.GPS_connected = false
 
 		// Set up detected ownship with long tail number
-		OwnshipTrafficInfo.Last_seen = stratuxClock.Time
+		OwnshipTrafficInfo.Last_seen = stratuxClock.GetTime()
 		OwnshipTrafficInfo.Lat = 42.0
 		OwnshipTrafficInfo.Lng = -95.0
 		OwnshipTrafficInfo.Alt = 3000
@@ -966,7 +966,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_registration_from_icao", func(t *testing.T) {
 		// Test ICAO to registration conversion
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 40.0
 		mySituation.GPSLongitude = -100.0
 		mySituation.GPSAltitudeMSL = 5000.0
@@ -991,7 +991,7 @@ func TestMakeOwnshipReport(t *testing.T) {
 	t.Run("with_long_registration", func(t *testing.T) {
 		// Test with registration > 8 characters (should be truncated)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 40.0
 		mySituation.GPSLongitude = -100.0
 		mySituation.GPSAltitudeMSL = 5000.0
@@ -1067,7 +1067,7 @@ func TestMakeOwnshipReport_RegistrationTruncation(t *testing.T) {
 
 		// Setup valid GPS
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSLatitude = 44.0
 		mySituation.GPSLongitude = -88.0
 		mySituation.GPSAltitudeMSL = 1000.0
@@ -1154,7 +1154,7 @@ func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
 	t.Run("with_valid_GPS", func(t *testing.T) {
 		// Set up valid GPS data
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSHeightAboveEllipsoid = 1000.0 // feet HAE
 
 		globalStatus.GPS_connected = true
@@ -1169,7 +1169,7 @@ func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
 	t.Run("without_GPS_fix", func(t *testing.T) {
 		// Set GPS as invalid
 		mySituation.GPSFixQuality = 0
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time.Add(-10 * time.Second)
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-10 * time.Second)
 		globalStatus.GPS_connected = false
 
 		result := makeOwnshipGeometricAltitudeReport()
@@ -1182,7 +1182,7 @@ func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
 	t.Run("with_zero_altitude", func(t *testing.T) {
 		// Valid GPS at zero altitude (sea level)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSHeightAboveEllipsoid = 0.0
 
 		globalStatus.GPS_connected = true
@@ -1197,7 +1197,7 @@ func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
 	t.Run("with_high_altitude", func(t *testing.T) {
 		// Test with very high altitude
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSHeightAboveEllipsoid = 50000.0 // Very high
 
 		globalStatus.GPS_connected = true
@@ -1212,7 +1212,7 @@ func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
 	t.Run("with_negative_altitude", func(t *testing.T) {
 		// Test with negative altitude (below ellipsoid)
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSHeightAboveEllipsoid = -100.0 // Below ellipsoid
 
 		globalStatus.GPS_connected = true
@@ -1227,7 +1227,7 @@ func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
 	t.Run("with_typical_cruising_altitude", func(t *testing.T) {
 		// Test with typical cruising altitude
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSHeightAboveEllipsoid = 8500.0 // Typical GA cruising altitude
 
 		globalStatus.GPS_connected = true
@@ -1243,7 +1243,7 @@ func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
 		// Test near the maximum altitude that fits in 16-bit signed int with 5-foot resolution
 		// Max value: 32767 * 5 = 163,835 feet
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSHeightAboveEllipsoid = 160000.0 // Near max
 
 		globalStatus.GPS_connected = true
@@ -1259,7 +1259,7 @@ func TestMakeOwnshipGeometricAltitudeReport(t *testing.T) {
 		// Test near the minimum altitude that fits in 16-bit signed int with 5-foot resolution
 		// Min value: -32768 * 5 = -163,840 feet
 		mySituation.GPSFixQuality = 2
-		mySituation.GPSLastFixLocalTime = stratuxClock.Time
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 		mySituation.GPSHeightAboveEllipsoid = -160000.0 // Near min
 
 		globalStatus.GPS_connected = true
@@ -1282,7 +1282,7 @@ func TestIsDetectedOwnshipValidEdgeCases(t *testing.T) {
 
 	t.Run("recently_seen_is_valid", func(t *testing.T) {
 		OwnshipTrafficInfo = TrafficInfo{
-			Last_seen: stratuxClock.Time,
+			Last_seen: stratuxClock.GetTime(),
 		}
 
 		if !isDetectedOwnshipValid() {
@@ -1292,7 +1292,7 @@ func TestIsDetectedOwnshipValidEdgeCases(t *testing.T) {
 
 	t.Run("old_ownship_is_invalid", func(t *testing.T) {
 		OwnshipTrafficInfo = TrafficInfo{
-			Last_seen: stratuxClock.Time.Add(-15 * time.Second),
+			Last_seen: stratuxClock.GetTime().Add(-15 * time.Second),
 		}
 
 		if isDetectedOwnshipValid() {
@@ -1303,7 +1303,7 @@ func TestIsDetectedOwnshipValidEdgeCases(t *testing.T) {
 	t.Run("boundary_at_10_seconds", func(t *testing.T) {
 		// Test exactly at the 10 second boundary
 		OwnshipTrafficInfo = TrafficInfo{
-			Last_seen: stratuxClock.Time.Add(-9 * time.Second),
+			Last_seen: stratuxClock.GetTime().Add(-9 * time.Second),
 		}
 
 		if !isDetectedOwnshipValid() {
@@ -1311,7 +1311,7 @@ func TestIsDetectedOwnshipValidEdgeCases(t *testing.T) {
 		}
 
 		OwnshipTrafficInfo = TrafficInfo{
-			Last_seen: stratuxClock.Time.Add(-11 * time.Second),
+			Last_seen: stratuxClock.GetTime().Add(-11 * time.Second),
 		}
 
 		if isDetectedOwnshipValid() {
@@ -2294,7 +2294,7 @@ func TestMsgLogAppend(t *testing.T) {
 	// Add a message
 	testMsg := msg{
 		MessageClass: MSGCLASS_UAT,
-		TimeReceived: stratuxClock.Time,
+		TimeReceived: stratuxClock.GetTime(),
 		Data:         "test",
 	}
 
@@ -2592,7 +2592,7 @@ func TestMakeOwnshipReport_WithReceivedOwnship(t *testing.T) {
 		Speed_valid: true,
 		Track:       270,
 		Tail:        "N12345",
-		Last_seen:   stratuxClock.Time,
+		Last_seen:   stratuxClock.GetTime(),
 	}
 
 	// Should use received ownship info
@@ -2602,7 +2602,7 @@ func TestMakeOwnshipReport_WithReceivedOwnship(t *testing.T) {
 	}
 
 	// Test with expired ownship
-	OwnshipTrafficInfo.Last_seen = stratuxClock.Time.Add(-15 * time.Second)
+	OwnshipTrafficInfo.Last_seen = stratuxClock.GetTime().Add(-15 * time.Second)
 	result = makeOwnshipReport()
 	if result {
 		t.Error("Expected makeOwnshipReport to fail with expired ownship and invalid GPS")

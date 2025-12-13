@@ -320,7 +320,7 @@ func sendTrafficUpdates() {
 	var highestAlarmLevel uint8
 	var highestAlarmTraffic TrafficInfo
 
-	if globalSettings.DEBUG && (stratuxClock.Time.Second()%15) == 0 {
+	if globalSettings.DEBUG && (stratuxClock.GetTime().Second()%15) == 0 {
 		log.Printf("List of all aircraft being tracked:\n")
 		log.Printf("==================================================================\n")
 	}
@@ -354,7 +354,7 @@ func sendTrafficUpdates() {
 		}
 
 		// DEBUG: Print the list of all tracked targets (with data) to the log every 15 seconds if "DEBUG" option is enabled
-		if globalSettings.DEBUG && (stratuxClock.Time.Second()%15) == 0 {
+		if globalSettings.DEBUG && (stratuxClock.GetTime().Second()%15) == 0 {
 			s_out, err := json.Marshal(ti)
 			if err != nil {
 				log.Printf("Error generating output: %s\n", err.Error())
@@ -705,7 +705,7 @@ func parseDownlinkReport(s string, signalLevel int) {
 		//log.Printf("Existing target %X imported for UAT update\n", icao_addr)
 	} else {
 		//log.Printf("New target %X created for UAT update\n", icao_addr)
-		ti.Last_seen = stratuxClock.Time // need to initialize to current stratuxClock so it doesn't get cut before we have a chance to populate a position message
+		ti.Last_seen = stratuxClock.GetTime() // need to initialize to current stratuxClock so it doesn't get cut before we have a chance to populate a position message
 		ti.Icao_addr = icao_addr
 		ti.ExtrapolatedPosition = false
 
@@ -1118,8 +1118,8 @@ func parseDump1090Message(buf string) {
 		//log.Printf("Existing target %X imported for ES update\n", icao)
 	} else {
 		//log.Printf("New target %X created for ES update\n",newTi.Icao_addr)
-		ti.Last_seen = stratuxClock.Time // need to initialize to current stratuxClock so it doesn't get cut before we have a chance to populate a position message
-		ti.Last_alt = stratuxClock.Time  // ditto.
+		ti.Last_seen = stratuxClock.GetTime() // need to initialize to current stratuxClock so it doesn't get cut before we have a chance to populate a position message
+		ti.Last_alt = stratuxClock.GetTime()  // ditto.
 		ti.Icao_addr = icao
 		ti.ExtrapolatedPosition = false
 		ti.Last_source = TRAFFIC_SOURCE_1090ES
@@ -1224,7 +1224,7 @@ func parseDump1090Message(buf string) {
 			}
 			ti.Position_valid = true
 			ti.ExtrapolatedPosition = false
-			ti.Last_seen = stratuxClock.Time // only update "last seen" data on position updates
+			ti.Last_seen = stratuxClock.GetTime() // only update "last seen" data on position updates
 		}
 	} else {
 		// Old traffic had no position and update doesn't have a position either -> assume Mode-S only
@@ -1262,7 +1262,7 @@ func parseDump1090Message(buf string) {
 			ti.Track = track
 			ti.Speed = speed
 			ti.Speed_valid = true
-			ti.Last_speed = stratuxClock.Time // only update "last seen" data on position updates
+			ti.Last_speed = stratuxClock.GetTime() // only update "last seen" data on position updates
 		}
 	} else if ((newTi.DF == 17) || (newTi.DF == 18)) && (newTi.TypeCode == 19) { // invalid speed on velocity message only
 		ti.Speed_valid = false
@@ -1467,11 +1467,11 @@ func updateDemoTraffic(icao uint32, tail string, relAlt float32, gs float64, off
 		//log.Printf("Existing target %X imported for ES update\n", icao)
 	} else {
 		//log.Printf("New target %X created for ES update\n",newTi.Icao_addr)
-		ti.Last_seen = stratuxClock.Time // need to initialize to current stratuxClock so it doesn't get cut before we have a chance to populate a position message
+		ti.Last_seen = stratuxClock.GetTime() // need to initialize to current stratuxClock so it doesn't get cut before we have a chance to populate a position message
 		ti.Icao_addr = icao
 		ti.ExtrapolatedPosition = false
 	}
-	hdg := float64((int32(stratuxClock.Milliseconds/1000)+offset)%720) / 2
+	hdg := float64((int32(stratuxClock.GetMilliseconds()/1000)+offset)%720) / 2
 	// gs := float64(220) // knots
 	radius := gs * 0.2 / (2 * math.Pi)
 	x := radius * math.Cos(hdg*math.Pi/180.0)

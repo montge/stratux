@@ -27,11 +27,11 @@ func TestNewMonotonic(t *testing.T) {
 		t.Error("ticker should be initialized")
 	}
 
-	if m.Milliseconds != 0 {
-		t.Errorf("Expected Milliseconds to start at 0, got %d", m.Milliseconds)
+	if m.GetMilliseconds() != 0 {
+		t.Errorf("Expected Milliseconds to start at 0, got %d", m.GetMilliseconds())
 	}
 
-	if m.Time.IsZero() {
+	if m.GetTime().IsZero() {
 		t.Error("Time should be initialized to current time")
 	}
 
@@ -40,10 +40,10 @@ func TestNewMonotonic(t *testing.T) {
 	}
 
 	// Verify the watcher is running by checking that time advances
-	initialMs := m.Milliseconds
+	initialMs := m.GetMilliseconds()
 	time.Sleep(50 * time.Millisecond)
 
-	if m.Milliseconds <= initialMs {
+	if m.GetMilliseconds() <= initialMs {
 		t.Error("Milliseconds should increase as watcher runs")
 	}
 }
@@ -53,25 +53,25 @@ func TestMonotonicWatcher(t *testing.T) {
 	m := NewMonotonic()
 
 	// Capture initial state
-	initialMs := m.Milliseconds
-	initialTime := m.Time
+	initialMs := m.GetMilliseconds()
+	initialTime := m.GetTime()
 
 	// Wait for several ticks (ticker fires every 10ms)
 	time.Sleep(100 * time.Millisecond)
 
 	// Check that milliseconds increased
-	if m.Milliseconds <= initialMs {
-		t.Errorf("Expected Milliseconds > %d, got %d", initialMs, m.Milliseconds)
+	if m.GetMilliseconds() <= initialMs {
+		t.Errorf("Expected Milliseconds > %d, got %d", initialMs, m.GetMilliseconds())
 	}
 
 	// Check that time advanced
-	if !m.Time.After(initialTime) {
+	if !m.GetTime().After(initialTime) {
 		t.Error("Expected Time to advance")
 	}
 
 	// Verify approximate consistency (allowing for timing variations)
 	expectedMs := initialMs + 100 // Approximately 100ms should have passed
-	actualMs := m.Milliseconds
+	actualMs := m.GetMilliseconds()
 	diff := int64(actualMs) - int64(expectedMs)
 	if diff < -50 || diff > 50 {
 		t.Logf("Warning: Milliseconds drift detected. Expected ~%d, got %d (diff: %d)",
@@ -92,18 +92,18 @@ func TestMonotonicWatcherRealTime(t *testing.T) {
 	}
 
 	// Initial RealTime should match reference
-	initialRealTime := m.RealTime
+	initialRealTime := m.GetRealTime()
 
 	// Wait for watcher to tick
 	time.Sleep(100 * time.Millisecond)
 
 	// RealTime should have advanced
-	if !m.RealTime.After(initialRealTime) {
+	if !m.GetRealTime().After(initialRealTime) {
 		t.Error("Expected RealTime to advance when realTimeSet is true")
 	}
 
 	// Verify RealTime advanced by approximately 100ms
-	elapsed := m.RealTime.Sub(initialRealTime)
+	elapsed := m.GetRealTime().Sub(initialRealTime)
 	if elapsed < 50*time.Millisecond || elapsed > 150*time.Millisecond {
 		t.Logf("Warning: RealTime advancement seems off. Expected ~100ms, got %v", elapsed)
 	}
@@ -148,7 +148,7 @@ func TestMonotonicSince(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			testTime := m.Time.Add(tc.offset)
+			testTime := m.GetTime().Add(tc.offset)
 			duration := m.Since(testTime)
 
 			var actualSign int
@@ -211,13 +211,13 @@ func TestMonotonicSetRealTimeReferenceOnce(t *testing.T) {
 		t.Error("realTimeSet should be true after first SetRealTimeReference")
 	}
 
-	if m.RealTime != firstRef {
-		t.Errorf("RealTime should be %v, got %v", firstRef, m.RealTime)
+	if m.GetRealTime() != firstRef {
+		t.Errorf("RealTime should be %v, got %v", firstRef, m.GetRealTime())
 	}
 
 	// Wait a bit for RealTime to advance
 	time.Sleep(100 * time.Millisecond)
-	realTimeAfterWait := m.RealTime
+	realTimeAfterWait := m.GetRealTime()
 
 	// Try to set second time
 	secondRef := time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)
@@ -229,16 +229,16 @@ func TestMonotonicSetRealTimeReferenceOnce(t *testing.T) {
 	}
 
 	// RealTime should NOT be secondRef, it should have continued from firstRef
-	if m.RealTime == secondRef {
+	if m.GetRealTime() == secondRef {
 		t.Error("Second SetRealTimeReference should be ignored")
 	}
 
 	// RealTime should be approximately what it was after the wait (plus a tiny bit more)
-	if m.RealTime.Before(realTimeAfterWait) {
+	if m.GetRealTime().Before(realTimeAfterWait) {
 		t.Error("RealTime should not go backwards")
 	}
 
-	timeDiff := m.RealTime.Sub(realTimeAfterWait)
+	timeDiff := m.GetRealTime().Sub(realTimeAfterWait)
 	if timeDiff > 50*time.Millisecond {
 		t.Logf("RealTime advanced by %v since check (expected < 50ms)", timeDiff)
 	}
@@ -260,8 +260,8 @@ func TestMonotonicSetRealTimeReferenceBeforeWatcher(t *testing.T) {
 		t.Error("realTimeSet should be true")
 	}
 
-	if m.RealTime != refTime {
-		t.Errorf("RealTime should be %v, got %v", refTime, m.RealTime)
+	if m.GetRealTime() != refTime {
+		t.Errorf("RealTime should be %v, got %v", refTime, m.GetRealTime())
 	}
 
 	// Start watcher
@@ -271,7 +271,7 @@ func TestMonotonicSetRealTimeReferenceBeforeWatcher(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// RealTime should have advanced
-	if !m.RealTime.After(refTime) {
+	if !m.GetRealTime().After(refTime) {
 		t.Error("RealTime should have advanced after watcher started")
 	}
 
@@ -289,14 +289,17 @@ func TestMonotonicConcurrency(t *testing.T) {
 	done := make(chan bool)
 	iterations := 1000
 
-	// Multiple goroutines reading from the clock concurrently
+	// Multiple goroutines reading from the clock concurrently using getters
 	for i := 0; i < 10; i++ {
 		go func() {
 			for j := 0; j < iterations; j++ {
 				_ = m.Since(time.Now())
 				_ = m.Unix()
 				_ = m.HasRealTimeReference()
-				_ = m.HumanizeTime(m.Time)
+				_ = m.HumanizeTime(m.GetTime())
+				_ = m.GetMilliseconds()
+				_ = m.GetTime()
+				_ = m.GetRealTime()
 			}
 			done <- true
 		}()
@@ -307,8 +310,8 @@ func TestMonotonicConcurrency(t *testing.T) {
 		<-done
 	}
 
-	// Verify clock is still working
-	if m.Milliseconds == 0 {
+	// Verify clock is still working using getters
+	if m.GetMilliseconds() == 0 {
 		t.Error("Clock should have advanced")
 	}
 
@@ -323,14 +326,14 @@ func TestMonotonicTimeAdvancement(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	samples := 10
-	prevMs := m.Milliseconds
-	prevTime := m.Time
+	prevMs := m.GetMilliseconds()
+	prevTime := m.GetTime()
 
 	for i := 0; i < samples; i++ {
 		time.Sleep(20 * time.Millisecond)
 
-		currMs := m.Milliseconds
-		currTime := m.Time
+		currMs := m.GetMilliseconds()
+		currTime := m.GetTime()
 
 		// Milliseconds should increase
 		if currMs <= prevMs {
@@ -402,13 +405,13 @@ func TestMonotonicHumanizeTimeEdgeCases(t *testing.T) {
 		{
 			name: "current time",
 			timeFunc: func() time.Time {
-				return m.Time
+				return m.GetTime()
 			},
 		},
 		{
 			name: "1 second ago",
 			timeFunc: func() time.Time {
-				return m.Time.Add(-1 * time.Second)
+				return m.GetTime().Add(-1 * time.Second)
 			},
 		},
 	}
@@ -434,7 +437,7 @@ func TestMonotonicSinceConsistency(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Capture a reference time
-	refTime := m.Time
+	refTime := m.GetTime()
 
 	// Wait a bit
 	time.Sleep(100 * time.Millisecond)
@@ -452,8 +455,8 @@ func TestMonotonicSinceConsistency(t *testing.T) {
 		t.Logf("Warning: Since duration %v outside expected range [50ms, 150ms]", duration)
 	}
 
-	// Since should be equivalent to m.Time.Sub(refTime)
-	expectedDuration := m.Time.Sub(refTime)
+	// Since should be equivalent to m.GetTime().Sub(refTime)
+	expectedDuration := m.GetTime().Sub(refTime)
 	if duration != expectedDuration {
 		t.Errorf("Since(%v) = %v, but Time.Sub(%v) = %v",
 			refTime, duration, refTime, expectedDuration)
@@ -469,24 +472,91 @@ func TestMonotonicWatcherWithoutRealTime(t *testing.T) {
 		t.Fatal("realTimeSet should be false initially")
 	}
 
-	initialMs := m.Milliseconds
-	initialTime := m.Time
+	initialMs := m.GetMilliseconds()
+	initialTime := m.GetTime()
 
 	// Wait for watcher to tick
 	time.Sleep(100 * time.Millisecond)
 
 	// Milliseconds and Time should advance
-	if m.Milliseconds <= initialMs {
+	if m.GetMilliseconds() <= initialMs {
 		t.Error("Milliseconds should advance even without RealTime set")
 	}
 
-	if !m.Time.After(initialTime) {
+	if !m.GetTime().After(initialTime) {
 		t.Error("Time should advance even without RealTime set")
 	}
 
 	// RealTime should still be zero/unset
-	if !m.RealTime.IsZero() && m.realTimeSet == false {
+	if !m.GetRealTime().IsZero() && m.realTimeSet == false {
 		t.Error("RealTime should be zero when not set")
+	}
+}
+
+// TestMonotonicGetters tests the thread-safe getter methods
+func TestMonotonicGetters(t *testing.T) {
+	m := NewMonotonic()
+	time.Sleep(50 * time.Millisecond)
+
+	// Set real time reference
+	refTime := time.Date(2024, 6, 15, 12, 30, 0, 0, time.UTC)
+	m.SetRealTimeReference(refTime)
+
+	// Wait for watcher to tick
+	time.Sleep(50 * time.Millisecond)
+
+	// Test GetMilliseconds
+	ms := m.GetMilliseconds()
+	if ms == 0 {
+		t.Error("GetMilliseconds() should return non-zero after waiting")
+	}
+
+	// Verify getter returns same value as field (within mutex window)
+	m.mu.RLock()
+	directMs := m.GetMilliseconds()
+	m.mu.RUnlock()
+	if ms != directMs && ms != directMs+10 && ms != directMs-10 {
+		t.Logf("GetMilliseconds() = %d, direct access = %d (may differ due to timing)", ms, directMs)
+	}
+
+	// Test GetTime
+	gotTime := m.GetTime()
+	if gotTime.IsZero() {
+		t.Error("GetTime() should not return zero time")
+	}
+
+	// Test GetRealTime
+	gotRealTime := m.GetRealTime()
+	if gotRealTime.IsZero() {
+		t.Error("GetRealTime() should not return zero time after SetRealTimeReference")
+	}
+
+	// RealTime should have advanced from refTime
+	if !gotRealTime.After(refTime) && gotRealTime != refTime {
+		t.Errorf("GetRealTime() = %v should be >= refTime %v", gotRealTime, refTime)
+	}
+}
+
+// TestMonotonicGettersConsistency tests that getters are consistent
+func TestMonotonicGettersConsistency(t *testing.T) {
+	m := NewMonotonic()
+	time.Sleep(50 * time.Millisecond)
+
+	// Multiple calls to getters should return increasing values
+	ms1 := m.GetMilliseconds()
+	time1 := m.GetTime()
+
+	time.Sleep(50 * time.Millisecond)
+
+	ms2 := m.GetMilliseconds()
+	time2 := m.GetTime()
+
+	if ms2 <= ms1 {
+		t.Errorf("GetMilliseconds() should increase: %d -> %d", ms1, ms2)
+	}
+
+	if !time2.After(time1) {
+		t.Errorf("GetTime() should advance: %v -> %v", time1, time2)
 	}
 }
 
@@ -509,22 +579,22 @@ func TestMonotonicMultipleInstances(t *testing.T) {
 	}
 
 	// Both should advance independently
-	m1Ms := m1.Milliseconds
-	m2Ms := m2.Milliseconds
+	m1Ms := m1.GetMilliseconds()
+	m2Ms := m2.GetMilliseconds()
 
 	time.Sleep(100 * time.Millisecond)
 
-	if m1.Milliseconds <= m1Ms {
+	if m1.GetMilliseconds() <= m1Ms {
 		t.Error("m1 should advance")
 	}
 
-	if m2.Milliseconds <= m2Ms {
+	if m2.GetMilliseconds() <= m2Ms {
 		t.Error("m2 should advance")
 	}
 
 	// m1 started first, so should have higher milliseconds
-	if m1.Milliseconds <= m2.Milliseconds {
+	if m1.GetMilliseconds() <= m2.GetMilliseconds() {
 		t.Logf("Warning: m1 (%d) should have higher milliseconds than m2 (%d)",
-			m1.Milliseconds, m2.Milliseconds)
+			m1.GetMilliseconds(), m2.GetMilliseconds())
 	}
 }

@@ -47,8 +47,8 @@ func TestComputeTrafficPriority_BaroAltitude(t *testing.T) {
 
 	// Set up test scenario: ownship at 5000ft baro, target at 6000ft
 	mySituation.BaroPressureAltitude = 5000
-	mySituation.GPSAltitudeMSL = 4800                                             // different from baro
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-1 * time.Second) // valid baro (recent)
+	mySituation.GPSAltitudeMSL = 4800                                                  // different from baro
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime().Add(-1 * time.Second) // valid baro (recent)
 	mySituation.BaroTemperature = 25.0
 
 	ti := TrafficInfo{
@@ -81,7 +81,7 @@ func TestComputeTrafficPriority_GPSAltitude(t *testing.T) {
 	// Set up test scenario: no valid baro, use GPS altitude
 	mySituation.BaroPressureAltitude = 99999 // invalid
 	mySituation.GPSAltitudeMSL = 4500
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-20 * time.Second) // stale baro data (>15s)
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime().Add(-20 * time.Second) // stale baro data (>15s)
 
 	ti := TrafficInfo{
 		BearingDist_valid: true,
@@ -112,7 +112,7 @@ func TestComputeTrafficPriority_SameAltitude(t *testing.T) {
 
 	// Set up test scenario: both at 5000ft
 	mySituation.BaroPressureAltitude = 5000
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-1 * time.Second)
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime().Add(-1 * time.Second)
 	mySituation.BaroTemperature = 25.0
 
 	ti := TrafficInfo{
@@ -144,7 +144,7 @@ func TestComputeTrafficPriority_CloseAndLowAltDiff(t *testing.T) {
 
 	// Set up test scenario: very close and similar altitude
 	mySituation.BaroPressureAltitude = 3000
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-1 * time.Second)
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime().Add(-1 * time.Second)
 	mySituation.BaroTemperature = 25.0
 
 	ti := TrafficInfo{
@@ -180,12 +180,12 @@ func TestExtrapolateTraffic_InitialExtrapolation(t *testing.T) {
 		Vvel:                 500,  // 500 fpm climb
 		TurnRate:             0.0,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time,
+		Last_seen:            stratuxClock.GetTime(),
 	}
 
 	// Simulate 2 seconds passing
 	time.Sleep(10 * time.Millisecond) // small delay to ensure time difference
-	ti.Last_seen = stratuxClock.Time.Add(-2 * time.Second)
+	ti.Last_seen = stratuxClock.GetTime().Add(-2 * time.Second)
 
 	extrapolateTraffic(&ti)
 
@@ -238,7 +238,7 @@ func TestExtrapolateTraffic_ContinuedExtrapolation(t *testing.T) {
 		Vvel:                 -1000, // 1000 fpm descent
 		TurnRate:             0.0,
 		ExtrapolatedPosition: true, // already extrapolating
-		Last_extrapolation:   stratuxClock.Time.Add(-3 * time.Second),
+		Last_extrapolation:   stratuxClock.GetTime().Add(-3 * time.Second),
 	}
 
 	extrapolateTraffic(&ti)
@@ -309,7 +309,7 @@ func TestExtrapolateTraffic_TrackNormalization(t *testing.T) {
 				Vvel:                 0,
 				TurnRate:             tc.turnRate,
 				ExtrapolatedPosition: false,
-				Last_seen:            stratuxClock.Time.Add(-time.Duration(tc.seconds) * time.Second),
+				Last_seen:            stratuxClock.GetTime().Add(-time.Duration(tc.seconds) * time.Second),
 			}
 
 			extrapolateTraffic(&ti)
@@ -345,7 +345,7 @@ func TestExtrapolateTraffic_ZeroSpeed(t *testing.T) {
 		Vvel:                 0,
 		TurnRate:             0.0,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time.Add(-5 * time.Second),
+		Last_seen:            stratuxClock.GetTime().Add(-5 * time.Second),
 	}
 
 	extrapolateTraffic(&ti)
@@ -383,7 +383,7 @@ func TestExtrapolateTraffic_HighSpeed(t *testing.T) {
 		Vvel:                 2000, // 2000 fpm climb
 		TurnRate:             0.0,
 		ExtrapolatedPosition: false,
-		Last_seen:            stratuxClock.Time.Add(-10 * time.Second),
+		Last_seen:            stratuxClock.GetTime().Add(-10 * time.Second),
 	}
 
 	originalLat := ti.Lat

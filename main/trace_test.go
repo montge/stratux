@@ -777,7 +777,7 @@ func TestInjectTraceMessage_AllContexts(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.context, func(t *testing.T) {
 			// Set time slightly in the future so we don't sleep
-			ts := stratuxClock.Time.Add(-1 * time.Millisecond)
+			ts := stratuxClock.GetTime().Add(-1 * time.Millisecond)
 
 			// This should not panic
 			injectTraceMessage(tc.context, ts, []byte(tc.data))
@@ -806,7 +806,7 @@ func TestInjectTraceMessage_LOWPOWERUAT(t *testing.T) {
 	radioData := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
 
 	// Set time slightly in the future so we don't sleep
-	ts := stratuxClock.Time.Add(-1 * time.Millisecond)
+	ts := stratuxClock.GetTime().Add(-1 * time.Millisecond)
 
 	// This should not panic and should call processRadioMessage
 	injectTraceMessage(CONTEXT_LOWPOWERUAT, ts, radioData)
@@ -833,7 +833,7 @@ func TestInjectTraceMessage_UnknownContext(t *testing.T) {
 	testData := []byte("test data")
 
 	// Set time slightly in the future so we don't sleep
-	ts := stratuxClock.Time.Add(-1 * time.Millisecond)
+	ts := stratuxClock.GetTime().Add(-1 * time.Millisecond)
 
 	// This should not panic - the function should just not match any branch
 	injectTraceMessage(unknownContext, ts, testData)

@@ -605,8 +605,8 @@ func TestCheckTimestamp(t *testing.T) {
 			{
 				id:                   0,
 				Time_type_preference: 0,
-				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second), // Old enough to trigger new timestamp
-				PreferredTime_value:  stratuxClock.Time.Add(-2 * time.Second),
+				StratuxClock_value:   stratuxClock.GetTime().Add(-2 * time.Second), // Old enough to trigger new timestamp
+				PreferredTime_value:  stratuxClock.GetTime().Add(-2 * time.Second),
 			},
 		}
 		dataLogCurTimestamp = 0
@@ -636,8 +636,8 @@ func TestCheckTimestamp(t *testing.T) {
 			{
 				id:                   0,
 				Time_type_preference: 0,
-				StratuxClock_value:   stratuxClock.Time, // Just now
-				PreferredTime_value:  stratuxClock.Time,
+				StratuxClock_value:   stratuxClock.GetTime(), // Just now
+				PreferredTime_value:  stratuxClock.GetTime(),
 			},
 		}
 		dataLogCurTimestamp = 0
@@ -665,7 +665,7 @@ func TestCheckTimestamp(t *testing.T) {
 		}()
 
 		// Set up GPS clock as valid (isGPSClockValid checks GPSLastGPSTimeStratuxTime)
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 		globalStatus.GPS_connected = true
 
 		// Reset state with GPS timestamp (Time_type_preference = 1)
@@ -675,13 +675,13 @@ func TestCheckTimestamp(t *testing.T) {
 			{
 				id:                   0,
 				Time_type_preference: 0, // Placeholder first timestamp
-				StratuxClock_value:   stratuxClock.Time.Add(-4 * time.Second),
-				PreferredTime_value:  stratuxClock.Time.Add(-4 * time.Second),
+				StratuxClock_value:   stratuxClock.GetTime().Add(-4 * time.Second),
+				PreferredTime_value:  stratuxClock.GetTime().Add(-4 * time.Second),
 			},
 			{
 				id:                   1,
 				Time_type_preference: 1, // GPS time (type 1)
-				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second),
+				StratuxClock_value:   stratuxClock.GetTime().Add(-2 * time.Second),
 				GPSClock_value:       baseTime.Add(-2 * time.Second),
 				PreferredTime_value:  baseTime.Add(-2 * time.Second),
 			},
@@ -718,7 +718,7 @@ func TestCheckTimestamp(t *testing.T) {
 		}()
 
 		// Set up GPS clock as valid
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 		globalStatus.GPS_connected = true
 
 		// Reset state with extrapolated timestamp (Time_type_preference = 2)
@@ -728,13 +728,13 @@ func TestCheckTimestamp(t *testing.T) {
 			{
 				id:                   0,
 				Time_type_preference: 0, // Placeholder first timestamp
-				StratuxClock_value:   stratuxClock.Time.Add(-4 * time.Second),
-				PreferredTime_value:  stratuxClock.Time.Add(-4 * time.Second),
+				StratuxClock_value:   stratuxClock.GetTime().Add(-4 * time.Second),
+				PreferredTime_value:  stratuxClock.GetTime().Add(-4 * time.Second),
 			},
 			{
 				id:                   1,
 				Time_type_preference: 2, // Extrapolated time (type 2)
-				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second),
+				StratuxClock_value:   stratuxClock.GetTime().Add(-2 * time.Second),
 				GPSClock_value:       baseTime.Add(-2 * time.Second),
 				PreferredTime_value:  baseTime.Add(-2 * time.Second),
 			},
@@ -780,7 +780,7 @@ func TestCheckTimestamp(t *testing.T) {
 			{
 				id:                   0,
 				Time_type_preference: 1, // GPS time
-				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second),
+				StratuxClock_value:   stratuxClock.GetTime().Add(-2 * time.Second),
 				GPSClock_value:       baseTime.Add(-2 * time.Second),
 				PreferredTime_value:  baseTime.Add(-2 * time.Second),
 			},
@@ -817,7 +817,7 @@ func TestCheckTimestamp(t *testing.T) {
 		}()
 
 		// Set up GPS clock as valid
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 		globalStatus.GPS_connected = true
 
 		// Reset state - index 0 means this is effectively the first real timestamp
@@ -825,8 +825,8 @@ func TestCheckTimestamp(t *testing.T) {
 			{
 				id:                   0,
 				Time_type_preference: 0, // stratuxClock type
-				StratuxClock_value:   stratuxClock.Time.Add(-2 * time.Second),
-				PreferredTime_value:  stratuxClock.Time.Add(-2 * time.Second),
+				StratuxClock_value:   stratuxClock.GetTime().Add(-2 * time.Second),
+				PreferredTime_value:  stratuxClock.GetTime().Add(-2 * time.Second),
 			},
 		}
 		dataLogCurTimestamp = 0
@@ -876,7 +876,7 @@ func TestSetDataLogTimeWithGPS(t *testing.T) {
 	t.Run("logs_gps_time_when_conditions_met", func(t *testing.T) {
 		// Setup: datalog started and GPS clock valid
 		dataLogStarted = true
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time // Make GPS clock valid
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime() // Make GPS clock valid
 		dataLogTimestamps = []StratuxTimestamp{}
 		dataLogCurTimestamp = -1
 
@@ -910,7 +910,7 @@ func TestSetDataLogTimeWithGPS(t *testing.T) {
 	t.Run("no_log_when_datalog_not_started", func(t *testing.T) {
 		// Setup: datalog NOT started
 		dataLogStarted = false
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time // GPS clock valid
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime() // GPS clock valid
 		dataLogTimestamps = []StratuxTimestamp{}
 		dataLogCurTimestamp = -1
 
@@ -948,7 +948,7 @@ func TestSetDataLogTimeWithGPS(t *testing.T) {
 	t.Run("updates_current_timestamp_index", func(t *testing.T) {
 		// Setup
 		dataLogStarted = true
-		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
 		dataLogTimestamps = []StratuxTimestamp{
 			{id: 0}, // Existing timestamp
 		}
@@ -1949,7 +1949,7 @@ func TestInsertData(t *testing.T) {
 
 		// Setup timestamp
 		dataLogTimestamps = []StratuxTimestamp{
-			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+			{id: 1, StratuxClock_value: stratuxClock.GetTime(), PreferredTime_value: stratuxClock.GetTime()},
 		}
 		dataLogCurTimestamp = 0
 
@@ -1983,8 +1983,8 @@ func TestInsertData(t *testing.T) {
 		ts := StratuxTimestamp{
 			id:                   0,
 			Time_type_preference: 0,
-			StratuxClock_value:   stratuxClock.Time,
-			PreferredTime_value:  stratuxClock.Time,
+			StratuxClock_value:   stratuxClock.GetTime(),
+			PreferredTime_value:  stratuxClock.GetTime(),
 		}
 
 		dataLogTimestamps = []StratuxTimestamp{ts}
@@ -2049,8 +2049,8 @@ func TestInsertData(t *testing.T) {
 			{
 				id:                   0,
 				Time_type_preference: 0,
-				StratuxClock_value:   stratuxClock.Time,
-				PreferredTime_value:  stratuxClock.Time,
+				StratuxClock_value:   stratuxClock.GetTime(),
+				PreferredTime_value:  stratuxClock.GetTime(),
 			},
 		}
 		dataLogCurTimestamp = 0
@@ -2081,7 +2081,7 @@ func TestInsertData(t *testing.T) {
 		makeTable(MultiData{}, "multi_insert", db)
 
 		dataLogTimestamps = []StratuxTimestamp{
-			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+			{id: 1, StratuxClock_value: stratuxClock.GetTime(), PreferredTime_value: stratuxClock.GetTime()},
 		}
 		dataLogCurTimestamp = 0
 
@@ -2140,7 +2140,7 @@ func TestBulkInsert(t *testing.T) {
 		makeTable(BulkData{}, "bulk_single", db)
 
 		dataLogTimestamps = []StratuxTimestamp{
-			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+			{id: 1, StratuxClock_value: stratuxClock.GetTime(), PreferredTime_value: stratuxClock.GetTime()},
 		}
 		dataLogCurTimestamp = 0
 
@@ -2185,7 +2185,7 @@ func TestBulkInsert(t *testing.T) {
 		makeTable(BulkData{}, "bulk_multi", db)
 
 		dataLogTimestamps = []StratuxTimestamp{
-			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+			{id: 1, StratuxClock_value: stratuxClock.GetTime(), PreferredTime_value: stratuxClock.GetTime()},
 		}
 		dataLogCurTimestamp = 0
 
@@ -2235,7 +2235,7 @@ func TestBulkInsert(t *testing.T) {
 		makeTable(BulkData{}, "bulk_large", db)
 
 		dataLogTimestamps = []StratuxTimestamp{
-			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+			{id: 1, StratuxClock_value: stratuxClock.GetTime(), PreferredTime_value: stratuxClock.GetTime()},
 		}
 		dataLogCurTimestamp = 0
 
@@ -2299,7 +2299,7 @@ func TestBulkInsert(t *testing.T) {
 		makeTable(DetailedData{}, "bulk_detailed", db)
 
 		dataLogTimestamps = []StratuxTimestamp{
-			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+			{id: 1, StratuxClock_value: stratuxClock.GetTime(), PreferredTime_value: stratuxClock.GetTime()},
 		}
 		dataLogCurTimestamp = 0
 

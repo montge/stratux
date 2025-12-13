@@ -116,7 +116,7 @@ func TestNetworkConnection_IsThrottled(t *testing.T) {
 	}
 
 	// When LastUnreachable is recent (< 15 seconds), should be throttled sometimes
-	conn.LastUnreachable = stratuxClock.Time
+	conn.LastUnreachable = stratuxClock.GetTime()
 
 	// Test multiple times to account for randomness (rand.Int()%1000 != 0)
 	throttledCount := 0
@@ -133,7 +133,7 @@ func TestNetworkConnection_IsThrottled(t *testing.T) {
 	}
 
 	// When LastUnreachable is old (>= 15 seconds), should not be throttled
-	conn.LastUnreachable = stratuxClock.Time.Add(-16 * time.Second)
+	conn.LastUnreachable = stratuxClock.GetTime().Add(-16 * time.Second)
 	throttledCount = 0
 	for i := 0; i < testRuns; i++ {
 		if conn.IsThrottled() {
@@ -195,8 +195,8 @@ func TestNetworkConnection_IsSleeping(t *testing.T) {
 	}
 
 	// Test case 4: Recent pong response - should not be sleeping
-	conn.LastPongResponse = stratuxClock.Time
-	conn.LastPingResponse = stratuxClock.Time
+	conn.LastPongResponse = stratuxClock.GetTime()
+	conn.LastPingResponse = stratuxClock.GetTime()
 	conn.LastUnreachable = time.Time{} // Zero time (old)
 	if conn.IsSleeping() {
 		t.Error("IsSleeping should return false when LastPongResponse is recent")
@@ -206,29 +206,29 @@ func TestNetworkConnection_IsSleeping(t *testing.T) {
 	}
 
 	// Test case 5: Old pong response (> 10 seconds) - should be sleeping
-	conn.LastPongResponse = stratuxClock.Time.Add(-11 * time.Second)
-	conn.LastPingResponse = stratuxClock.Time.Add(-11 * time.Second)
+	conn.LastPongResponse = stratuxClock.GetTime().Add(-11 * time.Second)
+	conn.LastPingResponse = stratuxClock.GetTime().Add(-11 * time.Second)
 	if !conn.IsSleeping() {
 		t.Error("IsSleeping should return true when LastPongResponse is old")
 	}
 
 	// Test case 6: No ping response - should be sleeping
-	conn.LastPingResponse = time.Time{}       // Zero time
-	conn.LastPongResponse = stratuxClock.Time // Recent pong
+	conn.LastPingResponse = time.Time{}            // Zero time
+	conn.LastPongResponse = stratuxClock.GetTime() // Recent pong
 	if !conn.IsSleeping() {
 		t.Error("IsSleeping should return true when LastPingResponse is zero")
 	}
 
 	// Test case 7: Recent unreachable (< 5 seconds) - should be sleeping
-	conn.LastPongResponse = stratuxClock.Time
-	conn.LastPingResponse = stratuxClock.Time
-	conn.LastUnreachable = stratuxClock.Time
+	conn.LastPongResponse = stratuxClock.GetTime()
+	conn.LastPingResponse = stratuxClock.GetTime()
+	conn.LastUnreachable = stratuxClock.GetTime()
 	if !conn.IsSleeping() {
 		t.Error("IsSleeping should return true when LastUnreachable is recent")
 	}
 
 	// Test case 8: Old unreachable (>= 5 seconds) - should not be sleeping
-	conn.LastUnreachable = stratuxClock.Time.Add(-6 * time.Second)
+	conn.LastUnreachable = stratuxClock.GetTime().Add(-6 * time.Second)
 	if conn.IsSleeping() {
 		t.Error("IsSleeping should return false when LastUnreachable is old and pings are recent")
 	}
@@ -272,8 +272,8 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 			name:             "LastPongResponse is zero",
 			noSleep:          false,
 			lastPongResponse: time.Time{},
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			description:      "conn.LastPongResponse.IsZero() == true branch",
@@ -281,9 +281,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "LastPongResponse older than 10 seconds",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time.Add(-11 * time.Second),
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime().Add(-11 * time.Second),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			description:      "stratuxClock.Since(conn.LastPongResponse) > 10s branch",
@@ -291,9 +291,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "LastPongResponse exactly 10 seconds",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time.Add(-10 * time.Second),
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime().Add(-10 * time.Second),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     false,
 			wantSleepFlag:    false,
 			description:      "boundary: exactly 10s should not sleep",
@@ -301,9 +301,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "LastPingResponse is zero",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
+			lastPongResponse: stratuxClock.GetTime(),
 			lastPingResponse: time.Time{},
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			description:      "conn.LastPingResponse.IsZero() == true branch",
@@ -311,9 +311,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "LastPingResponse older than 10 seconds",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time.Add(-11 * time.Second),
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime().Add(-11 * time.Second),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			description:      "stratuxClock.Since(conn.LastPingResponse) > 10s branch",
@@ -321,9 +321,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "LastPingResponse exactly 10 seconds",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time.Add(-10 * time.Second),
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime().Add(-10 * time.Second),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     false,
 			wantSleepFlag:    false,
 			description:      "boundary: exactly 10s should not sleep",
@@ -331,9 +331,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "LastUnreachable less than 5 seconds",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-2 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-2 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			description:      "stratuxClock.Since(conn.LastUnreachable) < 5s branch",
@@ -341,9 +341,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "LastUnreachable exactly 5 seconds",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-5 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-5 * time.Second),
 			wantSleeping:     false,
 			wantSleepFlag:    false,
 			description:      "boundary: exactly 5s should not sleep (else branch)",
@@ -351,9 +351,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "All responses healthy",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     false,
 			wantSleepFlag:    false,
 			description:      "else branch: all healthy, sets SleepFlag = false",
@@ -371,9 +371,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "Pong recent but ping old",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time.Add(-12 * time.Second),
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime().Add(-12 * time.Second),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			description:      "tests else-if for ping when pong is OK",
@@ -381,9 +381,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "Both pings recent but unreachable recent",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-1 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-1 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			description:      "tests third else-if for unreachable",
@@ -391,9 +391,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "Pong 9 seconds old",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time.Add(-9 * time.Second),
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime().Add(-9 * time.Second),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     false,
 			wantSleepFlag:    false,
 			description:      "just under 10s threshold should not sleep",
@@ -401,9 +401,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "Ping 9 seconds old",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time.Add(-9 * time.Second),
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime().Add(-9 * time.Second),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     false,
 			wantSleepFlag:    false,
 			description:      "just under 10s threshold should not sleep",
@@ -411,9 +411,9 @@ func TestNetworkConnection_IsSleeping_AllBranches(t *testing.T) {
 		{
 			name:             "Unreachable 4 seconds ago",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-4 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-4 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			description:      "just under 5s threshold should sleep",
@@ -484,9 +484,9 @@ func TestNetworkConnection_IsSleeping_X86Only(t *testing.T) {
 		{
 			name:             "x86 with old responses",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time.Add(-20 * time.Second),
-			lastPingResponse: stratuxClock.Time.Add(-20 * time.Second),
-			lastUnreachable:  stratuxClock.Time,
+			lastPongResponse: stratuxClock.GetTime().Add(-20 * time.Second),
+			lastPingResponse: stratuxClock.GetTime().Add(-20 * time.Second),
+			lastUnreachable:  stratuxClock.GetTime(),
 		},
 		{
 			name:             "x86 with NoSleep",
@@ -1719,7 +1719,7 @@ func TestNetworkConnection_IsSleeping_EdgeCases(t *testing.T) {
 	}
 
 	// Test: Recent ping but no pong - should be sleeping
-	conn.LastPingResponse = stratuxClock.Time
+	conn.LastPingResponse = stratuxClock.GetTime()
 	conn.LastPongResponse = time.Time{} // Zero
 	conn.LastUnreachable = time.Time{}  // Zero
 	if !conn.IsSleeping() {
@@ -1727,16 +1727,16 @@ func TestNetworkConnection_IsSleeping_EdgeCases(t *testing.T) {
 	}
 
 	// Test: Recent pong but old ping (>10s) - should be sleeping
-	conn.LastPongResponse = stratuxClock.Time
-	conn.LastPingResponse = stratuxClock.Time.Add(-11 * time.Second)
+	conn.LastPongResponse = stratuxClock.GetTime()
+	conn.LastPingResponse = stratuxClock.GetTime().Add(-11 * time.Second)
 	if !conn.IsSleeping() {
 		t.Error("Should be sleeping when ping is old")
 	}
 
 	// Test: Both recent but recent unreachable - should be sleeping
-	conn.LastPongResponse = stratuxClock.Time
-	conn.LastPingResponse = stratuxClock.Time
-	conn.LastUnreachable = stratuxClock.Time.Add(-2 * time.Second)
+	conn.LastPongResponse = stratuxClock.GetTime()
+	conn.LastPingResponse = stratuxClock.GetTime()
+	conn.LastUnreachable = stratuxClock.GetTime().Add(-2 * time.Second)
 	if !conn.IsSleeping() {
 		t.Error("Should be sleeping when recently unreachable")
 	}
@@ -1815,7 +1815,7 @@ func TestNetworkConnection_IsThrottled_Boundaries(t *testing.T) {
 	}
 
 	// Exactly at 15 second boundary
-	conn.LastUnreachable = stratuxClock.Time.Add(-15 * time.Second)
+	conn.LastUnreachable = stratuxClock.GetTime().Add(-15 * time.Second)
 	notThrottledCount := 0
 	testRuns := 100
 	for i := 0; i < testRuns; i++ {
@@ -1829,7 +1829,7 @@ func TestNetworkConnection_IsThrottled_Boundaries(t *testing.T) {
 	}
 
 	// Just before 15 second threshold
-	conn.LastUnreachable = stratuxClock.Time.Add(-14*time.Second - 999*time.Millisecond)
+	conn.LastUnreachable = stratuxClock.GetTime().Add(-14*time.Second - 999*time.Millisecond)
 	throttledCount := 0
 	for i := 0; i < testRuns; i++ {
 		if conn.IsThrottled() {
@@ -1987,9 +1987,9 @@ func TestNetworkConnection_Concurrent(t *testing.T) {
 		Ip:               "192.168.10.200",
 		Port:             5000,
 		Capability:       NETWORK_GDL90_STANDARD,
-		LastPongResponse: stratuxClock.Time,
-		LastPingResponse: stratuxClock.Time,
-		LastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+		LastPongResponse: stratuxClock.GetTime(),
+		LastPingResponse: stratuxClock.GetTime(),
+		LastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 	}
 
 	// Test concurrent access to various methods
@@ -2260,27 +2260,27 @@ func TestNetworkConnection_StateTransitions(t *testing.T) {
 	}
 
 	// State 2: Client wakes up (recent ping/pong) -> should be awake
-	conn.LastPingResponse = stratuxClock.Time
-	conn.LastPongResponse = stratuxClock.Time
+	conn.LastPingResponse = stratuxClock.GetTime()
+	conn.LastPongResponse = stratuxClock.GetTime()
 	conn.LastUnreachable = time.Time{}
 	if conn.IsSleeping() {
 		t.Error("After wake up: should not be sleeping")
 	}
 
 	// State 3: Client becomes unreachable -> should be sleeping
-	conn.LastUnreachable = stratuxClock.Time.Add(-2 * time.Second)
+	conn.LastUnreachable = stratuxClock.GetTime().Add(-2 * time.Second)
 	if !conn.IsSleeping() {
 		t.Error("After unreachable: should be sleeping")
 	}
 
 	// State 4: Unreachable timeout expires -> should be awake again
-	conn.LastUnreachable = stratuxClock.Time.Add(-6 * time.Second)
+	conn.LastUnreachable = stratuxClock.GetTime().Add(-6 * time.Second)
 	if conn.IsSleeping() {
 		t.Error("After unreachable timeout: should not be sleeping")
 	}
 
 	// State 5: Ping times out -> should be sleeping
-	conn.LastPingResponse = stratuxClock.Time.Add(-11 * time.Second)
+	conn.LastPingResponse = stratuxClock.GetTime().Add(-11 * time.Second)
 	if !conn.IsSleeping() {
 		t.Error("After ping timeout: should be sleeping")
 	}

@@ -61,7 +61,7 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 			name:             "Pong response is zero",
 			noSleep:          false,
 			lastPongResponse: time.Time{}, // Zero
-			lastPingResponse: stratuxClock.Time,
+			lastPingResponse: stratuxClock.GetTime(),
 			lastUnreachable:  time.Time{},
 			wantSleeping:     true,
 			wantSleepFlag:    true,
@@ -71,8 +71,8 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 		{
 			name:             "Pong response old (>10s)",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time.Add(-11 * time.Second),
-			lastPingResponse: stratuxClock.Time,
+			lastPongResponse: stratuxClock.GetTime().Add(-11 * time.Second),
+			lastPingResponse: stratuxClock.GetTime(),
 			lastUnreachable:  time.Time{},
 			wantSleeping:     true,
 			wantSleepFlag:    true,
@@ -82,8 +82,8 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 		{
 			name:             "Pong exactly 10s ago",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time.Add(-10 * time.Second),
-			lastPingResponse: stratuxClock.Time,
+			lastPongResponse: stratuxClock.GetTime().Add(-10 * time.Second),
+			lastPingResponse: stratuxClock.GetTime(),
 			lastUnreachable:  time.Time{},
 			wantSleeping:     false,
 			wantSleepFlag:    false,
@@ -93,7 +93,7 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 		{
 			name:             "Ping response is zero",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
+			lastPongResponse: stratuxClock.GetTime(),
 			lastPingResponse: time.Time{}, // Zero
 			lastUnreachable:  time.Time{},
 			wantSleeping:     true,
@@ -104,8 +104,8 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 		{
 			name:             "Ping response old (>10s)",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time.Add(-11 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime().Add(-11 * time.Second),
 			lastUnreachable:  time.Time{},
 			wantSleeping:     true,
 			wantSleepFlag:    true,
@@ -115,8 +115,8 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 		{
 			name:             "Ping exactly 10s ago",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime().Add(-10 * time.Second),
 			lastUnreachable:  time.Time{},
 			wantSleeping:     false,
 			wantSleepFlag:    false,
@@ -126,9 +126,9 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 		{
 			name:             "Recently unreachable (<5s)",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-2 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-2 * time.Second),
 			wantSleeping:     true,
 			wantSleepFlag:    true,
 			skipOnX86:        true,
@@ -137,9 +137,9 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 		{
 			name:             "Unreachable exactly 5s ago",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-5 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-5 * time.Second),
 			wantSleeping:     false,
 			wantSleepFlag:    false,
 			skipOnX86:        true,
@@ -148,9 +148,9 @@ func TestNetworkConnection_IsSleeping_Comprehensive(t *testing.T) {
 		{
 			name:             "All conditions healthy",
 			noSleep:          false,
-			lastPongResponse: stratuxClock.Time,
-			lastPingResponse: stratuxClock.Time,
-			lastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+			lastPongResponse: stratuxClock.GetTime(),
+			lastPingResponse: stratuxClock.GetTime(),
+			lastUnreachable:  stratuxClock.GetTime().Add(-10 * time.Second),
 			wantSleeping:     false,
 			wantSleepFlag:    false,
 			skipOnX86:        true,
@@ -247,9 +247,9 @@ func TestNetworkConnection_IsSleeping_X86Behavior(t *testing.T) {
 			conn := &networkConnection{
 				Ip:               "192.168.10.100",
 				Port:             4000,
-				LastPongResponse: time.Time{},       // Zero - would trigger sleep on ARM
-				LastPingResponse: time.Time{},       // Zero - would trigger sleep on ARM
-				LastUnreachable:  stratuxClock.Time, // Recent - would trigger sleep on ARM
+				LastPongResponse: time.Time{},            // Zero - would trigger sleep on ARM
+				LastPingResponse: time.Time{},            // Zero - would trigger sleep on ARM
+				LastUnreachable:  stratuxClock.GetTime(), // Recent - would trigger sleep on ARM
 			}
 
 			got := conn.IsSleeping()

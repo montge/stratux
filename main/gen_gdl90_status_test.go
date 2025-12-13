@@ -581,7 +581,7 @@ func TestMakeStratuxStatus_GPSFixQuality3D(t *testing.T) {
 	// Set up GPS with fix quality 1 (3D GPS, not DGPS)
 	mySituation.muGPS.Lock()
 	mySituation.GPSFixQuality = 1
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	msg := makeStratuxStatus()
@@ -653,7 +653,7 @@ func TestMakeStratuxStatus_GPSFixQuality2DGPS(t *testing.T) {
 	// Set up GPS with fix quality 2 (DGPS/SBAS/WAAS)
 	mySituation.muGPS.Lock()
 	mySituation.GPSFixQuality = 2
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	msg := makeStratuxStatus()
@@ -725,7 +725,7 @@ func TestMakeStratuxStatus_GPSFixQualityDefault(t *testing.T) {
 	// Set up GPS with fix quality 0 (default case - neither 1 nor 2)
 	mySituation.muGPS.Lock()
 	mySituation.GPSFixQuality = 0
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 
 	msg := makeStratuxStatus()
@@ -872,8 +872,8 @@ func TestMakeStratuxStatus_UnknownGPSFixQuality(t *testing.T) {
 	// Set GPS fix quality to an unknown value (not 0, 1, or 2)
 	// Also need to make GPS valid for the switch statement to be entered
 	mySituation.muGPS.Lock()
-	mySituation.GPSFixQuality = 99                      // Unknown value - should trigger default case
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Make GPS "valid" (recent fix)
+	mySituation.GPSFixQuality = 99                           // Unknown value - should trigger default case
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime() // Make GPS "valid" (recent fix)
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
 
@@ -2611,7 +2611,7 @@ func TestMsgLogAppend_Basic(t *testing.T) {
 	// Create a test message
 	testMsg := msg{
 		MessageClass:     MSGCLASS_UAT,
-		TimeReceived:     stratuxClock.Time,
+		TimeReceived:     stratuxClock.GetTime(),
 		Data:             "test-data",
 		Products:         []uint32{413},
 		Signal_amplitude: 100,
@@ -2669,7 +2669,7 @@ func TestMsgLogAppend_MultipleMessages(t *testing.T) {
 	for i, msgClass := range msgClasses {
 		testMsg := msg{
 			MessageClass:     msgClass,
-			TimeReceived:     stratuxClock.Time,
+			TimeReceived:     stratuxClock.GetTime(),
 			Data:             "test-data-" + string(rune('0'+i)),
 			Signal_amplitude: 100 + i,
 			Signal_strength:  -10.0 - float64(i),
@@ -2716,7 +2716,7 @@ func TestMsgLogAppend_PreservesOrder(t *testing.T) {
 	for i := 0; i < numMessages; i++ {
 		testMsg := msg{
 			MessageClass:     MSGCLASS_UAT,
-			TimeReceived:     stratuxClock.Time,
+			TimeReceived:     stratuxClock.GetTime(),
 			Signal_amplitude: i,
 		}
 		msgLogAppend(testMsg)
@@ -2790,7 +2790,7 @@ func TestMsgLogAppend_LargeVolume(t *testing.T) {
 	for i := 0; i < numMessages; i++ {
 		testMsg := msg{
 			MessageClass:     MSGCLASS_ES,
-			TimeReceived:     stratuxClock.Time,
+			TimeReceived:     stratuxClock.GetTime(),
 			Signal_amplitude: i,
 		}
 		msgLogAppend(testMsg)
@@ -2846,7 +2846,7 @@ func TestMsgLogAppend_Concurrent(t *testing.T) {
 			for i := 0; i < messagesPerGoroutine; i++ {
 				testMsg := msg{
 					MessageClass:     uint(goroutineID % 4), // Rotate through message classes
-					TimeReceived:     stratuxClock.Time,
+					TimeReceived:     stratuxClock.GetTime(),
 					Signal_amplitude: goroutineID*1000 + i,
 				}
 				msgLogAppend(testMsg)
@@ -2900,7 +2900,7 @@ func TestMsgLogAppend_WithExistingMessages(t *testing.T) {
 	// Append a new message
 	newMsg := msg{
 		MessageClass:     MSGCLASS_OGN,
-		TimeReceived:     stratuxClock.Time,
+		TimeReceived:     stratuxClock.GetTime(),
 		Signal_amplitude: 3,
 	}
 	msgLogAppend(newMsg)
@@ -3353,7 +3353,7 @@ func TestMakeStratuxStatus_WithValidTempPress(t *testing.T) {
 
 	// Set up valid temperature/pressure with recent timestamp
 	mySituation.muBaro.Lock()
-	mySituation.BaroLastMeasurementTime = stratuxClock.Time
+	mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
 	mySituation.muBaro.Unlock()
 
 	msg := makeStratuxStatus()

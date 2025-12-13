@@ -174,8 +174,8 @@ func TestUpdateDemoTraffic_GPSLocation(t *testing.T) {
 	mySituation.GPSLongitude = -100.0
 	mySituation.GPSAltitudeMSL = 3000
 	mySituation.GPSFixQuality = 2
-	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
-	mySituation.GPSLastFixLocalTime = stratuxClock.Time
+	mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.GetTime()
+	mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
 
@@ -232,7 +232,7 @@ func TestUpdateDemoTraffic_CircularMotion(t *testing.T) {
 	icao := uint32(0x456789)
 
 	// Call updateDemoTraffic multiple times (simulating time passing)
-	// Heading calculation: hdg = ((stratuxClock.Milliseconds/1000 + offset) % 720) / 2
+	// Heading calculation: hdg = ((stratuxClock.GetMilliseconds()/1000 + offset) % 720) / 2
 	// This means heading cycles from 0-360 degrees
 
 	updateDemoTraffic(icao, "DEMO4", 0, 220, 0)
@@ -290,12 +290,12 @@ func TestUpdateDemoTraffic_HeadingSuppression(t *testing.T) {
 	globalStatus.GPS_connected = false
 
 	// Use offsets that will result in headings in suppression zone (150-240 degrees)
-	// hdg = ((stratuxClock.Milliseconds/1000 + offset) % 720) / 2
+	// hdg = ((stratuxClock.GetMilliseconds()/1000 + offset) % 720) / 2
 	// To force hdg = 180, we need offset such that result = 360
 	// (currentTime + offset) % 720 = 360
 
 	// Get current time in seconds and calculate offset for heading ~180
-	currentSec := int32(stratuxClock.Milliseconds / 1000)
+	currentSec := int32(stratuxClock.GetMilliseconds() / 1000)
 	targetHdgDouble := int32(360) // *2 because of /2 in formula
 	offset := (targetHdgDouble - currentSec) % 720
 	if offset < 0 {
@@ -342,7 +342,7 @@ func TestUpdateDemoTraffic_OnGroundFlag(t *testing.T) {
 
 	// Force heading to be 250 (in range 240-270)
 	// This is outside suppression zone (150-240) so traffic should be added
-	currentSec := int32(stratuxClock.Milliseconds / 1000)
+	currentSec := int32(stratuxClock.GetMilliseconds() / 1000)
 	targetHdgDouble := int32(500) // 500/2 = 250 degrees
 	offset := (targetHdgDouble - currentSec) % 720
 	if offset < 0 {
@@ -391,7 +391,7 @@ func TestUpdateDemoTraffic_SpeedInvalid(t *testing.T) {
 	globalStatus.GPS_connected = false
 
 	// Force heading to be 140 (in range 135-150, outside suppression 150-240)
-	currentSec := int32(stratuxClock.Milliseconds / 1000)
+	currentSec := int32(stratuxClock.GetMilliseconds() / 1000)
 	targetHdgDouble := int32(280) // 280/2 = 140 degrees
 	offset := (targetHdgDouble - currentSec) % 720
 	if offset < 0 {
@@ -862,7 +862,7 @@ func TestUpdateDemoTraffic_HeadingEdgeCases(t *testing.T) {
 		trafficMutex.Unlock()
 
 		// Calculate offset to achieve target heading
-		currentSec := int32(stratuxClock.Milliseconds / 1000)
+		currentSec := int32(stratuxClock.GetMilliseconds() / 1000)
 		targetHdgDouble := tc.targetHdg * 2
 		offset := (targetHdgDouble - currentSec) % 720
 		if offset < 0 {
