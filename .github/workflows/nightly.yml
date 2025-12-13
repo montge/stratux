@@ -8,6 +8,10 @@ on:
   # Allow manual trigger
   workflow_dispatch:
 
+# Explicit permissions following least privilege principle
+# Job-level permissions are defined where needed (create-release job)
+permissions: {}
+
 jobs:
   check-changes:
     runs-on: ubuntu-latest

@@ -15,6 +15,10 @@ on:
         required: true
         type: string
 
+# Explicit permissions following least privilege principle
+# Job-level permissions are defined where needed (create-release job)
+permissions: {}
+
 jobs:
   build-us-image:
     runs-on: ubuntu-24.04-arm

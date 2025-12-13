@@ -7,6 +7,9 @@ on:
     branches: [ master ]
   workflow_dispatch:
 
+# Explicit permissions following least privilege principle
+permissions: {}
+
 jobs:
   test:
     name: Test & Coverage
@@ -15,6 +18,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for SonarCloud analysis
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -132,6 +137,11 @@ jobs:
           gofmt -l ./main ./common
           exit 1
         fi
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarqube-scan-action@v7
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build:
     name: Build Debian Package
