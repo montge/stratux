@@ -1,4 +1,4 @@
-## 1. Phase 1: Low-Hanging Fruit (Current: 56.4%, Target: 60%)
+## 1. Phase 1: Low-Hanging Fruit (Current: 56.5%, Target: 60%)
 
 ### 1.1 HTTP API Handlers
 - [x] Test remaining managementinterface.go handlers
@@ -32,10 +32,21 @@
 - [x] Test lookupOgnTailNumber (42.9% - limited by file I/O)
 - [x] Test importOgnStatusMessage (100% coverage)
 
-### 1.6 Remaining to reach 60% (~3.6% needed)
+### 1.6 Traffic/Demo Functions (NEW)
+- [x] Test updateDemoTraffic (100% coverage) - ADSR upgrade path
+- [x] Test pingKill (100% coverage) - wait loop path
+- [x] Test pongKill (100% coverage) - wait loop path
+
+### 1.7 MBTiles/Map Functions (NEW)
+- [x] Test connectMbTilesArchive (92.9% coverage)
+- [x] Test handleTilesets (50% coverage)
+- [x] Test handleTile validation
+
+### 1.8 Remaining to reach 60% (~3.5% needed)
 - [ ] sendTrafficUpdates (45.1%) - blocked by network operations
 - [ ] handleDownloadAHRSLogsRequest (36.1%) - file I/O heavy
 - [ ] processNMEALineLow (84.2%) - already heavily tested
+- [ ] sdrKill (66.7%) - requires mock SDR device
 
 ## 2. Phase 2: Interface Mocking (Target: 75%)
 
