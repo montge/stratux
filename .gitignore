@@ -69,3 +69,7 @@ coverage/
 
 # Backup files
 *.bak
+
+# SonarCloud/SonarQube working directories
+.scannerwork/
+.sonar/
