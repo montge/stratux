@@ -890,3 +890,95 @@ func TestUpdateDemoTraffic_HeadingEdgeCases(t *testing.T) {
 		}
 	}
 }
+
+// TestUpdateDemoTraffic_ADSRUpgrade tests the ADS-R upgrade path for existing TIS-B_S targets
+// Verifies: When a target with Addr_type=2 already exists with NIC>=7 and Emitter_category>0,
+// subsequent calls upgrade TargetType from TISB_S to ADSR
+func TestUpdateDemoTraffic_ADSRUpgrade(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	if traffic == nil {
+		traffic = make(map[uint32]TrafficInfo)
+	}
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+	if seenTraffic == nil {
+		seenTraffic = make(map[uint32]bool)
+	}
+
+	// Clear traffic
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+	trafficMutex.Unlock()
+
+	mySituation.GPSAltitudeMSL = 5000
+	globalStatus.GPS_connected = false
+
+	// ICAO that gives Addr_type = 2 (TIS-B with ICAO address)
+	// icao % 4 == 2 -> Addr_type = 2
+	icao := uint32(0x100002) // 0x100002 % 4 = 2
+
+	// First update - sets NIC=8, Emitter_category=1 (both happen after target type check)
+	// So first call sets TargetType = TISB_S because NIC/Emitter are 0 when checked
+	updateDemoTraffic(icao, "DEMO_ADSR", 0, 220, 0)
+
+	trafficMutex.Lock()
+	ti1, exists := traffic[icao]
+	trafficMutex.Unlock()
+
+	if !exists {
+		t.Fatalf("First update should create traffic")
+	}
+
+	// After first call, ti1 should have:
+	// - Addr_type = 2
+	// - NIC = 8 (set at line 1535)
+	// - Emitter_category = 1 (set at line 1509)
+	// - TargetType = TISB_S (because NIC/Emitter were 0 when checked)
+	if ti1.Addr_type != 2 {
+		t.Errorf("First call: Addr_type = %d, want 2", ti1.Addr_type)
+	}
+	if ti1.NIC != 8 {
+		t.Errorf("First call: NIC = %d, want 8", ti1.NIC)
+	}
+	if ti1.Emitter_category != 1 {
+		t.Errorf("First call: Emitter_category = %d, want 1", ti1.Emitter_category)
+	}
+	if ti1.TargetType != TARGET_TYPE_TISB_S {
+		t.Errorf("First call: TargetType = %d, want %d (TISB_S)", ti1.TargetType, TARGET_TYPE_TISB_S)
+	}
+
+	// Second update - now the existing traffic has NIC=8 and Emitter_category=1
+	// When the code runs: ti = val (copy from map) -> ti already has NIC=8, Emitter=1
+	// Then ti.Addr_type = 2 (set from icao % 4)
+	// The check at line 1504: (ti.NIC >= 7) && (ti.Emitter_category > 0) should be TRUE
+	// So TargetType should be upgraded to ADSR
+	updateDemoTraffic(icao, "DEMO_ADSR", 0, 220, 0)
+
+	trafficMutex.Lock()
+	ti2, exists := traffic[icao]
+	trafficMutex.Unlock()
+
+	if !exists {
+		t.Fatalf("Second update should preserve traffic")
+	}
+
+	// After second call, NIC and Emitter are still set from first call when copied
+	// So the ADS-R upgrade check should trigger
+	if ti2.NIC < 7 {
+		t.Errorf("Second call: NIC = %d, should be >= 7 for ADSR upgrade", ti2.NIC)
+	}
+	if ti2.Emitter_category <= 0 {
+		t.Errorf("Second call: Emitter_category = %d, should be > 0 for ADSR upgrade", ti2.Emitter_category)
+	}
+
+	// The key assertion: TargetType should now be ADSR after second call
+	if ti2.TargetType != TARGET_TYPE_ADSR {
+		t.Errorf("Second call: TargetType = %d, want %d (ADSR) - should upgrade from TISB_S when NIC>=7 and Emitter>0",
+			ti2.TargetType, TARGET_TYPE_ADSR)
+	}
+}
