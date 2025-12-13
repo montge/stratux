@@ -1137,8 +1137,8 @@ func TestLookupOgnTailNumber_LargeDatabase(t *testing.T) {
 			t.Errorf("Expected cache to have 100 entries, got %d", len(ognTailNumberCache))
 		}
 
-		// Test lookup of last device
-		result = lookupOgnTailNumber("DX1234")
+		// Test lookup of last device (i=99: 'A'+99/26='D', 'A'+99%26='V' -> "DV1234")
+		result = lookupOgnTailNumber("DV1234")
 		if result != "N99345" {
 			t.Errorf("Expected 'N99345', got '%s'", result)
 		}

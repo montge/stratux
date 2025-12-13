@@ -5684,7 +5684,7 @@ func TestHandleTile(t *testing.T) {
 		{
 			name:           "invalid_uri_too_short_two_parts",
 			uri:            "/tiles/file/1",
-			expectedStatus: http.StatusOK, // Early return, no error written
+			expectedStatus: http.StatusNotFound, // 4 parts, doesn't early return - tries to load tile and fails
 		},
 		{
 			name:           "invalid_y_coordinate_not_a_number",
