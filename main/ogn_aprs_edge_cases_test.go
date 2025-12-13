@@ -378,8 +378,8 @@ func TestImportOgnTrafficMessage_DistanceFilter(t *testing.T) {
 
 	// Set GPS position far from the APRS target
 	mySituation.muGPS.Lock()
-	mySituation.GPSLatitude = 0.0   // Equator
-	mySituation.GPSLongitude = 0.0  // Prime meridian
+	mySituation.GPSLatitude = 0.0  // Equator
+	mySituation.GPSLongitude = 0.0 // Prime meridian
 	mySituation.muGPS.Unlock()
 
 	// Parse message - target is in Oxford UK, very far from (0,0)
@@ -403,11 +403,11 @@ func TestParseOgnMessage_InvalidJSON(t *testing.T) {
 	resetAPRSEdgeCaseState()
 
 	invalidJSONMessages := []string{
-		"",                              // Empty
-		"{",                             // Incomplete
-		`{"invalid": "json"`,           // Unclosed
-		`not json at all`,              // Plain text
-		`{"sys": 123}`,                 // sys is number not string
+		"",                   // Empty
+		"{",                  // Incomplete
+		`{"invalid": "json"`, // Unclosed
+		`not json at all`,    // Plain text
+		`{"sys": 123}`,       // sys is number not string
 	}
 
 	for i, msg := range invalidJSONMessages {
@@ -431,10 +431,10 @@ func TestParseOgnMessage_MissingFields(t *testing.T) {
 
 	// Valid JSON but missing required fields for traffic creation
 	incompleteMessages := []string{
-		`{"sys":"OGN"}`,                                    // No position
-		`{"sys":"OGN","addr":"123456"}`,                    // No lat/lon
-		`{"sys":"OGN","lat_deg":51.0}`,                     // No lon
-		`{"sys":"OGN","lon_deg":-1.0}`,                     // No lat
+		`{"sys":"OGN"}`,                 // No position
+		`{"sys":"OGN","addr":"123456"}`, // No lat/lon
+		`{"sys":"OGN","lat_deg":51.0}`,  // No lon
+		`{"sys":"OGN","lon_deg":-1.0}`,  // No lat
 	}
 
 	for i, msg := range incompleteMessages {

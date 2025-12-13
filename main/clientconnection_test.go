@@ -213,7 +213,7 @@ func TestNetworkConnection_IsSleeping(t *testing.T) {
 	}
 
 	// Test case 6: No ping response - should be sleeping
-	conn.LastPingResponse = time.Time{} // Zero time
+	conn.LastPingResponse = time.Time{}       // Zero time
 	conn.LastPongResponse = stratuxClock.Time // Recent pong
 	if !conn.IsSleeping() {
 		t.Error("IsSleeping should return true when LastPingResponse is zero")

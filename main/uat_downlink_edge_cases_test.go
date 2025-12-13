@@ -586,9 +586,9 @@ func TestUATDownlinkDEBUGModeUATVersion2(t *testing.T) {
 	frame[11] = byte((raw_alt&0x0F)<<4) | 0x07
 
 	// Mode Status with UAT version 2
-	frame[23] = (0 << 5) | (2 << 2) | 0x02 // priority=0, uat_version=2, sil=2
-	frame[24] = 0x03                        // status_sda bits
-	frame[25] = 9 << 4                      // NACp = 9
+	frame[23] = (0 << 5) | (2 << 2) | 0x02     // priority=0, uat_version=2, sil=2
+	frame[24] = 0x03                           // status_sda bits
+	frame[25] = 9 << 4                         // NACp = 9
 	frame[26] = (1 << 7) | (1 << 6) | (1 << 1) // UAT_in, 1090_in, CSID
 
 	hexStr := "+"
@@ -643,7 +643,7 @@ func TestUATDownlinkSupersonicVelocity(t *testing.T) {
 	// Encode raw_ns = 100 (positive N/S velocity)
 	raw_ns := uint16(100)
 	frame[12] = frame[12] | byte((raw_ns>>6)&0x1F)
-	frame[13] = byte((raw_ns<<2)&0xFC)
+	frame[13] = byte((raw_ns << 2) & 0xFC)
 
 	// E/W velocity: raw_ew with valid velocity
 	raw_ew := uint16(150)
@@ -1124,7 +1124,7 @@ func TestUATDownlinkMessageType5(t *testing.T) {
 	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
 	frame[7] = byte((raw_lon >> 15) & 0xFF)
 	frame[8] = byte((raw_lon >> 7) & 0xFF)
-	frame[9] = byte((raw_lon << 1) & 0xFE) | 0x01 // alt_geo = 1 (GNSS)
+	frame[9] = byte((raw_lon<<1)&0xFE) | 0x01 // alt_geo = 1 (GNSS)
 
 	// Primary altitude (GNSS)
 	raw_alt := uint16(200)
@@ -1178,7 +1178,7 @@ func TestUATDownlinkMessageType6(t *testing.T) {
 	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
 	frame[7] = byte((raw_lon >> 15) & 0xFF)
 	frame[8] = byte((raw_lon >> 7) & 0xFF)
-	frame[9] = byte((raw_lon << 1) & 0xFE) | 0x01 // alt_geo = 1 (GNSS)
+	frame[9] = byte((raw_lon<<1)&0xFE) | 0x01 // alt_geo = 1 (GNSS)
 
 	// Primary altitude (GNSS)
 	raw_alt := uint16(300)
@@ -1639,7 +1639,7 @@ func TestParseDownlinkReport_AUXSVZeroAltitude(t *testing.T) {
 	frame[6] = frame[6] | byte((raw_lon>>23)&0x01)
 	frame[7] = byte((raw_lon >> 15) & 0xFF)
 	frame[8] = byte((raw_lon >> 7) & 0xFF)
-	frame[9] = byte((raw_lon << 1) & 0xFE) | 0x01 // alt_geo = 1 (GNSS)
+	frame[9] = byte((raw_lon<<1)&0xFE) | 0x01 // alt_geo = 1 (GNSS)
 
 	// Primary altitude (GNSS)
 	raw_alt := uint16(200)

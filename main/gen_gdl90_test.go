@@ -1921,27 +1921,27 @@ func TestParseInput_UATWithTextReports(t *testing.T) {
 	textUplinkBytes := make([]byte, 432)
 
 	// Position data (lat/lon = 0 for simplicity)
-	textUplinkBytes[0] = 0x00  // lat high
-	textUplinkBytes[1] = 0x00  // lat mid
-	textUplinkBytes[2] = 0x00  // lat low
-	textUplinkBytes[3] = 0x00  // lon high
-	textUplinkBytes[4] = 0x00  // lon mid
-	textUplinkBytes[5] = 0x00  // lon low
-	textUplinkBytes[6] = 0x20  // app_data_valid bit set (0x20)
-	textUplinkBytes[7] = 0x00  // tisb_site_id
+	textUplinkBytes[0] = 0x00 // lat high
+	textUplinkBytes[1] = 0x00 // lat mid
+	textUplinkBytes[2] = 0x00 // lat low
+	textUplinkBytes[3] = 0x00 // lon high
+	textUplinkBytes[4] = 0x00 // lon mid
+	textUplinkBytes[5] = 0x00 // lon low
+	textUplinkBytes[6] = 0x20 // app_data_valid bit set (0x20)
+	textUplinkBytes[7] = 0x00 // tisb_site_id
 
 	// FIS-B frame in app_data (starting at byte 8)
 	// Frame format: length (9 bits) | type (4 bits)
 	// Let's make a frame of length 50 bytes, type 0
 	frameLen := uint16(50)
-	textUplinkBytes[8] = byte(frameLen >> 1)           // length high 8 bits
+	textUplinkBytes[8] = byte(frameLen >> 1)          // length high 8 bits
 	textUplinkBytes[9] = byte((frameLen & 0x01) << 7) // length low bit + type (0)
 
 	// Product ID 413 in FIS-B data
 	// Product_id = ((data[0] & 0x1f) << 6) | (data[1] >> 2)
 	// 413 = 6*64 + 29, so we need bits to encode this
-	textUplinkBytes[10] = 0xC6  // 0b11000110: upper 3 bits ignored, low 5 bits = 00110 = 6
-	textUplinkBytes[11] = 0x74  // 0b01110100: bits 7-2 = 011101 = 29
+	textUplinkBytes[10] = 0xC6 // 0b11000110: upper 3 bits ignored, low 5 bits = 00110 = 6
+	textUplinkBytes[11] = 0x74 // 0b01110100: bits 7-2 = 011101 = 29
 
 	// Add simple text that will be in the frame
 	// DLAC encoding is complex, but the decoder will try to extract text
@@ -2348,12 +2348,14 @@ func TestIsX86DebugMode(t *testing.T) {
 // which needs root permissions.
 //
 // To achieve 100% coverage, run:
-//   sudo sh -c 'echo "#!/bin/sh\necho \"test\"\nexit 0" > /sbin/overlayctl && chmod +x /sbin/overlayctl'
-//   go test -run TestOverlayctl -v
-//   sudo rm /sbin/overlayctl
+//
+//	sudo sh -c 'echo "#!/bin/sh\necho \"test\"\nexit 0" > /sbin/overlayctl && chmod +x /sbin/overlayctl'
+//	go test -run TestOverlayctl -v
+//	sudo rm /sbin/overlayctl
 //
 // Or run the entire test suite with sudo:
-//   sudo go test -run TestOverlayctl -v
+//
+//	sudo go test -run TestOverlayctl -v
 func TestOverlayctl(t *testing.T) {
 	// The overlayctl function calls: exec.Command("/bin/sh", "/sbin/overlayctl", cmd).Output()
 	// To achieve 100% coverage, we need to test both success and error paths
@@ -2534,7 +2536,7 @@ exit 0
 
 	t.Run("edge_cases", func(t *testing.T) {
 		// Test edge cases - different command strings
-		overlayctl("")                       // Empty command
+		overlayctl("")                      // Empty command
 		overlayctl("test-with-dashes")      // Dashes
 		overlayctl("test_with_underscores") // Underscores
 		overlayctl("test.with.dots")        // Dots
@@ -2582,15 +2584,15 @@ func TestMakeOwnshipReport_WithReceivedOwnship(t *testing.T) {
 
 	// Set up received ownship info (valid within 10 seconds)
 	OwnshipTrafficInfo = TrafficInfo{
-		Icao_addr:    0xABC123,
-		Lat:          40.0,
-		Lng:          -105.0,
-		Alt:          5000,
-		Speed:        150,
-		Speed_valid:  true,
-		Track:        270,
-		Tail:         "N12345",
-		Last_seen:    stratuxClock.Time,
+		Icao_addr:   0xABC123,
+		Lat:         40.0,
+		Lng:         -105.0,
+		Alt:         5000,
+		Speed:       150,
+		Speed_valid: true,
+		Track:       270,
+		Tail:        "N12345",
+		Last_seen:   stratuxClock.Time,
 	}
 
 	// Should use received ownship info

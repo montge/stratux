@@ -872,7 +872,7 @@ func TestMakeStratuxStatus_UnknownGPSFixQuality(t *testing.T) {
 	// Set GPS fix quality to an unknown value (not 0, 1, or 2)
 	// Also need to make GPS valid for the switch statement to be entered
 	mySituation.muGPS.Lock()
-	mySituation.GPSFixQuality = 99 // Unknown value - should trigger default case
+	mySituation.GPSFixQuality = 99                      // Unknown value - should trigger default case
 	mySituation.GPSLastFixLocalTime = stratuxClock.Time // Make GPS "valid" (recent fix)
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = true
@@ -1140,9 +1140,10 @@ func TestMakeFFIDMessage_MessageStructure(t *testing.T) {
 // with the current implementation.
 //
 // The function has a branch that truncates devShortName if it's > 8 characters:
-//     if len(devShortName) > 8 {
-//         devShortName = devShortName[:8]
-//     }
+//
+//	if len(devShortName) > 8 {
+//	    devShortName = devShortName[:8]
+//	}
 //
 // However, devShortName is currently hardcoded to "Stratux" (7 characters),
 // so this branch is never executed. The comment in the code says:
@@ -2952,10 +2953,10 @@ func TestRegisterADSBTextMessageReceived_TooFewFields(t *testing.T) {
 
 	// Test with messages that have fewer than 5 fields
 	testCases := []string{
-		"",                  // Empty string
-		"METAR",             // 1 field
-		"METAR KJFK",        // 2 fields
-		"METAR KJFK 121853", // 3 fields
+		"",                       // Empty string
+		"METAR",                  // 1 field
+		"METAR KJFK",             // 2 fields
+		"METAR KJFK 121853",      // 3 fields
 		"METAR KJFK 121853 AUTO", // 4 fields
 	}
 
@@ -3270,11 +3271,11 @@ func TestMakeStratuxStatus_NegativeVersionNumbers(t *testing.T) {
 		version string
 	}{
 		// Versions with actual negative numbers after Atoi
-		{"Negative_major", "v-1.1"},        // Results in m < 0
-		{"Negative_minor", "v1.-1rc1"},     // Results in mi < 0 (needs suffix to parse minor)
-		{"Negative_build_rc", "v1.1rc-1"},  // Results in b < 0
-		{"Negative_build_r", "v1.1r-1"},    // Results in b < 0
-		{"Negative_build_b", "v1.1b-1"},    // Results in b < 0
+		{"Negative_major", "v-1.1"},       // Results in m < 0
+		{"Negative_minor", "v1.-1rc1"},    // Results in mi < 0 (needs suffix to parse minor)
+		{"Negative_build_rc", "v1.1rc-1"}, // Results in b < 0
+		{"Negative_build_r", "v1.1r-1"},   // Results in b < 0
+		{"Negative_build_b", "v1.1b-1"},   // Results in b < 0
 	}
 
 	for _, tc := range testCases {

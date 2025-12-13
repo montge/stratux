@@ -60,7 +60,7 @@ func resetAISState() {
 	// Set up GPS position for distance checks
 	// AIS parser filters targets >150km away
 	mySituation.muGPS.Lock()
-	mySituation.GPSLatitude = 37.7749   // San Francisco
+	mySituation.GPSLatitude = 37.7749 // San Francisco
 	mySituation.GPSLongitude = -122.4194
 	mySituation.GPSAltitudeMSL = 0
 	mySituation.GPSFixQuality = 1
@@ -106,10 +106,10 @@ func TestParseAisMessage_InvalidData(t *testing.T) {
 	resetAISState()
 
 	invalidMessages := []string{
-		"",                          // Empty
-		"INVALID",                   // Not AIS format
+		"",                           // Empty
+		"INVALID",                    // Not AIS format
 		"!AIVDM,1,1,,B,invalid,0*00", // Invalid payload
-		"notvalid",                  // Random text
+		"notvalid",                   // Random text
 	}
 
 	for i, msg := range invalidMessages {
@@ -173,16 +173,16 @@ func TestAISTrafficSource(t *testing.T) {
 	trafficMutex.Lock()
 	key := uint32(123456789)
 	traffic[key] = TrafficInfo{
-		Icao_addr:      key,
-		Last_source:    TRAFFIC_SOURCE_AIS,
-		TargetType:     TARGET_TYPE_AIS,
+		Icao_addr:        key,
+		Last_source:      TRAFFIC_SOURCE_AIS,
+		TargetType:       TARGET_TYPE_AIS,
 		Emitter_category: 18, // Ground vehicle for AIS
-		Addr_type:      1,    // Non-ICAO
-		Last_seen:      stratuxClock.Time,
-		Lat:            37.78,
-		Lng:            -122.42,
-		Position_valid: true,
-		OnGround:       true,
+		Addr_type:        1,  // Non-ICAO
+		Last_seen:        stratuxClock.Time,
+		Lat:              37.78,
+		Lng:              -122.42,
+		Position_valid:   true,
+		OnGround:         true,
 	}
 	trafficMutex.Unlock()
 
@@ -224,8 +224,8 @@ func TestAISTrafficFields(t *testing.T) {
 		TargetType:       TARGET_TYPE_AIS,
 		Emitter_category: 18,
 		Addr_type:        1,
-		Alt:              0,       // AIS vessels at sea level
-		OnGround:         true,    // AIS is always "on ground"
+		Alt:              0,    // AIS vessels at sea level
+		OnGround:         true, // AIS is always "on ground"
 		AltIsGNSS:        false,
 		Last_seen:        stratuxClock.Time,
 		Last_alt:         stratuxClock.Time,
@@ -280,11 +280,11 @@ func TestAISDistanceFiltering(t *testing.T) {
 		Icao_addr:         nearbyKey,
 		Last_source:       TRAFFIC_SOURCE_AIS,
 		TargetType:        TARGET_TYPE_AIS,
-		Lat:               37.78,    // Very close to ownship
+		Lat:               37.78, // Very close to ownship
 		Lng:               -122.42,
 		Position_valid:    true,
 		BearingDist_valid: true,
-		Distance:          1000,     // 1km away
+		Distance:          1000, // 1km away
 		Last_seen:         stratuxClock.Time,
 	}
 	trafficMutex.Unlock()
@@ -410,10 +410,10 @@ func TestAISCoordinateValidation(t *testing.T) {
 	// Invalid lat/lon > 360 or < -360 should be filtered
 
 	testCases := []struct {
-		name    string
-		lat     float32
-		lng     float32
-		valid   bool
+		name  string
+		lat   float32
+		lng   float32
+		valid bool
 	}{
 		{"Valid coordinates", 37.78, -122.42, true},
 		{"Valid polar", -90.0, 180.0, true},
@@ -523,9 +523,9 @@ func TestAISLongRangeBroadcast(t *testing.T) {
 		Icao_addr:      key,
 		Last_source:    TRAFFIC_SOURCE_AIS,
 		TargetType:     TARGET_TYPE_AIS,
-		Lat:            38.0,  // Lower precision for long range
+		Lat:            38.0, // Lower precision for long range
 		Lng:            -123.0,
-		Speed:          10,    // SOG in long range is 0-62
+		Speed:          10, // SOG in long range is 0-62
 		Speed_valid:    true,
 		Track:          90.0,
 		Position_valid: true,
@@ -555,9 +555,9 @@ func TestAISRateOfTurn(t *testing.T) {
 		expected float32
 	}{
 		{"No turn", 0, 0.0},
-		{"Right turn", 10, 4.46},    // (10/4.733)^2
-		{"Left turn", -10, 4.46},    // (-10/4.733)^2, always positive
-		{"Invalid ROT", -128, 0.0},  // -128 is invalid/not available
+		{"Right turn", 10, 4.46},   // (10/4.733)^2
+		{"Left turn", -10, 4.46},   // (-10/4.733)^2, always positive
+		{"Invalid ROT", -128, 0.0}, // -128 is invalid/not available
 	}
 
 	for _, tc := range testCases {
@@ -751,7 +751,7 @@ func TestImportAISTrafficMessage_DEBUG(t *testing.T) {
 	// The Type 1 message decodes to approximately:
 	// MMSI: 244660842, Lat: 52.5, Lng: 5.0 (Netherlands area)
 	mySituation.muGPS.Lock()
-	mySituation.GPSLatitude = 52.5   // Near Netherlands
+	mySituation.GPSLatitude = 52.5 // Near Netherlands
 	mySituation.GPSLongitude = 5.0
 	mySituation.GPSAltitudeMSL = 0
 	mySituation.GPSFixQuality = 1
@@ -1441,8 +1441,8 @@ func TestImportAISTrafficMessage_Comprehensive_UpdateExisting(t *testing.T) {
 	// Send same message twice
 	// Tests: if existingTi, ok := traffic[key]; ok
 	aisMsg := "!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09"
-	parseAisMessage(aisMsg)  // Creates new
-	parseAisMessage(aisMsg)  // Updates existing
+	parseAisMessage(aisMsg) // Creates new
+	parseAisMessage(aisMsg) // Updates existing
 
 	t.Logf("Update existing test complete: messages=%d", globalStatus.AIS_messages_total)
 }
@@ -1609,8 +1609,8 @@ func TestImportAISTrafficMessage_Comprehensive_Validated(t *testing.T) {
 			description: "Type 5 static data followed by Type 3 position",
 		},
 		{
-			name:        "Type3_UpdateExisting",
-			messages:    []string{
+			name: "Type3_UpdateExisting",
+			messages: []string{
 				"!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09",
 				"!AIVDM,1,1,,B,35MsUdPOh8JwI:0HUwquiIFH21>i,0*09",
 			},
@@ -1725,8 +1725,8 @@ func TestImportAISTrafficMessage_DirectCall_Type27_Sog63Plus(t *testing.T) {
 		},
 		Latitude:  37.5,
 		Longitude: -122.5,
-		Cog:       90,  // Valid COG
-		Sog:       63,  // Not available (>= 63)
+		Cog:       90, // Valid COG
+		Sog:       63, // Not available (>= 63)
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -1760,12 +1760,12 @@ func TestImportAISTrafficMessage_DirectCall_Type1_Cog360(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456791,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          10.5,  // Valid speed > 0
-		Cog:          360,   // Not available
-		TrueHeading:  45,    // Valid heading
-		RateOfTurn:   10,    // Valid ROT
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         10.5, // Valid speed > 0
+		Cog:         360,  // Not available
+		TrueHeading: 45,   // Valid heading
+		RateOfTurn:  10,   // Valid ROT
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -1799,12 +1799,12 @@ func TestImportAISTrafficMessage_DirectCall_Type1_Heading511(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456792,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          0.0,   // Zero speed - triggers else branch
-		Cog:          90,    // Valid COG (but won't be used because SOG=0)
-		TrueHeading:  511,   // Not available
-		RateOfTurn:   5,     // Valid ROT
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         0.0, // Zero speed - triggers else branch
+		Cog:         90,  // Valid COG (but won't be used because SOG=0)
+		TrueHeading: 511, // Not available
+		RateOfTurn:  5,   // Valid ROT
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -1838,12 +1838,12 @@ func TestImportAISTrafficMessage_DirectCall_Type1_ROT_Minus128(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456793,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          15.0,  // Valid speed
-		Cog:          180,   // Valid COG
-		TrueHeading:  180,   // Valid heading
-		RateOfTurn:   -128,  // Not available
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         15.0, // Valid speed
+		Cog:         180,  // Valid COG
+		TrueHeading: 180,  // Valid heading
+		RateOfTurn:  -128, // Not available
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -1877,12 +1877,12 @@ func TestImportAISTrafficMessage_DirectCall_Type2(t *testing.T) {
 			MessageID: 2,
 			UserID:    123456794,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          12.0,
-		Cog:          270,
-		TrueHeading:  270,
-		RateOfTurn:   0,
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         12.0,
+		Cog:         270,
+		TrueHeading: 270,
+		RateOfTurn:  0,
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -1916,12 +1916,12 @@ func TestImportAISTrafficMessage_DirectCall_Type3(t *testing.T) {
 			MessageID: 3,
 			UserID:    123456795,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          8.0,
-		Cog:          45,
-		TrueHeading:  45,
-		RateOfTurn:   -10,
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         8.0,
+		Cog:         45,
+		TrueHeading: 45,
+		RateOfTurn:  -10,
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -1997,12 +1997,12 @@ func TestImportAISTrafficMessage_DirectCall_Type5_UpdateExisting(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456797,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          10.0,
-		Cog:          90,
-		TrueHeading:  90,
-		RateOfTurn:   0,
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         10.0,
+		Cog:         90,
+		TrueHeading: 90,
+		RateOfTurn:  0,
 	}
 
 	vdmPacket1 := &aisnmea.VdmPacket{
@@ -2058,12 +2058,12 @@ func TestImportAISTrafficMessage_DirectCall_InvalidCoordinates(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456798,
 		},
-		Latitude:     400.0,  // Invalid - > 360
-		Longitude:    -122.5,
-		Sog:          10.0,
-		Cog:          90,
-		TrueHeading:  90,
-		RateOfTurn:   0,
+		Latitude:    400.0, // Invalid - > 360
+		Longitude:   -122.5,
+		Sog:         10.0,
+		Cog:         90,
+		TrueHeading: 90,
+		RateOfTurn:  0,
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -2102,12 +2102,12 @@ func TestImportAISTrafficMessage_DirectCall_ZeroLatLng(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456799,
 		},
-		Latitude:     0.0,  // Zero
-		Longitude:    0.0,  // Zero
-		Sog:          10.0,
-		Cog:          90,
-		TrueHeading:  90,
-		RateOfTurn:   0,
+		Latitude:    0.0, // Zero
+		Longitude:   0.0, // Zero
+		Sog:         10.0,
+		Cog:         90,
+		TrueHeading: 90,
+		RateOfTurn:  0,
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -2151,12 +2151,12 @@ func TestImportAISTrafficMessage_DirectCall_DEBUGLogging(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456800,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          10.0,
-		Cog:          90,
-		TrueHeading:  90,
-		RateOfTurn:   0,
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         10.0,
+		Cog:         90,
+		TrueHeading: 90,
+		RateOfTurn:  0,
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -2190,12 +2190,12 @@ func TestImportAISTrafficMessage_DirectCall_HighSpeed(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456801,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          102.3, // Invalid - >= 102.3
-		Cog:          90,
-		TrueHeading:  90,
-		RateOfTurn:   0,
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         102.3, // Invalid - >= 102.3
+		Cog:         90,
+		TrueHeading: 90,
+		RateOfTurn:  0,
 	}
 
 	vdmPacket := &aisnmea.VdmPacket{
@@ -2236,12 +2236,12 @@ func TestImportAISTrafficMessage_DirectCall_UpdateExisting(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456802,
 		},
-		Latitude:     37.5,
-		Longitude:    -122.5,
-		Sog:          10.0,
-		Cog:          90,
-		TrueHeading:  90,
-		RateOfTurn:   5,
+		Latitude:    37.5,
+		Longitude:   -122.5,
+		Sog:         10.0,
+		Cog:         90,
+		TrueHeading: 90,
+		RateOfTurn:  5,
 	}
 
 	vdmPacket1 := &aisnmea.VdmPacket{
@@ -2256,12 +2256,12 @@ func TestImportAISTrafficMessage_DirectCall_UpdateExisting(t *testing.T) {
 			MessageID: 1,
 			UserID:    123456802, // Same MMSI
 		},
-		Latitude:     37.6,
-		Longitude:    -122.6,
-		Sog:          12.0,
-		Cog:          95,
-		TrueHeading:  95,
-		RateOfTurn:   10,
+		Latitude:    37.6,
+		Longitude:   -122.6,
+		Sog:         12.0,
+		Cog:         95,
+		TrueHeading: 95,
+		RateOfTurn:  10,
 	}
 
 	vdmPacket2 := &aisnmea.VdmPacket{
@@ -2306,8 +2306,8 @@ func TestImportAISTrafficMessage_DirectCall_AllBranches(t *testing.T) {
 						Header:    ais.Header{MessageID: 27, UserID: 900001},
 						Latitude:  37.5,
 						Longitude: -122.5,
-						Cog:       90,  // Valid COG (< 511)
-						Sog:       20,  // Valid speed (< 63)
+						Cog:       90, // Valid COG (< 511)
+						Sog:       20, // Valid speed (< 63)
 					},
 				}
 			},

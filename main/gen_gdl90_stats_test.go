@@ -580,7 +580,8 @@ func TestUpdateStatus_Disconnected(t *testing.T) {
 // With sudo/root: ~100% coverage (all lines covered)
 //
 // To achieve 100% coverage, run:
-//   sudo bash run_coverage_test.sh
+//
+//	sudo bash run_coverage_test.sh
 func TestUpdateStatus_AHRSLogFiles(t *testing.T) {
 	// Initialize required globals
 	if stratuxClock == nil {

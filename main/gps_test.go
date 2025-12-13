@@ -2328,7 +2328,7 @@ func TestCalcGPSAttitude(t *testing.T) {
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.6, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0},
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.7, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},
 			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: baseTime + 0.8, msgType: "GPRMC", gsf: 80.0, coursef: 90.0, alt: 0}, // 23:59:59.8
-			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 0.9, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0}, // 00:00:00.9 - THIS triggers dt < 0
+			{stratuxTime: stratuxClock.Milliseconds, nmeaTime: 0.9, msgType: "GPGGA", gsf: 80.0, coursef: 90.0, alt: 2000.0},       // 00:00:00.9 - THIS triggers dt < 0
 		}
 		result := calcGPSAttitude()
 		idx := len(myGPSPerfStats) - 1
@@ -4150,14 +4150,14 @@ type mockTrackerForGPS struct {
 	shouldReturnChanged bool
 }
 
-func (m *mockTrackerForGPS) initNewConnection(serialPort *serial.Port)      {}
+func (m *mockTrackerForGPS) initNewConnection(serialPort *serial.Port)          {}
 func (m *mockTrackerForGPS) onNmea(serialPort *serial.Port, nmea []string) bool { return false }
-func (m *mockTrackerForGPS) gpsTimeOffsetPps() time.Duration                { return 0 }
-func (m *mockTrackerForGPS) getGpsHardwareType() uint                       { return 0 }
-func (m *mockTrackerForGPS) isDetected() bool                               { return true }
-func (m *mockTrackerForGPS) isConfigRead() bool                             { return true }
-func (m *mockTrackerForGPS) writeReadDelay() time.Duration                  { return m.writeDelay }
-func (m *mockTrackerForGPS) writeInitialConfig(serialPort *serial.Port) bool { return false }
+func (m *mockTrackerForGPS) gpsTimeOffsetPps() time.Duration                    { return 0 }
+func (m *mockTrackerForGPS) getGpsHardwareType() uint                           { return 0 }
+func (m *mockTrackerForGPS) isDetected() bool                                   { return true }
+func (m *mockTrackerForGPS) isConfigRead() bool                                 { return true }
+func (m *mockTrackerForGPS) writeReadDelay() time.Duration                      { return m.writeDelay }
+func (m *mockTrackerForGPS) writeInitialConfig(serialPort *serial.Port) bool    { return false }
 func (m *mockTrackerForGPS) requestTrackerConfig(serialPort *serial.Port) {
 	m.configRequested = true
 }

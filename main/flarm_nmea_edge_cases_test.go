@@ -821,7 +821,7 @@ func TestParseFlarmPFLAU_NoGPS(t *testing.T) {
 	mySituation.muGPS.Lock()
 	mySituation.GPSLatitude = 0
 	mySituation.GPSLongitude = 0
-	mySituation.GPSFixQuality = 0 // No fix
+	mySituation.GPSFixQuality = 0                 // No fix
 	mySituation.GPSLastFixLocalTime = time.Time{} // Zero time
 	mySituation.muGPS.Unlock()
 	globalStatus.GPS_connected = false

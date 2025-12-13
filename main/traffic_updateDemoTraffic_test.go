@@ -546,11 +546,11 @@ func TestUpdateDemoTraffic_SourceAssignment(t *testing.T) {
 		expectedSource uint8
 		description    string
 	}{
-		{0x100004, 1, "ICAO % 5 = 0 -> 1090ES (source=1)"},       // 0x100004 % 5 = 0
-		{0x100000, 2, "ICAO % 5 = 1 -> UAT (source=2)"},          // 0x100000 % 5 = 1
-		{0x100001, 1, "ICAO % 5 = 2 -> 1090ES (source=1)"},       // 0x100001 % 5 = 2
-		{0x100002, 1, "ICAO % 5 = 3 -> 1090ES (source=1)"},       // 0x100002 % 5 = 3
-		{0x100005, 2, "ICAO % 5 = 1 -> UAT (source=2)"},          // 0x100005 % 5 = 1
+		{0x100004, 1, "ICAO % 5 = 0 -> 1090ES (source=1)"}, // 0x100004 % 5 = 0
+		{0x100000, 2, "ICAO % 5 = 1 -> UAT (source=2)"},    // 0x100000 % 5 = 1
+		{0x100001, 1, "ICAO % 5 = 2 -> 1090ES (source=1)"}, // 0x100001 % 5 = 2
+		{0x100002, 1, "ICAO % 5 = 3 -> 1090ES (source=1)"}, // 0x100002 % 5 = 3
+		{0x100005, 2, "ICAO % 5 = 1 -> UAT (source=2)"},    // 0x100005 % 5 = 1
 	}
 
 	for _, tc := range testCases {

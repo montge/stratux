@@ -57,7 +57,6 @@ func TestMain(m *testing.M) {
 // - TestLookupOgnTailNumber_LargeDatabase: Scalability tests (skipped without /opt/stratux/ogn)
 // - TestLookupOgnTailNumber_CoverageSummary: Coverage documentation (always runs)
 
-
 // TestGetTailNumber tests the getTailNumber function with various configurations
 func TestGetTailNumber(t *testing.T) {
 	// Save original setting

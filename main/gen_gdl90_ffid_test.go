@@ -102,7 +102,7 @@ func TestMakeFFIDMessage_ComprehensiveCoverage(t *testing.T) {
 
 	t.Run("exactly_16_chars_no_truncation", func(t *testing.T) {
 		// Create a devLongName that is exactly 16 characters
-		stratuxVersion = "v1234567"  // 8 chars
+		stratuxVersion = "v1234567" // 8 chars
 		stratuxBuild = "b123456"    // 7 chars
 
 		// This creates: "v1234567-b123456" (16 chars exactly)

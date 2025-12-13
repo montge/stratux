@@ -224,18 +224,18 @@ func TestNetworkConnection_IsSleeping_X86Behavior(t *testing.T) {
 	defer func() { globalSettings.NoSleep = origNoSleep }()
 
 	tests := []struct {
-		name        string
-		noSleep     bool
+		name         string
+		noSleep      bool
 		wantSleeping bool
 	}{
 		{
-			name:        "x86 mode with NoSleep false",
-			noSleep:     false,
+			name:         "x86 mode with NoSleep false",
+			noSleep:      false,
 			wantSleeping: false, // isX86DebugMode() returns false
 		},
 		{
-			name:        "x86 mode with NoSleep true",
-			noSleep:     true,
+			name:         "x86 mode with NoSleep true",
+			noSleep:      true,
 			wantSleeping: false, // globalSettings.NoSleep returns false
 		},
 	}
@@ -247,8 +247,8 @@ func TestNetworkConnection_IsSleeping_X86Behavior(t *testing.T) {
 			conn := &networkConnection{
 				Ip:               "192.168.10.100",
 				Port:             4000,
-				LastPongResponse: time.Time{}, // Zero - would trigger sleep on ARM
-				LastPingResponse: time.Time{}, // Zero - would trigger sleep on ARM
+				LastPongResponse: time.Time{},       // Zero - would trigger sleep on ARM
+				LastPingResponse: time.Time{},       // Zero - would trigger sleep on ARM
 				LastUnreachable:  stratuxClock.Time, // Recent - would trigger sleep on ARM
 			}
 

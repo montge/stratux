@@ -1652,10 +1652,10 @@ func TestSetWifiInternetPassthroughEnabled(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name              string
-		initialPassthru   bool
-		newPassthru       bool
-		expectChange      bool
+		name            string
+		initialPassthru bool
+		newPassthru     bool
+		expectChange    bool
 	}{
 		{"enable_passthrough", false, true, true},
 		{"disable_passthrough", true, false, true},

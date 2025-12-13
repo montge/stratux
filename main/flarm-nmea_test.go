@@ -729,7 +729,7 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 			},
 			ti: TrafficInfo{
 				Icao_addr:      0xAABBCC,
-				Lat:            47.005,  // ~500m away
+				Lat:            47.005, // ~500m away
 				Lng:            -122.0,
 				Alt:            1000,
 				Position_valid: true,
@@ -821,9 +821,9 @@ func TestMakeFlarmPFLAUString(t *testing.T) {
 			ti: TrafficInfo{
 				Icao_addr:      0xABC123,
 				Tail:           "N12345",
-				Lat:            47.002,  // ~222m away
+				Lat:            47.002, // ~222m away
 				Lng:            -122.0,
-				Alt:            1550,    // 50 feet above = 15.24m vertical difference
+				Alt:            1550, // 50 feet above = 15.24m vertical difference
 				Position_valid: true,
 			},
 			expectGPSStatus:       "2",
@@ -1020,17 +1020,17 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 				mySituation.BaroLastMeasurementTime = stratuxClock.Time
 			},
 			ti: TrafficInfo{
-				Icao_addr:      0xAABBCC,
-				Addr_type:      0, // ICAO
-				Lat:            47.005,
-				Lng:            -122.005,
-				Alt:            1000,
-				Track:          90.0,
-				Speed:          100,
-				Speed_valid:    true,
-				Vvel:           500,
+				Icao_addr:        0xAABBCC,
+				Addr_type:        0, // ICAO
+				Lat:              47.005,
+				Lng:              -122.005,
+				Alt:              1000,
+				Track:            90.0,
+				Speed:            100,
+				Speed_valid:      true,
+				Vvel:             500,
 				Emitter_category: 1,
-				Position_valid: true,
+				Position_valid:   true,
 			},
 			expectValid:           true,
 			expectAlarmLevel:      3, // Close distance and vertical
@@ -1051,17 +1051,17 @@ func TestMakeFlarmPFLAAString(t *testing.T) {
 				mySituation.BaroLastMeasurementTime = stratuxClock.Time
 			},
 			ti: TrafficInfo{
-				Icao_addr:      0x123456,
-				Addr_type:      1, // Non-ICAO
-				Lat:            47.01,
-				Lng:            -122.01,
-				Alt:            2000,
-				Track:          180.0,
-				Speed:          150,
-				Speed_valid:    true,
-				Vvel:           -200,
+				Icao_addr:        0x123456,
+				Addr_type:        1, // Non-ICAO
+				Lat:              47.01,
+				Lng:              -122.01,
+				Alt:              2000,
+				Track:            180.0,
+				Speed:            150,
+				Speed_valid:      true,
+				Vvel:             -200,
 				Emitter_category: 9,
-				Position_valid: true,
+				Position_valid:   true,
 			},
 			expectValid:           true,
 			expectAlarmLevel:      2, // Within level 2 alarm distance (< 1NM)
@@ -1348,7 +1348,7 @@ func TestMakeGPRMCString(t *testing.T) {
 				mySituation.GPSGroundSpeed = 250.0
 				mySituation.GPSTrueCourse = 180.0
 				mySituation.GPSLastFixSinceMidnightUTC = 3600.0 // 01:00:00 UTC
-				mySituation.GPSFixQuality = 2 // DGPS
+				mySituation.GPSFixQuality = 2                   // DGPS
 				mySituation.GPSLastFixLocalTime = stratuxClock.Time
 			},
 			setupGlobalStatus: func() {

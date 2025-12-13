@@ -1327,30 +1327,32 @@ func TestHandleRegionGet_Headers(t *testing.T) {
 // Why the error path is unreachable:
 //
 // 1. RegionInfo struct composition (defined in gen_gdl90.go):
-//    - IsSet: bool (always marshalable)
-//    - Region: string (always marshalable)
 //
-// 2. Conditions that cause json.Marshal to fail:
-//    a) Unsupported types: channels, functions, complex numbers
-//       → RegionInfo has none
-//    b) Cyclic data structures
-//       → Impossible with this struct (no pointers)
-//    c) Float64 fields with math.Inf() or math.NaN()
-//       → RegionInfo has no float64 fields
-//    d) Custom MarshalJSON() methods that return errors
-//       → RegionInfo has no custom MarshalJSON()
+//   - IsSet: bool (always marshalable)
+//
+//   - Region: string (always marshalable)
+//
+//     2. Conditions that cause json.Marshal to fail:
+//     a) Unsupported types: channels, functions, complex numbers
+//     → RegionInfo has none
+//     b) Cyclic data structures
+//     → Impossible with this struct (no pointers)
+//     c) Float64 fields with math.Inf() or math.NaN()
+//     → RegionInfo has no float64 fields
+//     d) Custom MarshalJSON() methods that return errors
+//     → RegionInfo has no custom MarshalJSON()
 //
 // 3. Why unsafe.Pointer approaches fail:
-//    - JSON marshaling uses type reflection (reflect.TypeOf), not memory inspection
-//    - Even if we overlay RegionSettings memory with a struct containing channels,
-//      the JSON marshaler still sees type RegionInfo and marshals according to its
-//      defined fields
-//    - The Go type system prevents fooling the marshaler this way
+//   - JSON marshaling uses type reflection (reflect.TypeOf), not memory inspection
+//   - Even if we overlay RegionSettings memory with a struct containing channels,
+//     the JSON marshaler still sees type RegionInfo and marshals according to its
+//     defined fields
+//   - The Go type system prevents fooling the marshaler this way
 //
 // 4. What would be needed to test this error path:
-//    - Modify RegionInfo in gen_gdl90.go to add a float64 field, then set it to math.Inf()
-//    - Use build tags to compile different RegionInfo definitions for testing
-//    - Monkey-patch json.Marshal (not possible in standard Go)
+//   - Modify RegionInfo in gen_gdl90.go to add a float64 field, then set it to math.Inf()
+//   - Use build tags to compile different RegionInfo definitions for testing
+//   - Monkey-patch json.Marshal (not possible in standard Go)
 //
 // Conclusion:
 // The error handler at line 327 is defensive programming for hypothetical future
@@ -1655,7 +1657,6 @@ func TestHandleRegionGet_ExtremeRegionValues(t *testing.T) {
 		})
 	}
 }
-
 
 // TestHandleClientsGetRequest tests the /getClients endpoint
 func TestHandleClientsGetRequest(t *testing.T) {
@@ -2304,9 +2305,9 @@ func TestHandleRegionSet_POST(t *testing.T) {
 	defer func() { globalSettings = origSettings }()
 
 	testCases := []struct {
-		name             string
-		body             string
-		expectedRegion   int
+		name           string
+		body           string
+		expectedRegion int
 	}{
 		{
 			name:           "set_us_region",
@@ -2359,8 +2360,8 @@ func TestHandleRegionSet_POST(t *testing.T) {
 // Note: The production code has a bug where it loops infinitely on decode errors.
 // We work around this by returning EOF on the third read.
 type errorAfterValidJSONReader struct {
-	data         []byte
-	readCount    int
+	data          []byte
+	readCount     int
 	returnedError bool
 }
 
@@ -2523,9 +2524,9 @@ func TestHandleSettingsSetRequest_POST_ValidSettings(t *testing.T) {
 
 	// Test setting multiple boolean settings
 	testCases := []struct {
-		name          string
-		body          string
-		verifyFunc    func(t *testing.T)
+		name       string
+		body       string
+		verifyFunc func(t *testing.T)
 	}{
 		{
 			name: "set_uat_enabled_true",
@@ -2822,7 +2823,7 @@ func TestHandleSettingsSetRequest_POST_OwnshipModeS(t *testing.T) {
 		{
 			name:     "empty_string",
 			input:    `{"OwnshipModeS": ""}`,
-			expected: "000000",  // Empty string gets parsed as one empty code and padded
+			expected: "000000", // Empty string gets parsed as one empty code and padded
 		},
 	}
 
@@ -4017,8 +4018,8 @@ func TestHandleOrientAHRS_PostActions(t *testing.T) {
 
 // mockIMUReaderWithAccel is a mock implementation that returns specific accelerometer values
 type mockIMUReaderWithAccel struct {
-	closed bool
-	a1, a2, a3 float64
+	closed      bool
+	a1, a2, a3  float64
 	shouldError bool
 }
 
@@ -4587,21 +4588,21 @@ func (e *errorWriter) Write(b []byte) (int, error) {
 // This test achieves 36.1% coverage without write access to /var/log.
 // To achieve higher coverage, run with write access to /var/log:
 //
-//   sudo chmod 777 /var/log
-//   go test -run TestHandleDownloadAHRSLogsRequest -v -coverprofile=/tmp/coverage.out
-//   go tool cover -func=/tmp/coverage.out | grep handleDownloadAHRSLogsRequest
-//   sudo chmod 775 /var/log  # restore original permissions
+//	sudo chmod 777 /var/log
+//	go test -run TestHandleDownloadAHRSLogsRequest -v -coverprofile=/tmp/coverage.out
+//	go tool cover -func=/tmp/coverage.out | grep handleDownloadAHRSLogsRequest
+//	sudo chmod 775 /var/log  # restore original permissions
 //
 // The test suite includes 15 comprehensive sub-tests:
-//   1. BasicRequest - Tests basic functionality with /var/log in any state
-//   2. WithAHRSFiles - Tests with multiple AHRS log files
-//   3. NoMatchingFiles - Tests empty directory scenario
-//   4. UnreadableFile - Tests error handling for unreadable files
-//   5. PatternMatching - Tests file pattern filtering (sensors_*.csv vs stratux.log)
-//   6. FileContentVerification - Tests content copying to zip is byte-perfect
-//   7. MultipleSensorFiles - Tests multiple sensor files in zip
-//   8. EmptyFile - Tests empty file handling
-//   9. LargeFile - Tests large file compression
+//  1. BasicRequest - Tests basic functionality with /var/log in any state
+//  2. WithAHRSFiles - Tests with multiple AHRS log files
+//  3. NoMatchingFiles - Tests empty directory scenario
+//  4. UnreadableFile - Tests error handling for unreadable files
+//  5. PatternMatching - Tests file pattern filtering (sensors_*.csv vs stratux.log)
+//  6. FileContentVerification - Tests content copying to zip is byte-perfect
+//  7. MultipleSensorFiles - Tests multiple sensor files in zip
+//  8. EmptyFile - Tests empty file handling
+//  9. LargeFile - Tests large file compression
 //  10. SpecialCharactersInFilename - Tests various filename patterns
 //  11. POSTRequest - Tests POST method (function doesn't check HTTP method)
 //  12. ConcurrentRequests - Tests concurrent access to the handler
@@ -4833,10 +4834,10 @@ func TestHandleDownloadAHRSLogsRequest(t *testing.T) {
 	t.Run("PatternMatching", func(t *testing.T) {
 		// Create files that should NOT match
 		testFiles := []string{
-			"/var/log/test_sensors.csv",      // doesn't match sensors_*.csv
-			"/var/log/sensor_data.csv",       // doesn't match sensors_*.csv
-			"/var/log/stratux.log.old",       // doesn't match stratux.log
-			"/var/log/other.txt",             // doesn't match
+			"/var/log/test_sensors.csv",       // doesn't match sensors_*.csv
+			"/var/log/sensor_data.csv",        // doesn't match sensors_*.csv
+			"/var/log/stratux.log.old",        // doesn't match stratux.log
+			"/var/log/other.txt",              // doesn't match
 			"/var/log/sensors_test_match.csv", // SHOULD match
 		}
 
@@ -4982,7 +4983,7 @@ func TestHandleDownloadAHRSLogsRequest(t *testing.T) {
 			"/var/log/sensors_20250101.csv": "data1\n",
 			"/var/log/sensors_20250102.csv": "data2\n",
 			"/var/log/sensors_20250103.csv": "data3\n",
-			"/var/log/stratux.log":           "log data\n",
+			"/var/log/stratux.log":          "log data\n",
 		}
 
 		createdFiles := []string{}
@@ -5268,7 +5269,7 @@ func TestHandleDownloadAHRSLogsRequest(t *testing.T) {
 	t.Run("BothFileTypes", func(t *testing.T) {
 		testFiles := map[string]string{
 			"/var/log/sensors_both_test.csv": "sensor,data\n1,2\n",
-			"/var/log/stratux.log":            "stratux log line\n",
+			"/var/log/stratux.log":           "stratux log line\n",
 		}
 
 		createdFiles := []string{}
@@ -5449,7 +5450,7 @@ func TestDefaultServer(t *testing.T) {
 	resp := w.Result()
 	// Any status is acceptable - depends on whether files exist
 	if resp.StatusCode != 0 && resp.StatusCode != http.StatusOK &&
-	   resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusForbidden {
+		resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusForbidden {
 		t.Logf("Note: defaultServer returned status %d (acceptable in test)", resp.StatusCode)
 	}
 
@@ -5464,7 +5465,8 @@ func TestDefaultServer(t *testing.T) {
 //
 // This test achieves 100% coverage when run with proper permissions.
 // To set up the test environment, run:
-//   sudo mkdir -p /opt/stratux/mapdata && sudo chmod 777 /opt/stratux/mapdata
+//
+//	sudo mkdir -p /opt/stratux/mapdata && sudo chmod 777 /opt/stratux/mapdata
 //
 // The test covers:
 // 1. Error case: Directory doesn't exist or isn't readable (returns 500 error)
@@ -5898,13 +5900,13 @@ func TestHandleTile_WithDatabase(t *testing.T) {
 // TestTileToDegree tests the tileToDegree helper function
 func TestTileToDegree(t *testing.T) {
 	testCases := []struct {
-		name string
-		z, x, y int
+		name      string
+		z, x, y   int
 		checkFunc func(lon, lat float64) bool
 	}{
 		{
 			name: "zoom_0_tile_0_0",
-			z: 0, x: 0, y: 0,
+			z:    0, x: 0, y: 0,
 			checkFunc: func(lon, lat float64) bool {
 				// At zoom 0, tile 0,0 should be roughly -180, 85.05
 				return lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90
@@ -5912,7 +5914,7 @@ func TestTileToDegree(t *testing.T) {
 		},
 		{
 			name: "zoom_1_tile_0_0",
-			z: 1, x: 0, y: 0,
+			z:    1, x: 0, y: 0,
 			checkFunc: func(lon, lat float64) bool {
 				return lon >= -180 && lon <= 0 && lat >= 0 && lat <= 90
 			},

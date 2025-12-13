@@ -3701,7 +3701,7 @@ func TestSendTrafficUpdates_BearingDistanceCalculation(t *testing.T) {
 	traffic = make(map[uint32]TrafficInfo)
 	traffic[0xABCDEF] = TrafficInfo{
 		Icao_addr:      0xABCDEF,
-		Lat:            44.0,  // ~1.2 km north
+		Lat:            44.0,   // ~1.2 km north
 		Lng:            -88.56, // Same longitude
 		Alt:            2000,
 		Position_valid: true,

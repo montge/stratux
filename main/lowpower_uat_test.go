@@ -464,9 +464,9 @@ func TestProcessRadioMessage_SpecificBytePatterns(t *testing.T) {
 		msg := make([]byte, 557)
 		msg[0] = 200
 		// Simulate a FIS-B header structure
-		msg[5] = 0x01  // Version
-		msg[6] = 0x19  // Product ID (text weather)
-		msg[7] = 0x80  // Flags
+		msg[5] = 0x01 // Version
+		msg[6] = 0x19 // Product ID (text weather)
+		msg[7] = 0x80 // Flags
 		processRadioMessage(msg)
 		t.Log("Processed uplink with FIS-B-like header")
 	})
@@ -487,7 +487,7 @@ func TestProcessRadioMessage_SpecificBytePatterns(t *testing.T) {
 		msg[0] = 200
 		// Create pseudo-random high entropy data
 		for i := 5; i < 53; i++ {
-			msg[i] = byte((i * 7 + 13) % 256)
+			msg[i] = byte((i*7 + 13) % 256)
 		}
 		processRadioMessage(msg)
 		t.Log("Processed message with high entropy data")

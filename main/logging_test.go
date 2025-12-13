@@ -595,4 +595,3 @@ func containsSlowPath(s, substr string) bool {
 	}
 	return false
 }
-
