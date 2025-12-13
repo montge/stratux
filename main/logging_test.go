@@ -1221,3 +1221,46 @@ func TestGetStratuxLogFiles_WithConfigurablePath(t *testing.T) {
 		}
 	})
 }
+
+// TestResetPathsToDefaults tests that resetPathsToDefaults restores default values
+func TestResetPathsToDefaults(t *testing.T) {
+	// Save original values
+	origStratuxHome := stratuxHome
+	origLogDirPath := logDirPath
+	origVarLogDirPath := varLogDirPath
+
+	// Change values
+	stratuxHome = "/test/home"
+	logDirPath = "/test/logs/"
+	varLogDirPath = "/test/varlog"
+
+	// Verify changed
+	if stratuxHome == "/opt/stratux" {
+		t.Error("stratuxHome should have been changed")
+	}
+	if logDirPath == "/var/log/" {
+		t.Error("logDirPath should have been changed")
+	}
+	if varLogDirPath == "/var/log" {
+		t.Error("varLogDirPath should have been changed")
+	}
+
+	// Reset to defaults
+	resetPathsToDefaults()
+
+	// Verify defaults restored
+	if stratuxHome != "/opt/stratux" {
+		t.Errorf("Expected stratuxHome to be /opt/stratux, got %s", stratuxHome)
+	}
+	if logDirPath != "/var/log/" {
+		t.Errorf("Expected logDirPath to be /var/log/, got %s", logDirPath)
+	}
+	if varLogDirPath != "/var/log" {
+		t.Errorf("Expected varLogDirPath to be /var/log, got %s", varLogDirPath)
+	}
+
+	// Restore original values for other tests
+	stratuxHome = origStratuxHome
+	logDirPath = origLogDirPath
+	varLogDirPath = origVarLogDirPath
+}
