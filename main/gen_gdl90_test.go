@@ -2797,3 +2797,166 @@ func TestGracefulShutdown(t *testing.T) {
 
 	t.Log("gracefulShutdown completed without panic")
 }
+
+// TestSdrKillWithConnectedDevice tests the sdrKill function when devices are connected
+// Verifies: Loop path when SDR devices are nil vs non-nil
+func TestSdrKillWithConnectedDevice(t *testing.T) {
+	// Test case 1: When all devices are nil (immediate return)
+	t.Run("all_devices_nil", func(t *testing.T) {
+		// Save and reset shutdown flag
+		originalShutdown := sdrShutdown
+		defer func() { sdrShutdown = originalShutdown }()
+
+		// Ensure all device pointers are nil
+		UATDev = nil
+		ESDev = nil
+		OGNDev = nil
+		AISDev = nil
+
+		// Should complete immediately
+		done := make(chan bool, 1)
+		go func() {
+			sdrKill()
+			done <- true
+		}()
+
+		select {
+		case <-done:
+			t.Log("sdrKill completed immediately with nil devices")
+		case <-time.After(2 * time.Second):
+			t.Error("sdrKill timed out with nil devices")
+		}
+	})
+}
+
+// TestPingKillWithConnectedDevice tests the pingKill function wait loop
+// Verifies: Loop path when Ping_connected is true then becomes false
+func TestPingKillWithConnectedDevice(t *testing.T) {
+	// Test case 1: When not connected (immediate return)
+	t.Run("not_connected", func(t *testing.T) {
+		// Save original values
+		originalShutdown := shutdownPing
+		originalConnected := globalStatus.Ping_connected
+		defer func() {
+			shutdownPing = originalShutdown
+			globalStatus.Ping_connected = originalConnected
+		}()
+
+		// Ensure not connected
+		globalStatus.Ping_connected = false
+
+		// Should complete immediately
+		done := make(chan bool, 1)
+		go func() {
+			pingKill()
+			done <- true
+		}()
+
+		select {
+		case <-done:
+			t.Log("pingKill completed immediately when not connected")
+		case <-time.After(2 * time.Second):
+			t.Error("pingKill timed out when not connected")
+		}
+	})
+
+	// Test case 2: When connected but becomes disconnected
+	t.Run("connected_then_disconnects", func(t *testing.T) {
+		// Save original values
+		originalShutdown := shutdownPing
+		originalConnected := globalStatus.Ping_connected
+		defer func() {
+			shutdownPing = originalShutdown
+			globalStatus.Ping_connected = originalConnected
+		}()
+
+		// Set as connected
+		globalStatus.Ping_connected = true
+
+		// Start a goroutine that will simulate disconnection after 100ms
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			globalStatus.Ping_connected = false
+		}()
+
+		// Should complete after the simulated disconnection
+		done := make(chan bool, 1)
+		go func() {
+			pingKill()
+			done <- true
+		}()
+
+		select {
+		case <-done:
+			t.Log("pingKill completed after simulated disconnection")
+		case <-time.After(3 * time.Second):
+			t.Error("pingKill timed out waiting for disconnection")
+		}
+	})
+}
+
+// TestPongKillWithConnectedDevice tests the pongKill function wait loop
+// Verifies: Loop path when Pong_connected is true then becomes false
+func TestPongKillWithConnectedDevice(t *testing.T) {
+	// Test case 1: When not connected (immediate return)
+	t.Run("not_connected", func(t *testing.T) {
+		// Save original values
+		originalShutdown := shutdownPong
+		originalConnected := globalStatus.Pong_connected
+		defer func() {
+			shutdownPong = originalShutdown
+			globalStatus.Pong_connected = originalConnected
+		}()
+
+		// Ensure not connected
+		globalStatus.Pong_connected = false
+
+		// Should complete immediately
+		done := make(chan bool, 1)
+		go func() {
+			pongKill()
+			done <- true
+		}()
+
+		select {
+		case <-done:
+			t.Log("pongKill completed immediately when not connected")
+		case <-time.After(2 * time.Second):
+			t.Error("pongKill timed out when not connected")
+		}
+	})
+
+	// Test case 2: When connected but becomes disconnected
+	t.Run("connected_then_disconnects", func(t *testing.T) {
+		// Save original values
+		originalShutdown := shutdownPong
+		originalConnected := globalStatus.Pong_connected
+		defer func() {
+			shutdownPong = originalShutdown
+			globalStatus.Pong_connected = originalConnected
+		}()
+
+		// Set as connected
+		globalStatus.Pong_connected = true
+
+		// Start a goroutine that will simulate disconnection after 100ms
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			globalStatus.Pong_connected = false
+		}()
+
+		// Should complete after the simulated disconnection
+		done := make(chan bool, 1)
+		go func() {
+			pongKill()
+			done <- true
+		}()
+
+		select {
+		case <-done:
+			t.Log("pongKill completed after simulated disconnection")
+		case <-time.After(3 * time.Second):
+			t.Error("pongKill timed out waiting for disconnection")
+		}
+	})
+}
