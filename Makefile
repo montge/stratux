@@ -24,12 +24,12 @@ endif
 all: libdump978.so xdump1090 xrtlais stratuxrun $(PLATFORMDEPENDENT)
 
 stratuxrun: main/*.go common/*.go libdump978.so
-	LIBRARY_PATH=$(CURDIR) CGO_CFLAGS_ALLOW="-L$(CURDIR)" go build -mod=mod $(BUILDINFO) -o stratuxrun ./main/
+	GOTOOLCHAIN=local LIBRARY_PATH=$(CURDIR) CGO_CFLAGS_ALLOW="-L$(CURDIR)" go build -mod=mod $(BUILDINFO) -o stratuxrun ./main/
 	@# Fix go version format after build (Go 1.23.12 writes 1.23.0 but older versions expect 1.23)
 	@sed -i 's/^go 1\.23\.0$$/go 1.23/' go.mod 2>/dev/null || sed -i '' 's/^go 1\.23\.0$$/go 1.23/' go.mod 2>/dev/null || true
 
 fancontrol: fancontrol_main/*.go common/*.go
-	go build -mod=mod $(BUILDINFO) -o fancontrol -p 4 ./fancontrol_main/
+	GOTOOLCHAIN=local go build -mod=mod $(BUILDINFO) -o fancontrol -p 4 ./fancontrol_main/
 
 xdump1090:
 	cd dump1090 && make BLADERF=no
