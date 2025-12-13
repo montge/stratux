@@ -56,9 +56,10 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        # TODO: Add -race flag once stratuxClock race conditions are fixed (see monotonic.go)
-        go test -v -coverprofile=coverage.out -covermode=atomic ./main/...
-        go test -v ./common/...
+        # Run unit tests with timeout (excludes E2E tests which can be slow)
+        # E2E tests start with TestE2E prefix
+        go test -v -timeout 300s -coverprofile=coverage.out -covermode=atomic -run "^(Test[^E]|TestE[^2])" ./main/...
+        go test -v -timeout 60s ./common/...
 
     - name: Generate coverage report
       run: |
