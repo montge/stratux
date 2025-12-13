@@ -1469,6 +1469,10 @@ func TestSendMsg_CapabilityFiltering(t *testing.T) {
 	if netMutex == nil {
 		netMutex = &sync.Mutex{}
 	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
 	clientConnections = make(map[string]connection)
 	if networkGDL90Chan == nil {
 		networkGDL90Chan = make(chan []byte, 10)
@@ -1531,6 +1535,10 @@ func TestSendMsg_CapabilityFiltering(t *testing.T) {
 func TestSendMsg_MultipleCapabilities(t *testing.T) {
 	if netMutex == nil {
 		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
 	}
 	clientConnections = make(map[string]connection)
 	if networkGDL90Chan == nil {
@@ -2722,5 +2730,500 @@ func TestConnectionWriter_GlobalStats(t *testing.T) {
 
 	if bytesSent < uint64(len(testMsg)) {
 		t.Errorf("Expected at least %d bytes sent, got %d", len(testMsg), bytesSent)
+	}
+}
+
+// TestGetNetworkConn tests the getNetworkConn helper function
+func TestGetNetworkConn(t *testing.T) {
+	// Initialize required global variables
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Clear and initialize clientConnections
+	clientConnections = make(map[string]connection)
+
+	// Create a UDP connection for testing
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("Cannot resolve UDP address: %v", err)
+	}
+	udpConn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		t.Skipf("Cannot create UDP connection: %v", err)
+	}
+	defer udpConn.Close()
+
+	// Create network connections
+	conn1 := &networkConnection{
+		Conn:       udpConn,
+		Ip:         "192.168.10.50",
+		Port:       4000,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	conn2 := &networkConnection{
+		Ip:         "192.168.10.51",
+		Port:       4001,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	// Add a serial connection (should not be returned by getNetworkConn)
+	serialConn := &serialConnection{
+		DeviceString: "/dev/ttyUSB0",
+		Baud:         38400,
+		Capability:   NETWORK_GDL90_STANDARD,
+		Queue:        NewMessageQueue(10),
+	}
+
+	// Add connections to global map
+	netMutex.Lock()
+	clientConnections[conn1.GetConnectionKey()] = conn1
+	clientConnections[conn2.GetConnectionKey()] = conn2
+	clientConnections[serialConn.GetConnectionKey()] = serialConn
+	netMutex.Unlock()
+
+	// Test finding existing network connection
+	result := getNetworkConn("192.168.10.50:4000")
+	if result == nil {
+		t.Error("getNetworkConn should return connection for valid IP:port")
+	}
+	if result != nil && result.Ip != "192.168.10.50" {
+		t.Errorf("getNetworkConn returned wrong connection: got IP %s, expected 192.168.10.50", result.Ip)
+	}
+
+	// Test finding non-existent connection
+	result = getNetworkConn("192.168.10.99:4000")
+	if result != nil {
+		t.Error("getNetworkConn should return nil for non-existent connection")
+	}
+
+	// Test with invalid format (no colon)
+	result = getNetworkConn("192.168.10.50")
+	if result != nil {
+		t.Error("getNetworkConn should return nil for invalid format (no port)")
+	}
+
+	// Test with serial connection key (should not be returned)
+	result = getNetworkConn("/dev/ttyUSB0")
+	if result != nil {
+		t.Error("getNetworkConn should return nil for serial connection")
+	}
+
+	// Test with empty string
+	result = getNetworkConn("")
+	if result != nil {
+		t.Error("getNetworkConn should return nil for empty string")
+	}
+}
+
+// TestGetNetworkConnsByIp tests finding all network connections for a given IP
+func TestGetNetworkConnsByIp(t *testing.T) {
+	// Initialize required global variables
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Clear and initialize clientConnections
+	clientConnections = make(map[string]connection)
+
+	// Create multiple network connections with same IP, different ports
+	conn1 := &networkConnection{
+		Ip:         "192.168.10.100",
+		Port:       4000,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	conn2 := &networkConnection{
+		Ip:         "192.168.10.100",
+		Port:       4001,
+		Capability: NETWORK_AHRS_GDL90,
+		Queue:      NewMessageQueue(10),
+	}
+
+	conn3 := &networkConnection{
+		Ip:         "192.168.10.101",
+		Port:       4000,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	// Add a serial connection (should not be returned)
+	serialConn := &serialConnection{
+		DeviceString: "/dev/ttyUSB0",
+		Baud:         38400,
+		Capability:   NETWORK_GDL90_STANDARD,
+		Queue:        NewMessageQueue(10),
+	}
+
+	// Add a TCP connection with matching IP prefix (edge case)
+	tcpConn := &tcpConnection{
+		Key:        "TCP:192.168.10.100:8080",
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	// Add all connections to global map
+	netMutex.Lock()
+	clientConnections[conn1.GetConnectionKey()] = conn1
+	clientConnections[conn2.GetConnectionKey()] = conn2
+	clientConnections[conn3.GetConnectionKey()] = conn3
+	clientConnections[serialConn.GetConnectionKey()] = serialConn
+	clientConnections[tcpConn.GetConnectionKey()] = tcpConn
+	netMutex.Unlock()
+
+	// Test finding multiple connections with same IP
+	results := getNetworkConnsByIp("192.168.10.100")
+	if len(results) != 2 {
+		t.Errorf("Expected 2 connections for 192.168.10.100, got %d", len(results))
+	}
+
+	// Verify both connections are present
+	foundPorts := make(map[uint32]bool)
+	for _, conn := range results {
+		foundPorts[conn.Port] = true
+	}
+	if !foundPorts[4000] || !foundPorts[4001] {
+		t.Error("getNetworkConnsByIp should return both port 4000 and 4001")
+	}
+
+	// Test finding single connection
+	results = getNetworkConnsByIp("192.168.10.101")
+	if len(results) != 1 {
+		t.Errorf("Expected 1 connection for 192.168.10.101, got %d", len(results))
+	}
+	if len(results) == 1 && results[0].Port != 4000 {
+		t.Errorf("Expected port 4000, got %d", results[0].Port)
+	}
+
+	// Test finding no connections
+	results = getNetworkConnsByIp("192.168.10.99")
+	if len(results) != 0 {
+		t.Errorf("Expected 0 connections for non-existent IP, got %d", len(results))
+	}
+
+	// Test with empty string
+	results = getNetworkConnsByIp("")
+	if len(results) != 0 {
+		t.Errorf("Expected 0 connections for empty string, got %d", len(results))
+	}
+}
+
+// TestGetSerialConns tests retrieving all serial connections
+func TestGetSerialConns(t *testing.T) {
+	// Initialize required global variables
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Clear and initialize clientConnections
+	clientConnections = make(map[string]connection)
+
+	// Create serial connections
+	serial1 := &serialConnection{
+		DeviceString: "/dev/ttyUSB0",
+		Baud:         38400,
+		Capability:   NETWORK_GDL90_STANDARD,
+		Queue:        NewMessageQueue(10),
+	}
+
+	serial2 := &serialConnection{
+		DeviceString: "/dev/ttyUSB1",
+		Baud:         115200,
+		Capability:   NETWORK_FLARM_NMEA,
+		Queue:        NewMessageQueue(10),
+	}
+
+	// Create network connections (should not be returned)
+	netConn := &networkConnection{
+		Ip:         "192.168.10.50",
+		Port:       4000,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	// Create TCP connection (should not be returned)
+	tcpConn := &tcpConnection{
+		Key:        "TCP:192.168.10.60:8080",
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	// Add all connections to global map
+	netMutex.Lock()
+	clientConnections[serial1.GetConnectionKey()] = serial1
+	clientConnections[serial2.GetConnectionKey()] = serial2
+	clientConnections[netConn.GetConnectionKey()] = netConn
+	clientConnections[tcpConn.GetConnectionKey()] = tcpConn
+	netMutex.Unlock()
+
+	// Get all serial connections
+	results := getSerialConns()
+
+	// Verify only serial connections are returned
+	if len(results) != 2 {
+		t.Errorf("Expected 2 serial connections, got %d", len(results))
+	}
+
+	// Verify correct connections are returned
+	foundDevices := make(map[string]bool)
+	for _, conn := range results {
+		foundDevices[conn.DeviceString] = true
+	}
+	if !foundDevices["/dev/ttyUSB0"] || !foundDevices["/dev/ttyUSB1"] {
+		t.Error("getSerialConns should return both serial devices")
+	}
+
+	// Test with no serial connections
+	clientConnections = make(map[string]connection)
+	netMutex.Lock()
+	clientConnections[netConn.GetConnectionKey()] = netConn
+	netMutex.Unlock()
+
+	results = getSerialConns()
+	if len(results) != 0 {
+		t.Errorf("Expected 0 serial connections when none exist, got %d", len(results))
+	}
+
+	// Test with empty clientConnections
+	clientConnections = make(map[string]connection)
+	results = getSerialConns()
+	if len(results) != 0 {
+		t.Errorf("Expected 0 serial connections when map is empty, got %d", len(results))
+	}
+}
+
+// TestCloseSerial tests closing a serial connection by device string
+func TestCloseSerial(t *testing.T) {
+	// Initialize required global variables
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Clear and initialize clientConnections
+	clientConnections = make(map[string]connection)
+
+	// Create serial connection
+	serial1 := &serialConnection{
+		DeviceString: "/dev/ttyUSB0",
+		Baud:         38400,
+		Capability:   NETWORK_GDL90_STANDARD,
+		serialPort:   &serial.Port{},
+		Queue:        NewMessageQueue(10),
+	}
+
+	serial2 := &serialConnection{
+		DeviceString: "/dev/ttyUSB1",
+		Baud:         38400,
+		Capability:   NETWORK_GDL90_STANDARD,
+		serialPort:   &serial.Port{},
+		Queue:        NewMessageQueue(10),
+	}
+
+	// Add to clientConnections
+	netMutex.Lock()
+	clientConnections[serial1.GetConnectionKey()] = serial1
+	clientConnections[serial2.GetConnectionKey()] = serial2
+	netMutex.Unlock()
+
+	// Verify both connections exist
+	netMutex.Lock()
+	initialCount := len(clientConnections)
+	netMutex.Unlock()
+	if initialCount != 2 {
+		t.Fatalf("Expected 2 connections initially, got %d", initialCount)
+	}
+
+	// Close serial1
+	closeSerial("/dev/ttyUSB0")
+
+	// Give time for async Close to complete
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify serial1 was removed but serial2 remains
+	netMutex.Lock()
+	_, exists1 := clientConnections[serial1.GetConnectionKey()]
+	_, exists2 := clientConnections[serial2.GetConnectionKey()]
+	finalCount := len(clientConnections)
+	netMutex.Unlock()
+
+	if exists1 {
+		t.Error("Serial connection /dev/ttyUSB0 should have been removed")
+	}
+	if !exists2 {
+		t.Error("Serial connection /dev/ttyUSB1 should still exist")
+	}
+	if finalCount != 1 {
+		t.Errorf("Expected 1 connection after closeSerial, got %d", finalCount)
+	}
+
+	// Test closing non-existent device (should not panic)
+	closeSerial("/dev/ttyUSB99")
+	time.Sleep(10 * time.Millisecond)
+
+	// Count should still be 1
+	netMutex.Lock()
+	count := len(clientConnections)
+	netMutex.Unlock()
+	if count != 1 {
+		t.Errorf("Expected 1 connection after closing non-existent device, got %d", count)
+	}
+
+	// Test with empty string
+	closeSerial("")
+	time.Sleep(10 * time.Millisecond)
+
+	// Count should still be 1
+	netMutex.Lock()
+	count = len(clientConnections)
+	netMutex.Unlock()
+	if count != 1 {
+		t.Errorf("Expected 1 connection after closing with empty string, got %d", count)
+	}
+}
+
+// TestSendMsg tests the sendMsg function with various message types
+func TestSendMsg(t *testing.T) {
+	// Initialize required global variables
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	if networkGDL90Chan == nil {
+		networkGDL90Chan = make(chan []byte, 1024)
+	}
+
+	// Drain any leftover messages from previous tests
+	for {
+		select {
+		case <-networkGDL90Chan:
+			// Discard leftover message
+		default:
+			goto drained
+		}
+	}
+drained:
+
+	// Clear and initialize clientConnections
+	clientConnections = make(map[string]connection)
+
+	// Create connections with different capabilities
+	gdl90Conn := &networkConnection{
+		Ip:         "192.168.10.50",
+		Port:       4000,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(10),
+	}
+
+	flarmConn := &networkConnection{
+		Ip:         "192.168.10.51",
+		Port:       4001,
+		Capability: NETWORK_FLARM_NMEA,
+		Queue:      NewMessageQueue(10),
+	}
+
+	combinedConn := &networkConnection{
+		Ip:         "192.168.10.52",
+		Port:       4002,
+		Capability: NETWORK_GDL90_STANDARD | NETWORK_FLARM_NMEA,
+		Queue:      NewMessageQueue(10),
+	}
+
+	// Add connections to global map
+	netMutex.Lock()
+	clientConnections[gdl90Conn.GetConnectionKey()] = gdl90Conn
+	clientConnections[flarmConn.GetConnectionKey()] = flarmConn
+	clientConnections[combinedConn.GetConnectionKey()] = combinedConn
+	netMutex.Unlock()
+
+	// Test sending GDL90 message
+	testMsg := []byte{0x7E, 0x00, 0x81, 0x41, 0x7E}
+	sendMsg(testMsg, NETWORK_GDL90_STANDARD, 5*time.Second, 0)
+
+	// Verify GDL90 channel received the message
+	select {
+	case msg := <-networkGDL90Chan:
+		if len(msg) != len(testMsg) {
+			t.Errorf("Expected %d bytes in GDL90 channel, got %d", len(testMsg), len(msg))
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("GDL90 message not sent to networkGDL90Chan")
+	}
+
+	// Give time for messages to be queued
+	time.Sleep(20 * time.Millisecond)
+
+	// Verify messages were queued to appropriate connections
+	netMutex.Lock()
+	gdl90QueueDump := gdl90Conn.Queue.GetQueueDump(false)
+	flarmQueueDump := flarmConn.Queue.GetQueueDump(false)
+	combinedQueueDump := combinedConn.Queue.GetQueueDump(false)
+	netMutex.Unlock()
+
+	if len(gdl90QueueDump) < 1 {
+		t.Error("GDL90 connection should have received the message")
+	}
+	if len(flarmQueueDump) > 0 {
+		t.Error("FLARM-only connection should not have received GDL90 message")
+	}
+	if len(combinedQueueDump) < 1 {
+		t.Error("Combined capability connection should have received the message")
+	}
+
+	// Test sending FLARM message
+	flarmMsg := []byte("$PFLAA,0,1000,500,100*")
+	sendMsg(flarmMsg, NETWORK_FLARM_NMEA, 5*time.Second, 0)
+
+	// Give time for messages to be queued
+	time.Sleep(20 * time.Millisecond)
+
+	// Drain the GDL90 channel (FLARM messages don't go there)
+	select {
+	case <-networkGDL90Chan:
+		t.Error("FLARM message should not be sent to GDL90 channel")
+	default:
+		// Expected - no message in channel
+	}
+
+	// Verify FLARM message was queued correctly
+	netMutex.Lock()
+	gdl90QueueDump2 := gdl90Conn.Queue.GetQueueDump(false)
+	flarmQueueDump2 := flarmConn.Queue.GetQueueDump(false)
+	combinedQueueDump2 := combinedConn.Queue.GetQueueDump(false)
+	netMutex.Unlock()
+
+	// GDL90-only connection should not have received new message
+	if len(gdl90QueueDump2) != len(gdl90QueueDump) {
+		t.Error("GDL90-only connection should not have received FLARM message")
+	}
+	// FLARM connection should have received the message
+	if len(flarmQueueDump2) < len(flarmQueueDump)+1 {
+		t.Error("FLARM connection should have received the FLARM message")
+	}
+	// Combined connection should have received the message
+	if len(combinedQueueDump2) < len(combinedQueueDump)+1 {
+		t.Error("Combined capability connection should have received FLARM message")
 	}
 }

@@ -598,6 +598,9 @@ func getNetworkConn(ipAndPort string) *networkConnection {
 
 func getNetworkConnsByIp(ip string) []*networkConnection {
 	conns := make([]*networkConnection, 0)
+	if ip == "" {
+		return conns
+	}
 	// Search for any connection with the same IP to match ping responses
 	for key, conn := range clientConnections {
 		if netconn, ok := conn.(*networkConnection); ok {

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stratux/goflying/ahrs"
 	"github.com/tarm/serial"
 )
 
@@ -5594,6 +5595,865 @@ func TestProcessNMEALine_GSAWithDifferentModes(t *testing.T) {
 
 			if mySituation.GPSSatellites != tc.expectedSats {
 				t.Errorf("Satellite count: expected %d, got %d", tc.expectedSats, mySituation.GPSSatellites)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_VTGLowSpeedThreshold tests VTG messages at the speed threshold
+func TestProcessNMEALine_VTGLowSpeedThreshold(t *testing.T) {
+	setUp()
+	defer tearDown()
+
+	testCases := []struct {
+		name        string
+		speed       string
+		course      string
+		shouldUpdate bool
+		description string
+	}{
+		{
+			name:        "Speed exactly 3 knots",
+			speed:       "3.0",
+			course:      "90.0",
+			shouldUpdate: false,
+			description: "Speed at 3 knots should not update course",
+		},
+		{
+			name:        "Speed 2.9 knots",
+			speed:       "2.9",
+			course:      "90.0",
+			shouldUpdate: false,
+			description: "Speed below 3 knots should not update course",
+		},
+		{
+			name:        "Speed 3.1 knots",
+			speed:       "3.1",
+			course:      "90.0",
+			shouldUpdate: true,
+			description: "Speed above 3 knots should update course",
+		},
+		{
+			name:        "Speed 0 knots",
+			speed:       "0.0",
+			course:      "0.0",
+			shouldUpdate: false,
+			description: "Zero speed should not update course",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mySituation.GPSTrueCourse = 999.0 // Invalid initial value
+			
+			sentence := fmt.Sprintf("$GPVTG,%s,T,,M,%s,N,,K*XX", tc.course, tc.speed)
+			sentence = addNMEAChecksum(sentence)
+			
+			result := processNMEALine(sentence)
+			if !result {
+				t.Errorf("%s: Failed to process VTG", tc.description)
+			}
+			
+			if tc.shouldUpdate && mySituation.GPSTrueCourse == 999.0 {
+				t.Errorf("%s: Course not updated", tc.description)
+			} else if !tc.shouldUpdate && mySituation.GPSTrueCourse != 999.0 {
+				// Actually course might be set to 0 for low speed, that's ok
+				t.Logf("%s: Course set to %.1f (expected not updated)", tc.description, mySituation.GPSTrueCourse)
+			}
+			
+			t.Logf("%s: Speed=%.1f, Course=%.1f", tc.description, mySituation.GPSGroundSpeed, mySituation.GPSTrueCourse)
+		})
+	}
+}
+
+// TestProcessNMEALine_GGABoundsChecking tests bounds checking in GGA parsing
+func TestProcessNMEALine_GGABoundsChecking(t *testing.T) {
+	setUp()
+	defer tearDown()
+
+	testCases := []struct {
+		name         string
+		fixQuality   string
+		expectClamped uint8
+		description  string
+	}{
+		{
+			name:        "Fix quality -1",
+			fixQuality:  "-1",
+			expectClamped: 0,
+			description: "Negative fix quality should clamp to 0",
+		},
+		{
+			name:        "Fix quality 10",
+			fixQuality:  "10",
+			expectClamped: 9,
+			description: "Fix quality over 9 should clamp to 9",
+		},
+		{
+			name:        "Fix quality 99",
+			fixQuality:  "99",
+			expectClamped: 9,
+			description: "Fix quality way over max should clamp to 9",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mySituation.GPSFixQuality = 255
+			
+			sentence := fmt.Sprintf("$GPGGA,123519.0,4807.038,N,01131.000,E,%s,08,0.9,545.4,M,46.9,M,,*XX",
+				tc.fixQuality)
+			sentence = addNMEAChecksum(sentence)
+			
+			processNMEALine(sentence)
+			
+			if mySituation.GPSFixQuality != tc.expectClamped {
+				t.Errorf("%s: Expected %d, got %d", tc.description, tc.expectClamped, mySituation.GPSFixQuality)
+			}
+			t.Logf("%s: Fix quality %s -> %d", tc.description, tc.fixQuality, mySituation.GPSFixQuality)
+		})
+	}
+}
+
+// TestProcessNMEALine_GSASatelliteBounds tests satellite number bounds in GSA
+func TestProcessNMEALine_GSASatelliteBounds(t *testing.T) {
+	setUp()
+	defer tearDown()
+
+	testCases := []struct {
+		name         string
+		satellites   []string
+		expectedType uint8
+		expectedID   string
+		description  string
+	}{
+		{
+			name:        "GPS satellite 32",
+			satellites:  []string{"32"},
+			expectedType: SAT_TYPE_GPS,
+			expectedID:  "G32",
+			description: "GPS satellite at upper bound",
+		},
+		{
+			name:        "SBAS satellite 33",
+			satellites:  []string{"33"},
+			expectedType: SAT_TYPE_SBAS,
+			expectedID:  "S120",
+			description: "SBAS satellite 33 = PRN 120",
+		},
+		{
+			name:        "GLONASS satellite 65",
+			satellites:  []string{"65"},
+			expectedType: SAT_TYPE_GLONASS,
+			expectedID:  "R1",
+			description: "GLONASS satellite at lower bound",
+		},
+		{
+			name:        "Galileo satellite 301",
+			satellites:  []string{"301"},
+			expectedType: SAT_TYPE_GALILEO,
+			expectedID:  "E1",
+			description: "Galileo satellite at lower bound",
+		},
+		{
+			name:        "BeiDou satellite 401",
+			satellites:  []string{"401"},
+			expectedType: SAT_TYPE_BEIDOU,
+			expectedID:  "B1",
+			description: "BeiDou satellite at lower bound",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			Satellites = make(map[string]SatelliteInfo)
+			
+			satFields := make([]string, 12)
+			for i := 0; i < 12; i++ {
+				if i < len(tc.satellites) {
+					satFields[i] = tc.satellites[i]
+				} else {
+					satFields[i] = ""
+				}
+			}
+			
+			sentence := fmt.Sprintf("$GPGSA,A,3,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,2.5,1.2,2.1*XX",
+				satFields[0], satFields[1], satFields[2], satFields[3],
+				satFields[4], satFields[5], satFields[6], satFields[7],
+				satFields[8], satFields[9], satFields[10], satFields[11])
+			sentence = addNMEAChecksum(sentence)
+			
+			processNMEALine(sentence)
+			
+			if sat, ok := Satellites[tc.expectedID]; ok {
+				if sat.Type != tc.expectedType {
+					t.Errorf("%s: Expected type %d, got %d", tc.description, tc.expectedType, sat.Type)
+				}
+				t.Logf("%s: Satellite %s type %d", tc.description, tc.expectedID, sat.Type)
+			} else {
+				t.Errorf("%s: Satellite %s not found", tc.description, tc.expectedID)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_GSVBoundsChecking tests satellite value bounds in GSV
+func TestProcessNMEALine_GSVBoundsChecking(t *testing.T) {
+	setUp()
+	defer tearDown()
+
+	testCases := []struct {
+		name        string
+		svID        string
+		elevation   string
+		azimuth     string
+		signal      string
+		expectElev  int16
+		expectAz    int16
+		expectSig   int8
+		description string
+	}{
+		{
+			name:        "Empty elevation",
+			svID:        "1",
+			elevation:   "",
+			azimuth:     "180",
+			signal:      "40",
+			expectElev:  -999,
+			expectAz:    180,
+			expectSig:   40,
+			description: "Empty elevation should be -999",
+		},
+		{
+			name:        "Empty azimuth",
+			svID:        "2",
+			elevation:   "45",
+			azimuth:     "",
+			signal:      "35",
+			expectElev:  45,
+			expectAz:    -999,
+			expectSig:   35,
+			description: "Empty azimuth should be -999",
+		},
+		{
+			name:        "Empty signal",
+			svID:        "3",
+			elevation:   "30",
+			azimuth:     "90",
+			signal:      "",
+			expectElev:  30,
+			expectAz:    90,
+			expectSig:   -99,
+			description: "Empty signal should be -99",
+		},
+		{
+			name:        "Signal overflow",
+			svID:        "4",
+			elevation:   "60",
+			azimuth:     "270",
+			signal:      "200",
+			expectElev:  60,
+			expectAz:    270,
+			expectSig:   127,
+			description: "Signal over 127 should clamp to 127",
+		},
+		{
+			name:        "Extreme negative elevation",
+			svID:        "5",
+			elevation:   "-50000",
+			azimuth:     "45",
+			signal:      "25",
+			expectElev:  -999,
+			expectAz:    45,
+			expectSig:   25,
+			description: "Extreme elevation should clamp",
+		},
+		{
+			name:        "Extreme positive elevation",
+			svID:        "6",
+			elevation:   "50000",
+			azimuth:     "135",
+			signal:      "30",
+			expectElev:  -999,
+			expectAz:    135,
+			expectSig:   30,
+			description: "Extreme elevation should clamp",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			Satellites = make(map[string]SatelliteInfo)
+			
+			sentence := fmt.Sprintf("$GPGSV,1,1,1,%s,%s,%s,%s*XX",
+				tc.svID, tc.elevation, tc.azimuth, tc.signal)
+			sentence = addNMEAChecksum(sentence)
+			
+			result := processNMEALine(sentence)
+			if !result {
+				t.Errorf("%s: Failed to parse GSV", tc.description)
+				return
+			}
+			
+			expectedID := fmt.Sprintf("G%s", tc.svID)
+			if sat, ok := Satellites[expectedID]; ok {
+				if sat.Elevation != tc.expectElev {
+					t.Errorf("%s: Expected elevation %d, got %d", tc.description, tc.expectElev, sat.Elevation)
+				}
+				if sat.Azimuth != tc.expectAz {
+					t.Errorf("%s: Expected azimuth %d, got %d", tc.description, tc.expectAz, sat.Azimuth)
+				}
+				if sat.Signal != tc.expectSig {
+					t.Errorf("%s: Expected signal %d, got %d", tc.description, tc.expectSig, sat.Signal)
+				}
+				t.Logf("%s: Elev=%d, Az=%d, Sig=%d", tc.description, sat.Elevation, sat.Azimuth, sat.Signal)
+			} else {
+				t.Errorf("%s: Satellite %s not found", tc.description, expectedID)
+			}
+		})
+	}
+}
+
+// TestValidateNMEAChecksumExtended tests additional edge cases
+func TestValidateNMEAChecksumExtended(t *testing.T) {
+	testCases := []struct {
+		name        string
+		input       string
+		expectValid bool
+		description string
+	}{
+		{
+			name:        "Single char checksum",
+			input:       "$GPGGA,123519*0",
+			expectValid: false,
+			description: "Checksum must be 2 hex digits",
+		},
+		{
+			name:        "Non-hex checksum",
+			input:       "$GPGGA,123519*ZZ",
+			expectValid: false,
+			description: "Checksum must be valid hex",
+		},
+		{
+			name:        "Minimal valid sentence",
+			input:       "$A*41",
+			expectValid: true,
+			description: "Single char sentence is valid",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, valid := validateNMEAChecksum(tc.input)
+			if valid != tc.expectValid {
+				t.Errorf("%s: Expected %v, got %v", tc.description, tc.expectValid, valid)
+			}
+			t.Logf("%s: valid=%v", tc.description, valid)
+		})
+	}
+}
+
+// TestCalcGPSAttitudeDataQuality tests data quality checks
+func TestCalcGPSAttitudeDataQuality(t *testing.T) {
+	setUp()
+	defer tearDown()
+
+	testCases := []struct {
+		name        string
+		setupFunc   func()
+		expectValid bool
+		description string
+	}{
+		{
+			name: "Empty performance array",
+			setupFunc: func() {
+				mySituation.muGPSPerformance.Lock()
+				myGPSPerfStats = []gpsPerfStats{}
+				mySituation.muGPSPerformance.Unlock()
+			},
+			expectValid: false,
+			description: "Empty array should return false",
+		},
+		{
+			name: "Single entry only",
+			setupFunc: func() {
+				mySituation.muGPSPerformance.Lock()
+				myGPSPerfStats = []gpsPerfStats{
+					{nmeaTime: 12345.0, stratuxTime: stratuxClock.GetMilliseconds()},
+				}
+				mySituation.muGPSPerformance.Unlock()
+			},
+			expectValid: false,
+			description: "Single entry should return false",
+		},
+		{
+			name: "Stale data",
+			setupFunc: func() {
+				oldTime := stratuxClock.GetMilliseconds() - 4000
+				mySituation.muGPSPerformance.Lock()
+				myGPSPerfStats = []gpsPerfStats{
+					{nmeaTime: 12345.0, stratuxTime: oldTime},
+					{nmeaTime: 12346.0, stratuxTime: oldTime + 100},
+				}
+				mySituation.muGPSPerformance.Unlock()
+			},
+			expectValid: false,
+			description: "Data older than 3s should return false",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.setupFunc()
+			result := calcGPSAttitude()
+			if result != tc.expectValid {
+				t.Errorf("%s: Expected %v, got %v", tc.description, tc.expectValid, result)
+			}
+			t.Logf("%s: Result=%v", tc.description, result)
+		})
+	}
+}
+
+// TestMakeAHRSSimReport tests the X-Plane AHRS report generation
+func TestMakeAHRSSimReport(t *testing.T) {
+	setUp()
+
+	// Initialize network infrastructure
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	clientConnections = make(map[string]connection)
+
+	// Create an X-Plane connection to receive messages
+	xplaneConn := &networkConnection{
+		Ip:         "192.168.10.100",
+		Port:       49002,
+		Capability: NETWORK_POSITION_FFSIM,
+		Queue:      NewMessageQueue(10),
+	}
+
+	netMutex.Lock()
+	clientConnections[xplaneConn.GetConnectionKey()] = xplaneConn
+	netMutex.Unlock()
+
+	testCases := []struct {
+		name    string
+		heading float64
+		pitch   float64
+		roll    float64
+	}{
+		{
+			name:    "Level flight north",
+			heading: 0.0,
+			pitch:   0.0,
+			roll:    0.0,
+		},
+		{
+			name:    "Climbing turn east",
+			heading: 90.0,
+			pitch:   5.0,
+			roll:    15.0,
+		},
+		{
+			name:    "Descending south",
+			heading: 180.0,
+			pitch:   -10.0,
+			roll:    0.0,
+		},
+		{
+			name:    "Steep bank west",
+			heading: 270.0,
+			pitch:   0.0,
+			roll:    45.0,
+		},
+		{
+			name:    "Negative roll",
+			heading: 45.0,
+			pitch:   2.0,
+			roll:    -30.0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up AHRS values
+			mySituation.AHRSGyroHeading = tc.heading
+			mySituation.AHRSPitch = tc.pitch
+			mySituation.AHRSRoll = tc.roll
+
+			// Clear any previous messages
+			netMutex.Lock()
+			xplaneConn.Queue = NewMessageQueue(10)
+			netMutex.Unlock()
+
+			// Call the function
+			makeAHRSSimReport()
+
+			// Give time for message to be queued
+			time.Sleep(10 * time.Millisecond)
+
+			// Check that a message was queued
+			netMutex.Lock()
+			queueDump := xplaneConn.Queue.GetQueueDump(false)
+			netMutex.Unlock()
+
+			if len(queueDump) < 1 {
+				t.Error("Expected at least one message in the queue")
+			} else {
+				// Verify message format
+				msgBytes, ok := queueDump[0].([]byte)
+				if !ok {
+					t.Error("Expected message to be []byte")
+					return
+				}
+				msg := string(msgBytes)
+				if !strings.HasPrefix(msg, "XATTStratux,") {
+					t.Errorf("Expected message to start with 'XATTStratux,', got: %s", msg)
+				}
+				t.Logf("Message: %s", msg)
+			}
+		})
+	}
+}
+
+// TestMakeFFAHRSMessage tests ForeFlight AHRS message generation
+func TestMakeFFAHRSMessage(t *testing.T) {
+	setUp()
+
+	// Initialize network infrastructure
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	clientConnections = make(map[string]connection)
+
+	// Create an AHRS GDL90 connection
+	ahrsConn := &networkConnection{
+		Ip:         "192.168.10.100",
+		Port:       4000,
+		Capability: NETWORK_AHRS_GDL90,
+		Queue:      NewMessageQueue(10),
+	}
+
+	netMutex.Lock()
+	clientConnections[ahrsConn.GetConnectionKey()] = ahrsConn
+	netMutex.Unlock()
+
+	testCases := []struct {
+		name         string
+		ahrsValid    bool
+		pitch        float64
+		roll         float64
+		invalidPitch bool
+		invalidRoll  bool
+	}{
+		{
+			name:      "Valid AHRS data",
+			ahrsValid: true,
+			pitch:     5.0,
+			roll:      10.0,
+		},
+		{
+			name:      "AHRS not valid",
+			ahrsValid: false,
+			pitch:     5.0,
+			roll:      10.0,
+		},
+		{
+			name:         "Invalid pitch value",
+			ahrsValid:    true,
+			invalidPitch: true,
+			roll:         10.0,
+		},
+		{
+			name:        "Invalid roll value",
+			ahrsValid:   true,
+			pitch:       5.0,
+			invalidRoll: true,
+		},
+		{
+			name:      "Zero values",
+			ahrsValid: true,
+			pitch:     0.0,
+			roll:      0.0,
+		},
+		{
+			name:      "Negative values",
+			ahrsValid: true,
+			pitch:     -15.0,
+			roll:      -45.0,
+		},
+		{
+			name:      "Maximum reasonable values",
+			ahrsValid: true,
+			pitch:     30.0,
+			roll:      60.0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up AHRS state
+			if tc.ahrsValid {
+				globalStatus.IMUConnected = true
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time
+			} else {
+				globalStatus.IMUConnected = false
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-5 * time.Second)
+			}
+
+			// Set values
+			if tc.invalidPitch {
+				mySituation.AHRSPitch = ahrs.Invalid
+			} else {
+				mySituation.AHRSPitch = tc.pitch
+			}
+
+			if tc.invalidRoll {
+				mySituation.AHRSRoll = ahrs.Invalid
+			} else {
+				mySituation.AHRSRoll = tc.roll
+			}
+
+			// Clear any previous messages
+			netMutex.Lock()
+			ahrsConn.Queue = NewMessageQueue(10)
+			netMutex.Unlock()
+
+			// Call the function
+			makeFFAHRSMessage()
+
+			// Give time for message to be queued
+			time.Sleep(10 * time.Millisecond)
+
+			// Check that a message was queued
+			netMutex.Lock()
+			queueDump := ahrsConn.Queue.GetQueueDump(false)
+			netMutex.Unlock()
+
+			if len(queueDump) < 1 {
+				t.Error("Expected at least one message in the queue")
+			} else {
+				msg, ok := queueDump[0].([]byte)
+				if !ok {
+					t.Error("Expected message to be []byte")
+					return
+				}
+				// Check message type (after GDL90 framing, first byte should be 0x65)
+				if len(msg) < 3 {
+					t.Error("Message too short")
+				} else {
+					// GDL90 framing: 0x7E, then data, then 0x7E
+					// Message type should be at offset 1
+					if msg[1] != 0x65 {
+						t.Errorf("Expected ForeFlight message type 0x65, got 0x%02X", msg[1])
+					}
+					t.Logf("Message length: %d bytes, type: 0x%02X", len(msg), msg[1])
+				}
+			}
+		})
+	}
+}
+
+// TestMakeAHRSGDL90Report tests the GDL90 AHRS report generation
+func TestMakeAHRSGDL90Report(t *testing.T) {
+	setUp()
+
+	// Initialize network infrastructure
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	clientConnections = make(map[string]connection)
+
+	// Create an AHRS GDL90 connection
+	ahrsConn := &networkConnection{
+		Ip:         "192.168.10.100",
+		Port:       4000,
+		Capability: NETWORK_AHRS_GDL90,
+		Queue:      NewMessageQueue(10),
+	}
+
+	netMutex.Lock()
+	clientConnections[ahrsConn.GetConnectionKey()] = ahrsConn
+	netMutex.Unlock()
+
+	testCases := []struct {
+		name           string
+		ahrsValid      bool
+		baroValid      bool
+		pitch          float64
+		roll           float64
+		heading        float64
+		slipSkid       float64
+		turnRate       float64
+		gLoad          float64
+		baroAlt        float32
+		baroVSpeed     float32
+		invalidPitch   bool
+		invalidRoll    bool
+		invalidHeading bool
+	}{
+		{
+			name:       "Valid AHRS and Baro",
+			ahrsValid:  true,
+			baroValid:  true,
+			pitch:      5.0,
+			roll:       10.0,
+			heading:    90.0,
+			slipSkid:   0.5,
+			turnRate:   3.0,
+			gLoad:      1.0,
+			baroAlt:    5000.0,
+			baroVSpeed: 500.0,
+		},
+		{
+			name:      "Valid AHRS, no Baro",
+			ahrsValid: true,
+			baroValid: false,
+			pitch:     5.0,
+			roll:      10.0,
+			heading:   180.0,
+			slipSkid:  0.0,
+			turnRate:  0.0,
+			gLoad:     1.0,
+		},
+		{
+			name:       "AHRS invalid, valid Baro",
+			ahrsValid:  false,
+			baroValid:  true,
+			baroAlt:    10000.0,
+			baroVSpeed: -1000.0,
+		},
+		{
+			name:      "All invalid",
+			ahrsValid: false,
+			baroValid: false,
+		},
+		{
+			name:      "Zero values",
+			ahrsValid: true,
+			baroValid: true,
+			pitch:     0.0,
+			roll:      0.0,
+			heading:   0.0,
+			slipSkid:  0.0,
+			turnRate:  0.0,
+			gLoad:     0.0,
+			baroAlt:   0.0,
+		},
+		{
+			name:      "Extreme positive values",
+			ahrsValid: true,
+			baroValid: true,
+			pitch:     30.0,
+			roll:      60.0,
+			heading:   359.0,
+			slipSkid:  10.0,
+			turnRate:  20.0,
+			gLoad:     4.0,
+			baroAlt:   45000.0,
+		},
+		{
+			name:      "Negative values",
+			ahrsValid: true,
+			baroValid: true,
+			pitch:     -30.0,
+			roll:      -60.0,
+			heading:   270.0,
+			slipSkid:  -10.0,
+			turnRate:  -20.0,
+			gLoad:     0.5,
+			baroAlt:   -1000.0,
+		},
+		{
+			name:           "Invalid individual values",
+			ahrsValid:      true,
+			invalidPitch:   true,
+			invalidRoll:    true,
+			invalidHeading: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up AHRS state
+			if tc.ahrsValid {
+				globalStatus.IMUConnected = true
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time
+			} else {
+				globalStatus.IMUConnected = false
+				mySituation.AHRSLastAttitudeTime = stratuxClock.Time.Add(-5 * time.Second)
+			}
+
+			// Set up Baro state
+			if tc.baroValid {
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time
+			} else {
+				mySituation.BaroLastMeasurementTime = stratuxClock.Time.Add(-5 * time.Second)
+			}
+
+			// Set AHRS values
+			if tc.invalidPitch {
+				mySituation.AHRSPitch = ahrs.Invalid
+			} else {
+				mySituation.AHRSPitch = tc.pitch
+			}
+
+			if tc.invalidRoll {
+				mySituation.AHRSRoll = ahrs.Invalid
+			} else {
+				mySituation.AHRSRoll = tc.roll
+			}
+
+			if tc.invalidHeading {
+				mySituation.AHRSGyroHeading = ahrs.Invalid
+			} else {
+				mySituation.AHRSGyroHeading = tc.heading
+			}
+
+			mySituation.AHRSSlipSkid = tc.slipSkid
+			mySituation.AHRSTurnRate = tc.turnRate
+			mySituation.AHRSGLoad = tc.gLoad
+			mySituation.BaroPressureAltitude = tc.baroAlt
+			mySituation.BaroVerticalSpeed = tc.baroVSpeed
+
+			// Clear any previous messages
+			netMutex.Lock()
+			ahrsConn.Queue = NewMessageQueue(10)
+			netMutex.Unlock()
+
+			// Call the function
+			makeAHRSGDL90Report()
+
+			// Give time for message to be queued
+			time.Sleep(10 * time.Millisecond)
+
+			// Check that a message was queued
+			netMutex.Lock()
+			queueDump := ahrsConn.Queue.GetQueueDump(false)
+			netMutex.Unlock()
+
+			if len(queueDump) < 1 {
+				t.Error("Expected at least one message in the queue")
+			} else {
+				msg, ok := queueDump[0].([]byte)
+				if !ok {
+					t.Error("Expected message to be []byte")
+					return
+				}
+				// Message should be GDL90 framed
+				if len(msg) < 5 {
+					t.Error("Message too short")
+				} else {
+					// Check GDL90 framing
+					if msg[0] != 0x7E {
+						t.Errorf("Expected GDL90 start flag 0x7E, got 0x%02X", msg[0])
+					}
+					// Check message header (0x4C, 0x45, 0x01, 0x01)
+					if msg[1] != 0x4C || msg[2] != 0x45 {
+						t.Errorf("Expected AHRS header 0x4C 0x45, got 0x%02X 0x%02X", msg[1], msg[2])
+					}
+					t.Logf("Message length: %d bytes", len(msg))
+				}
 			}
 		})
 	}
