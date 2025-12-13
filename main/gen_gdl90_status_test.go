@@ -3380,3 +3380,181 @@ func TestMakeStratuxStatus_WithValidTempPress(t *testing.T) {
 
 	t.Logf("makeStratuxStatus() with valid temp/press generated %d-byte message, flags=0x%02X", len(msg), msg[14])
 }
+
+// TestUpdateStatus_GPSSolutions tests all GPS solution status strings
+func TestUpdateStatus_GPSSolutions(t *testing.T) {
+	// Initialize required components
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mutex if needed
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original values
+	origSituation := mySituation
+	origStatus := globalStatus
+
+	defer func() {
+		mySituation = origSituation
+		globalStatus = origStatus
+	}()
+
+	// Initialize Satellites map
+	Satellites = make(map[string]SatelliteInfo)
+
+	testCases := []struct {
+		name           string
+		fixQuality     uint8
+		gpsConnected   bool
+		expectedSolution string
+	}{
+		{
+			name:           "3D GPS + SBAS",
+			fixQuality:     2,
+			gpsConnected:   true,
+			expectedSolution: "3D GPS + SBAS",
+		},
+		{
+			name:           "3D GPS",
+			fixQuality:     1,
+			gpsConnected:   true,
+			expectedSolution: "3D GPS",
+		},
+		{
+			name:           "Dead Reckoning",
+			fixQuality:     6,
+			gpsConnected:   true,
+			expectedSolution: "Dead Reckoning",
+		},
+		{
+			name:           "No Fix",
+			fixQuality:     0,
+			gpsConnected:   true,
+			expectedSolution: "No Fix",
+		},
+		{
+			name:           "Unknown fix quality",
+			fixQuality:     99, // Unknown value
+			gpsConnected:   true,
+			expectedSolution: "Unknown",
+		},
+		{
+			name:           "GPS Disconnected",
+			fixQuality:     2,
+			gpsConnected:   false,
+			expectedSolution: "Disconnected",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset state
+			mySituation.GPSFixQuality = tc.fixQuality
+			mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
+			globalStatus.GPS_connected = tc.gpsConnected
+
+			// Call updateStatus
+			updateStatus()
+
+			// Verify GPS solution
+			if globalStatus.GPS_solution != tc.expectedSolution {
+				t.Errorf("Expected GPS_solution=%q, got %q", tc.expectedSolution, globalStatus.GPS_solution)
+			}
+		})
+	}
+}
+
+// TestUpdateStatus_SatelliteTracking tests satellite count updates
+func TestUpdateStatus_SatelliteTracking(t *testing.T) {
+	// Initialize required components
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mutex if needed
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original values
+	origSituation := mySituation
+	origStatus := globalStatus
+
+	defer func() {
+		mySituation = origSituation
+		globalStatus = origStatus
+	}()
+
+	// Initialize Satellites map
+	Satellites = make(map[string]SatelliteInfo)
+
+	// Set up connected GPS with satellite data
+	mySituation.GPSFixQuality = 2
+	mySituation.GPSSatellites = 10
+	mySituation.GPSSatellitesSeen = 15
+	mySituation.GPSSatellitesTracked = 12
+	mySituation.GPSHorizontalAccuracy = 3.5
+	mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
+	globalStatus.GPS_connected = true
+
+	// Call updateStatus
+	updateStatus()
+
+	// Verify satellite counts were updated
+	if globalStatus.GPS_satellites_locked != 10 {
+		t.Errorf("Expected GPS_satellites_locked=10, got %d", globalStatus.GPS_satellites_locked)
+	}
+	if globalStatus.GPS_satellites_seen != 15 {
+		t.Errorf("Expected GPS_satellites_seen=15, got %d", globalStatus.GPS_satellites_seen)
+	}
+	if globalStatus.GPS_satellites_tracked != 12 {
+		t.Errorf("Expected GPS_satellites_tracked=12, got %d", globalStatus.GPS_satellites_tracked)
+	}
+	if globalStatus.GPS_position_accuracy != 3.5 {
+		t.Errorf("Expected GPS_position_accuracy=3.5, got %f", globalStatus.GPS_position_accuracy)
+	}
+}
+
+// TestUpdateStatus_Uptime tests uptime value updates
+func TestUpdateStatus_Uptime(t *testing.T) {
+	// Initialize required components
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mutex if needed
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+
+	// Save original values
+	origSituation := mySituation
+	origStatus := globalStatus
+
+	defer func() {
+		mySituation = origSituation
+		globalStatus = origStatus
+	}()
+
+	// Initialize Satellites map
+	Satellites = make(map[string]SatelliteInfo)
+
+	// Set up minimal state
+	mySituation.GPSFixQuality = 0
+	mySituation.GPSLastValidNMEAMessageTime = stratuxClock.GetTime()
+	globalStatus.GPS_connected = true
+
+	// Call updateStatus
+	updateStatus()
+
+	// Verify uptime was updated (should be non-zero after some time)
+	if globalStatus.Uptime == 0 {
+		t.Error("Expected Uptime to be non-zero")
+	}
+	if globalStatus.UptimeClock.IsZero() {
+		t.Error("Expected UptimeClock to be set")
+	}
+}
