@@ -547,10 +547,11 @@ func TestGPSVTGLowSpeed(t *testing.T) {
 func TestGPSGSASentence(t *testing.T) {
 	resetGPSState()
 
-	// Initialize Satellites map if needed
-	if Satellites == nil {
-		Satellites = make(map[string]SatelliteInfo)
-	}
+	// Reset Satellites map and satellite counters for clean test
+	Satellites = make(map[string]SatelliteInfo)
+	mySituation.GPSSatellites = 0
+	mySituation.GPSSatellitesTracked = 0
+	mySituation.GPSSatellitesSeen = 0
 
 	// First, set a GPS fix with GGA to establish fix quality
 	gga := "$GPGGA,120000.000,4727.030,N,12218.528,W,1,08,0.9,420.9,M,46.9,M,,*4A"

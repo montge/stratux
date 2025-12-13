@@ -1977,7 +1977,8 @@ func TestInsertData(t *testing.T) {
 		insertString = make(map[string]string)
 		insertBatchIfs = make(map[string][][]interface{})
 
-		makeTable(StratuxTimestamp{}, "test_timestamp", db)
+		// Must use exact table name "timestamp" - code has hardcoded checks for this name
+		makeTable(StratuxTimestamp{}, "timestamp", db)
 
 		ts := StratuxTimestamp{
 			id:                   0,
@@ -1989,7 +1990,7 @@ func TestInsertData(t *testing.T) {
 		dataLogTimestamps = []StratuxTimestamp{ts}
 		dataLogCurTimestamp = 0
 
-		returnedID := insertData(ts, "test_timestamp", db, 0)
+		returnedID := insertData(ts, "timestamp", db, 0)
 
 		// Timestamp should be inserted immediately
 		if returnedID == 0 {
@@ -1997,8 +1998,8 @@ func TestInsertData(t *testing.T) {
 		}
 
 		// Batch should be cleared after immediate insert
-		if len(insertBatchIfs["test_timestamp"]) != 0 {
-			t.Errorf("Expected empty batch after immediate insert, got %d rows", len(insertBatchIfs["test_timestamp"]))
+		if len(insertBatchIfs["timestamp"]) != 0 {
+			t.Errorf("Expected empty batch after immediate insert, got %d rows", len(insertBatchIfs["timestamp"]))
 		}
 
 		// Verify the timestamp ID was updated in the structure
@@ -2014,11 +2015,12 @@ func TestInsertData(t *testing.T) {
 		insertString = make(map[string]string)
 		insertBatchIfs = make(map[string][][]interface{})
 
-		makeTable(StratuxStartup{}, "test_startup", db)
+		// Must use exact table name "startup" - code has hardcoded checks for this name
+		makeTable(StratuxStartup{}, "startup", db)
 
 		startup := StratuxStartup{Fill: "test"}
 
-		returnedID := insertData(startup, "test_startup", db, 0)
+		returnedID := insertData(startup, "startup", db, 0)
 
 		// Startup should be inserted immediately
 		if returnedID == 0 {
@@ -2039,7 +2041,8 @@ func TestInsertData(t *testing.T) {
 		}
 
 		makeTable(DataWithTS{}, "data_with_ts", db)
-		makeTable(StratuxTimestamp{}, "ts_table", db)
+		// Must use exact table name "timestamp" - code internally calls insertData with hardcoded "timestamp"
+		makeTable(StratuxTimestamp{}, "timestamp", db)
 
 		// Setup timestamp with id=0 (not yet inserted)
 		dataLogTimestamps = []StratuxTimestamp{

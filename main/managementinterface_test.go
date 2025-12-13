@@ -8102,8 +8102,10 @@ func TestDefaultServer_CacheControl(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	testFile := filepath.Join(tmpDir, "index.html")
-	if err := os.WriteFile(testFile, []byte("<html>test</html>"), 0644); err != nil {
+	// Use test.css instead of index.html to avoid redirect (http.FileServer
+	// redirects /index.html to / for canonical URL handling)
+	testFile := filepath.Join(tmpDir, "test.css")
+	if err := os.WriteFile(testFile, []byte("body { color: black; }"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -8112,7 +8114,7 @@ func TestDefaultServer_CacheControl(t *testing.T) {
 	STRATUX_WWW_DIR = tmpDir
 	defer func() { STRATUX_WWW_DIR = originalWWWDir }()
 
-	req := httptest.NewRequest("GET", "/index.html", nil)
+	req := httptest.NewRequest("GET", "/test.css", nil)
 	w := httptest.NewRecorder()
 
 	defaultServer(w, req)

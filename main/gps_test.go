@@ -5068,37 +5068,37 @@ func TestProcessNMEALine_DatelineCrossing(t *testing.T) {
 	}{
 		{
 			name:        "Near international dateline - East",
-			sentence:    "$GPGGA,123519,4807.038,N,17959.999,E,1,08,0.9,545.4,M,46.9,M,,*47",
+			sentence:    "$GPGGA,123519.00,4807.038,N,17959.999,E,1,08,0.9,545.4,M,46.9,M,,*61",
 			expectedLat: 48.117298,
 			expectedLon: 179.99998,
 		},
 		{
 			name:        "Near international dateline - West",
-			sentence:    "$GPGGA,123519,4807.038,N,17959.999,W,1,08,0.9,545.4,M,46.9,M,,*55",
+			sentence:    "$GPGGA,123519.00,4807.038,N,17959.999,W,1,08,0.9,545.4,M,46.9,M,,*73",
 			expectedLat: 48.117298,
 			expectedLon: -179.99998,
 		},
 		{
 			name:        "Equator crossing - North",
-			sentence:    "$GPGGA,123519,0000.100,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4F",
+			sentence:    "$GPGGA,123519.00,0000.100,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*68",
 			expectedLat: 0.0016666667,
 			expectedLon: 11.516667,
 		},
 		{
 			name:        "Equator crossing - South",
-			sentence:    "$GPGGA,123519,0000.100,S,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4D",
+			sentence:    "$GPGGA,123519.00,0000.100,S,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*75",
 			expectedLat: -0.0016666667,
 			expectedLon: 11.516667,
 		},
 		{
 			name:        "Prime meridian crossing - East",
-			sentence:    "$GPGGA,123519,5130.000,N,00001.000,E,1,08,0.9,545.4,M,46.9,M,,*40",
+			sentence:    "$GPGGA,123519.00,5130.000,N,00001.000,E,1,08,0.9,545.4,M,46.9,M,,*6D",
 			expectedLat: 51.5,
 			expectedLon: 0.016666667,
 		},
 		{
 			name:        "Prime meridian crossing - West",
-			sentence:    "$GPGGA,123519,5130.000,N,00001.000,W,1,08,0.9,545.4,M,46.9,M,,*52",
+			sentence:    "$GPGGA,123519.00,5130.000,N,00001.000,W,1,08,0.9,545.4,M,46.9,M,,*7F",
 			expectedLat: 51.5,
 			expectedLon: -0.016666667,
 		},
@@ -5144,22 +5144,22 @@ func TestProcessNMEALine_ExtremeDates(t *testing.T) {
 	}{
 		{
 			name:          "Year 2000",
-			sentence:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,010100,003.1,W*63",
+			sentence:      "$GPRMC,123519.00,A,4807.038,N,01131.000,E,022.4,084.4,010100,003.1,W*4B",
 			shouldSucceed: true,
 		},
 		{
 			name:          "Year 2099",
-			sentence:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,311299,003.1,W*6C",
+			sentence:      "$GPRMC,123519.00,A,4807.038,N,01131.000,E,022.4,084.4,311299,003.1,W*4A",
 			shouldSucceed: true,
 		},
 		{
 			name:          "Leap year Feb 29",
-			sentence:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,290220,003.1,W*65",
+			sentence:      "$GPRMC,123519.00,A,4807.038,N,01131.000,E,022.4,084.4,290220,003.1,W*40",
 			shouldSucceed: true,
 		},
 		{
 			name:          "Invalid month 13",
-			sentence:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,011320,003.1,W*61",
+			sentence:      "$GPRMC,123519.00,A,4807.038,N,01131.000,E,022.4,084.4,011320,003.1,W*4A",
 			shouldSucceed: true, // Parser doesn't validate month range
 		},
 	}
@@ -5190,7 +5190,7 @@ func TestProcessNMEALine_HighPrecisionCoordinates(t *testing.T) {
 	}
 
 	// Test with many decimal places
-	sentence := "$GPGGA,123519.123,4807.0383456,N,01131.0001234,E,1,08,0.9,545.4,M,46.9,M,,*67"
+	sentence := "$GPGGA,123519.123,4807.0383456,N,01131.0001234,E,1,08,0.9,545.4,M,46.9,M,,*59"
 	result := processNMEALine(sentence)
 	if !result {
 		t.Error("Failed to process high-precision coordinates")
@@ -5226,19 +5226,19 @@ func TestProcessNMEALine_MultipleSatelliteSystems(t *testing.T) {
 	Satellites = make(map[string]SatelliteInfo)
 
 	// GPS satellites
-	gpsGSV := "$GPGSV,3,1,10,01,45,180,42,02,45,090,43,03,30,270,40,04,60,045,45*7A"
+	gpsGSV := "$GPGSV,3,1,10,01,45,180,42,02,45,090,43,03,30,270,40,04,60,045,45*7B"
 	processNMEALine(gpsGSV)
 
 	// GLONASS satellites
-	glonassGSV := "$GLGSV,2,1,06,65,45,180,42,66,45,090,43,67,30,270,40,68,60,045,45*64"
+	glonassGSV := "$GLGSV,2,1,06,65,45,180,42,66,45,090,43,67,30,270,40,68,60,045,45*69"
 	processNMEALine(glonassGSV)
 
-	// Galileo satellites
-	galileoGSV := "$GAGSV,2,1,05,11,45,180,42,12,45,090,43,21,30,270,40,31,60,045,45*66"
+	// Galileo satellites (IDs must be in 301-336 range per NMEA spec)
+	galileoGSV := "$GAGSV,2,1,05,301,45,180,42,310,45,090,43,320,30,270,40,330,60,045,45*6A"
 	processNMEALine(galileoGSV)
 
-	// Beidou satellites
-	beidouGSV := "$GBGSV,2,1,05,201,45,180,42,202,45,090,43,210,30,270,40,220,60,045,45*66"
+	// Beidou satellites (IDs must be in 401-463 range per NMEA spec)
+	beidouGSV := "$GBGSV,2,1,05,401,45,180,42,410,45,090,43,420,30,270,40,430,60,045,45*69"
 	processNMEALine(beidouGSV)
 
 	// Verify satellites from different systems were recorded
@@ -5313,7 +5313,7 @@ func TestProcessNMEALine_RMCSpeedVariations(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sentence := "$GPRMC,123519,A,4807.038,N,01131.000,E," + tc.speedKnots + ",084.4,230394,003.1,W*XX"
+			sentence := "$GPRMC,123519.0,A,4807.038,N,01131.000,E," + tc.speedKnots + ",084.4,230394,003.1,W*XX"
 			// Calculate proper checksum
 			sentence = addNMEAChecksum(sentence)
 
@@ -5364,7 +5364,7 @@ func TestProcessNMEALine_GPSFixQualityVariations(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sentence := "$GPGGA,123519,4807.038,N,01131.000,E," + tc.fixQuality + ",08,0.9,545.4,M,46.9,M,,*XX"
+			sentence := "$GPGGA,123519.0,4807.038,N,01131.000,E," + tc.fixQuality + ",08,0.9,545.4,M,46.9,M,,*XX"
 			sentence = addNMEAChecksum(sentence)
 
 			result := processNMEALine(sentence)
@@ -5427,7 +5427,7 @@ func TestProcessNMEALine_NegativeAltitudes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sentence := "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9," + tc.altMeters + ",M," + tc.geoidSep + ",M,,*XX"
+			sentence := "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9," + tc.altMeters + ",M," + tc.geoidSep + ",M,,*XX"
 			sentence = addNMEAChecksum(sentence)
 
 			result := processNMEALine(sentence)
@@ -5540,16 +5540,20 @@ func TestProcessNMEALine_GSAWithDifferentModes(t *testing.T) {
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
 	}
+	// Initialize Satellites map to avoid nil map panic
+	Satellites = make(map[string]SatelliteInfo)
 
 	testCases := []struct {
-		name         string
-		sentence     string
-		expectedSats uint16
+		name           string
+		sentence       string
+		expectedSats   uint16
+		expectsFailure bool // Fix mode 1 (no solution) returns false
 	}{
 		{
-			name:         "No satellites in solution",
-			sentence:     "$GPGSA,A,1,,,,,,,,,,,,,99.9,99.9,99.9*XX",
-			expectedSats: 0,
+			name:           "No satellites in solution",
+			sentence:       "$GPGSA,A,1,,,,,,,,,,,,,99.9,99.9,99.9*XX",
+			expectedSats:   0,
+			expectsFailure: true, // Fix mode 1 = no solution, correctly rejected
 		},
 		{
 			name:         "4 satellites",
@@ -5570,9 +5574,19 @@ func TestProcessNMEALine_GSAWithDifferentModes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Reset state before each test case
+			Satellites = make(map[string]SatelliteInfo)
+			mySituation.GPSSatellites = 0
+
 			sentence := addNMEAChecksum(tc.sentence)
 
 			result := processNMEALine(sentence)
+			if tc.expectsFailure {
+				if result {
+					t.Errorf("Expected processing to fail for: %s", sentence)
+				}
+				return // Test passed - expected rejection
+			}
 			if !result {
 				t.Errorf("Failed to process: %s", sentence)
 				return
