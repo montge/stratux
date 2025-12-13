@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"testing"
 
 	"golang.org/x/net/websocket"
@@ -39,7 +40,12 @@ func TestNewUIBroadcaster(t *testing.T) {
 // TestSend tests the Send function with various scenarios
 func TestSend(t *testing.T) {
 	t.Run("send_with_valid_broadcaster", func(t *testing.T) {
-		b := NewUIBroadcaster()
+		// Create broadcaster without writer goroutine for deterministic testing
+		b := &uibroadcaster{
+			sockets:    make([]*websocket.Conn, 0),
+			sockets_mu: &sync.Mutex{},
+			messages:   make(chan []byte, 1024),
+		}
 
 		testMsg := []byte("test message")
 		b.Send(testMsg)
@@ -83,7 +89,12 @@ func TestSend(t *testing.T) {
 	})
 
 	t.Run("send_multiple_messages", func(t *testing.T) {
-		b := NewUIBroadcaster()
+		// Create broadcaster without writer goroutine for deterministic testing
+		b := &uibroadcaster{
+			sockets:    make([]*websocket.Conn, 0),
+			sockets_mu: &sync.Mutex{},
+			messages:   make(chan []byte, 1024),
+		}
 
 		messages := [][]byte{
 			[]byte("message 1"),
@@ -111,7 +122,12 @@ func TestSend(t *testing.T) {
 	})
 
 	t.Run("send_empty_message", func(t *testing.T) {
-		b := NewUIBroadcaster()
+		// Create broadcaster without writer goroutine for deterministic testing
+		b := &uibroadcaster{
+			sockets:    make([]*websocket.Conn, 0),
+			sockets_mu: &sync.Mutex{},
+			messages:   make(chan []byte, 1024),
+		}
 
 		emptyMsg := []byte{}
 		b.Send(emptyMsg)
@@ -129,7 +145,12 @@ func TestSend(t *testing.T) {
 	})
 
 	t.Run("send_large_message", func(t *testing.T) {
-		b := NewUIBroadcaster()
+		// Create broadcaster without writer goroutine for deterministic testing
+		b := &uibroadcaster{
+			sockets:    make([]*websocket.Conn, 0),
+			sockets_mu: &sync.Mutex{},
+			messages:   make(chan []byte, 1024),
+		}
 
 		// Create a large message (10KB)
 		largeMsg := make([]byte, 10240)
@@ -155,7 +176,12 @@ func TestSend(t *testing.T) {
 // TestSendJSON tests the SendJSON function
 func TestSendJSON(t *testing.T) {
 	t.Run("send_json_object", func(t *testing.T) {
-		b := NewUIBroadcaster()
+		// Create broadcaster without writer goroutine for deterministic testing
+		b := &uibroadcaster{
+			sockets:    make([]*websocket.Conn, 0),
+			sockets_mu: &sync.Mutex{},
+			messages:   make(chan []byte, 1024),
+		}
 
 		testObj := map[string]interface{}{
 			"field1": "value1",
@@ -190,7 +216,12 @@ func TestSendJSON(t *testing.T) {
 	})
 
 	t.Run("send_json_nil_object", func(t *testing.T) {
-		b := NewUIBroadcaster()
+		// Create broadcaster without writer goroutine for deterministic testing
+		b := &uibroadcaster{
+			sockets:    make([]*websocket.Conn, 0),
+			sockets_mu: &sync.Mutex{},
+			messages:   make(chan []byte, 1024),
+		}
 
 		// Send nil object (should marshal to "null")
 		b.SendJSON(nil)
@@ -239,7 +270,12 @@ func TestSend_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("send_with_valid_broadcaster_nil_message", func(t *testing.T) {
-		b := NewUIBroadcaster()
+		// Create broadcaster without writer goroutine for deterministic testing
+		b := &uibroadcaster{
+			sockets:    make([]*websocket.Conn, 0),
+			sockets_mu: &sync.Mutex{},
+			messages:   make(chan []byte, 1024),
+		}
 
 		// Send nil message (this is valid - a nil slice)
 		b.Send(nil)
