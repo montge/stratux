@@ -1,4 +1,4 @@
-## 1. Phase 1: Low-Hanging Fruit (Current: 56.4%, Target: 60%) ✓ COMPLETE
+## 1. Phase 1: Low-Hanging Fruit (Current: 56.4%, Target: 60%)
 
 ### 1.1 HTTP API Handlers
 - [x] Test remaining managementinterface.go handlers
@@ -31,6 +31,11 @@
 - [x] Test getTailNumber (100% coverage)
 - [x] Test lookupOgnTailNumber (42.9% - limited by file I/O)
 - [x] Test importOgnStatusMessage (100% coverage)
+
+### 1.6 Remaining to reach 60% (~3.6% needed)
+- [ ] sendTrafficUpdates (45.1%) - blocked by network operations
+- [ ] handleDownloadAHRSLogsRequest (36.1%) - file I/O heavy
+- [ ] processNMEALineLow (84.2%) - already heavily tested
 
 ## 2. Phase 2: Interface Mocking (Target: 75%)
 
