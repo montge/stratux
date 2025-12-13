@@ -1345,24 +1345,563 @@ Done`
 	})
 }
 
-// TestApplyNetworkSettings tests the applyNetworkSettings function
-func TestApplyNetworkSettings(t *testing.T) {
-	origIPAddress := globalSettings.WiFiIPAddress
+// TestSetWifiCountry tests the setWifiCountry function
+func TestSetWifiCountry(t *testing.T) {
+	origCountry := globalSettings.WiFiCountry
 	origHasChanged := hasChanged
 	defer func() {
-		globalSettings.WiFiIPAddress = origIPAddress
+		globalSettings.WiFiCountry = origCountry
 		hasChanged = origHasChanged
 	}()
 
-	t.Run("ip_in_dhcp_range", func(t *testing.T) {
+	tests := []struct {
+		name           string
+		initialCountry string
+		newCountry     string
+		expectChange   bool
+	}{
+		{"change_country_US_to_EU", "US", "EU", true},
+		{"change_country_empty_to_US", "", "US", true},
+		{"same_country_no_change", "US", "US", false},
+		{"change_to_GB", "US", "GB", true},
+		{"change_to_DE", "GB", "DE", true},
+		{"same_empty_strings", "", "", false},
+		{"change_to_lowercase", "US", "us", true},
+		{"change_to_special_char", "US", "U$", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalSettings.WiFiCountry = tt.initialCountry
+			hasChanged = false
+
+			setWifiCountry(tt.newCountry)
+
+			if hasChanged != tt.expectChange {
+				t.Errorf("hasChanged = %v, expected %v", hasChanged, tt.expectChange)
+			}
+			if globalSettings.WiFiCountry != tt.newCountry {
+				t.Errorf("WiFiCountry = %s, expected %s", globalSettings.WiFiCountry, tt.newCountry)
+			}
+		})
+	}
+}
+
+// TestSetWifiSSID tests the setWifiSSID function
+func TestSetWifiSSID(t *testing.T) {
+	origSSID := globalSettings.WiFiSSID
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiSSID = origSSID
+		hasChanged = origHasChanged
+	}()
+
+	tests := []struct {
+		name         string
+		initialSSID  string
+		newSSID      string
+		expectChange bool
+	}{
+		{"change_ssid", "OldNetwork", "NewNetwork", true},
+		{"same_ssid", "Network", "Network", false},
+		{"empty_to_ssid", "", "Stratux", true},
+		{"ssid_to_empty", "Stratux", "", true},
+		{"empty_to_empty", "", "", false},
+		{"ssid_with_spaces", "Old", "New Network", true},
+		{"ssid_with_special_chars", "Test", "Test-5GHz (2.4)", true},
+		{"ssid_with_unicode", "Test", "Café ☕", true},
+		{"long_ssid", "Short", "VeryLongNetworkNameWith32Chars", true},
+		{"same_long_ssid", "VeryLongNetworkNameWith32Chars", "VeryLongNetworkNameWith32Chars", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalSettings.WiFiSSID = tt.initialSSID
+			hasChanged = false
+
+			setWifiSSID(tt.newSSID)
+
+			if hasChanged != tt.expectChange {
+				t.Errorf("hasChanged = %v, expected %v", hasChanged, tt.expectChange)
+			}
+			if globalSettings.WiFiSSID != tt.newSSID {
+				t.Errorf("WiFiSSID = %s, expected %s", globalSettings.WiFiSSID, tt.newSSID)
+			}
+		})
+	}
+}
+
+// TestSetWifiPassphrase tests the setWifiPassphrase function
+func TestSetWifiPassphrase(t *testing.T) {
+	origPassphrase := globalSettings.WiFiPassphrase
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiPassphrase = origPassphrase
+		hasChanged = origHasChanged
+	}()
+
+	tests := []struct {
+		name              string
+		initialPassphrase string
+		newPassphrase     string
+		expectChange      bool
+	}{
+		{"change_passphrase", "oldpass123", "newpass456", true},
+		{"same_passphrase", "password", "password", false},
+		{"empty_to_passphrase", "", "newpassword", true},
+		{"passphrase_to_empty", "password", "", true},
+		{"empty_to_empty", "", "", false},
+		{"passphrase_with_special_chars", "simple", "P@ssw0rd!#$%", true},
+		{"long_passphrase", "short", "ThisIsAVeryLongPasswordThatCouldBeUpTo63CharactersLongForWPA2", true},
+		{"same_long_passphrase", "ThisIsAVeryLongPasswordThatCouldBeUpTo63CharactersLongForWPA2", "ThisIsAVeryLongPasswordThatCouldBeUpTo63CharactersLongForWPA2", false},
+		{"passphrase_with_spaces", "noSpaces", "has spaces in it", true},
+		{"passphrase_with_quotes", "simple", `pass"with'quotes`, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalSettings.WiFiPassphrase = tt.initialPassphrase
+			hasChanged = false
+
+			setWifiPassphrase(tt.newPassphrase)
+
+			if hasChanged != tt.expectChange {
+				t.Errorf("hasChanged = %v, expected %v", hasChanged, tt.expectChange)
+			}
+			if globalSettings.WiFiPassphrase != tt.newPassphrase {
+				t.Errorf("WiFiPassphrase = %s, expected %s", globalSettings.WiFiPassphrase, tt.newPassphrase)
+			}
+		})
+	}
+}
+
+// TestSetWifiChannel tests the setWifiChannel function
+func TestSetWifiChannel(t *testing.T) {
+	origChannel := globalSettings.WiFiChannel
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiChannel = origChannel
+		hasChanged = origHasChanged
+	}()
+
+	tests := []struct {
+		name           string
+		initialChannel int
+		newChannel     int
+		expectChange   bool
+	}{
+		{"change_channel_1_to_6", 1, 6, true},
+		{"same_channel", 6, 6, false},
+		{"change_to_channel_11", 6, 11, true},
+		{"change_from_zero", 0, 1, true},
+		{"change_to_zero", 1, 0, true},
+		{"zero_to_zero", 0, 0, false},
+		{"change_to_high_channel", 1, 165, true},
+		{"change_negative_to_positive", -1, 1, true},
+		{"same_high_channel", 165, 165, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalSettings.WiFiChannel = tt.initialChannel
+			hasChanged = false
+
+			setWifiChannel(tt.newChannel)
+
+			if hasChanged != tt.expectChange {
+				t.Errorf("hasChanged = %v, expected %v", hasChanged, tt.expectChange)
+			}
+			if globalSettings.WiFiChannel != tt.newChannel {
+				t.Errorf("WiFiChannel = %d, expected %d", globalSettings.WiFiChannel, tt.newChannel)
+			}
+		})
+	}
+}
+
+// TestSetWifiSecurityEnabled tests the setWifiSecurityEnabled function
+func TestSetWifiSecurityEnabled(t *testing.T) {
+	origSecurity := globalSettings.WiFiSecurityEnabled
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiSecurityEnabled = origSecurity
+		hasChanged = origHasChanged
+	}()
+
+	tests := []struct {
+		name            string
+		initialSecurity bool
+		newSecurity     bool
+		expectChange    bool
+	}{
+		{"enable_security", false, true, true},
+		{"disable_security", true, false, true},
+		{"already_enabled", true, true, false},
+		{"already_disabled", false, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalSettings.WiFiSecurityEnabled = tt.initialSecurity
+			hasChanged = false
+
+			setWifiSecurityEnabled(tt.newSecurity)
+
+			if hasChanged != tt.expectChange {
+				t.Errorf("hasChanged = %v, expected %v", hasChanged, tt.expectChange)
+			}
+			if globalSettings.WiFiSecurityEnabled != tt.newSecurity {
+				t.Errorf("WiFiSecurityEnabled = %v, expected %v", globalSettings.WiFiSecurityEnabled, tt.newSecurity)
+			}
+		})
+	}
+}
+
+// TestSetWiFiMode tests the setWiFiMode function
+func TestSetWiFiMode(t *testing.T) {
+	origMode := globalSettings.WiFiMode
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiMode = origMode
+		hasChanged = origHasChanged
+	}()
+
+	tests := []struct {
+		name         string
+		initialMode  int
+		newMode      int
+		expectChange bool
+	}{
+		{"change_ap_to_direct", WifiModeAp, WifiModeDirect, true},
+		{"change_direct_to_apclient", WifiModeDirect, WifiModeApClient, true},
+		{"change_apclient_to_ap", WifiModeApClient, WifiModeAp, true},
+		{"same_mode_ap", WifiModeAp, WifiModeAp, false},
+		{"same_mode_direct", WifiModeDirect, WifiModeDirect, false},
+		{"same_mode_apclient", WifiModeApClient, WifiModeApClient, false},
+		{"change_from_invalid_mode", 99, WifiModeAp, true},
+		{"change_to_invalid_mode", WifiModeAp, 99, true},
+		{"same_invalid_mode", 99, 99, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalSettings.WiFiMode = tt.initialMode
+			hasChanged = false
+
+			setWiFiMode(tt.newMode)
+
+			if hasChanged != tt.expectChange {
+				t.Errorf("hasChanged = %v, expected %v", hasChanged, tt.expectChange)
+			}
+			if globalSettings.WiFiMode != tt.newMode {
+				t.Errorf("WiFiMode = %d, expected %d", globalSettings.WiFiMode, tt.newMode)
+			}
+		})
+	}
+}
+
+// TestSetWifiDirectPin tests the setWifiDirectPin function
+func TestSetWifiDirectPin(t *testing.T) {
+	origPin := globalSettings.WiFiDirectPin
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiDirectPin = origPin
+		hasChanged = origHasChanged
+	}()
+
+	tests := []struct {
+		name         string
+		initialPin   string
+		newPin       string
+		expectChange bool
+	}{
+		{"change_pin", "12345678", "87654321", true},
+		{"same_pin", "12345678", "12345678", false},
+		{"empty_to_pin", "", "12345678", true},
+		{"pin_to_empty", "12345678", "", true},
+		{"empty_to_empty", "", "", false},
+		{"short_pin", "1234", "5678", true},
+		{"long_pin", "12345678", "123456789012345678", true},
+		{"pin_with_letters", "12345678", "ABC12345", true},
+		{"same_short_pin", "1234", "1234", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalSettings.WiFiDirectPin = tt.initialPin
+			hasChanged = false
+
+			setWifiDirectPin(tt.newPin)
+
+			if hasChanged != tt.expectChange {
+				t.Errorf("hasChanged = %v, expected %v", hasChanged, tt.expectChange)
+			}
+			if globalSettings.WiFiDirectPin != tt.newPin {
+				t.Errorf("WiFiDirectPin = %s, expected %s", globalSettings.WiFiDirectPin, tt.newPin)
+			}
+		})
+	}
+}
+
+// TestSetWifiInternetPassthroughEnabled tests the setWifiInternetPassthroughEnabled function
+func TestSetWifiInternetPassthroughEnabled(t *testing.T) {
+	origPassthrough := globalSettings.WiFiInternetPassThroughEnabled
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiInternetPassThroughEnabled = origPassthrough
+		hasChanged = origHasChanged
+	}()
+
+	tests := []struct {
+		name              string
+		initialPassthru   bool
+		newPassthru       bool
+		expectChange      bool
+	}{
+		{"enable_passthrough", false, true, true},
+		{"disable_passthrough", true, false, true},
+		{"already_enabled", true, true, false},
+		{"already_disabled", false, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalSettings.WiFiInternetPassThroughEnabled = tt.initialPassthru
+			hasChanged = false
+
+			setWifiInternetPassthroughEnabled(tt.newPassthru)
+
+			if hasChanged != tt.expectChange {
+				t.Errorf("hasChanged = %v, expected %v", hasChanged, tt.expectChange)
+			}
+			if globalSettings.WiFiInternetPassThroughEnabled != tt.newPassthru {
+				t.Errorf("WiFiInternetPassThroughEnabled = %v, expected %v", globalSettings.WiFiInternetPassThroughEnabled, tt.newPassthru)
+			}
+		})
+	}
+}
+
+// TestApplyNetworkSettings tests the applyNetworkSettings function
+func TestApplyNetworkSettings(t *testing.T) {
+	origIPAddress := globalSettings.WiFiIPAddress
+	origWiFiMode := globalSettings.WiFiMode
+	origWiFiChannel := globalSettings.WiFiChannel
+	origWiFiSSID := globalSettings.WiFiSSID
+	origWiFiCountry := globalSettings.WiFiCountry
+	origWiFiSecurityEnabled := globalSettings.WiFiSecurityEnabled
+	origWiFiPassphrase := globalSettings.WiFiPassphrase
+	origWiFiDirectPin := globalSettings.WiFiDirectPin
+	origWiFiClientNetworks := globalSettings.WiFiClientNetworks
+	origWiFiInternetPassThrough := globalSettings.WiFiInternetPassThroughEnabled
+	origHasChanged := hasChanged
+	defer func() {
+		globalSettings.WiFiIPAddress = origIPAddress
+		globalSettings.WiFiMode = origWiFiMode
+		globalSettings.WiFiChannel = origWiFiChannel
+		globalSettings.WiFiSSID = origWiFiSSID
+		globalSettings.WiFiCountry = origWiFiCountry
+		globalSettings.WiFiSecurityEnabled = origWiFiSecurityEnabled
+		globalSettings.WiFiPassphrase = origWiFiPassphrase
+		globalSettings.WiFiDirectPin = origWiFiDirectPin
+		globalSettings.WiFiClientNetworks = origWiFiClientNetworks
+		globalSettings.WiFiInternetPassThroughEnabled = origWiFiInternetPassThrough
+		hasChanged = origHasChanged
+	}()
+
+	t.Run("no_change_no_force", func(t *testing.T) {
 		hasChanged = false
-		globalSettings.WiFiIPAddress = "192.168.1.25"
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		// Should return immediately without doing anything
+		applyNetworkSettings(false, true)
+		// hasChanged should still be false
+		if hasChanged {
+			t.Error("hasChanged should remain false when no changes and no force")
+		}
+	})
+
+	t.Run("no_change_with_force", func(t *testing.T) {
+		hasChanged = false
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		globalSettings.WiFiMode = WifiModeAp
+		globalSettings.WiFiChannel = 1
+		globalSettings.WiFiSSID = "Stratux"
+		globalSettings.WiFiCountry = "US"
+		globalSettings.WiFiSecurityEnabled = false
+		// Force=true should process even when hasChanged=false
+		applyNetworkSettings(true, true)
+		// hasChanged should be reset to false after processing
+		if hasChanged {
+			t.Error("hasChanged should be reset to false after processing")
+		}
+	})
+
+	t.Run("has_change_onlyWriteFiles", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		globalSettings.WiFiMode = WifiModeAp
+		globalSettings.WiFiChannel = 6
+		globalSettings.WiFiSSID = "TestNetwork"
+		globalSettings.WiFiCountry = "US"
+		applyNetworkSettings(false, true)
+		// hasChanged should be reset to false
+		if hasChanged {
+			t.Error("hasChanged should be reset to false after processing")
+		}
+	})
+
+	t.Run("ip_in_dhcp_range_10_to_50", func(t *testing.T) {
+		// Test IP in range 10-50 (should adjust DHCP range to 60-110)
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.1.25" // .25 is in range 10-50
+		globalSettings.WiFiMode = WifiModeAp
+		globalSettings.WiFiChannel = 1
+		globalSettings.WiFiSSID = "Stratux"
+		globalSettings.WiFiCountry = "US"
 		applyNetworkSettings(true, true)
 	})
 
-	t.Run("onlyWriteFiles_true", func(t *testing.T) {
+	t.Run("ip_outside_dhcp_range", func(t *testing.T) {
+		// Test IP outside range 10-50 (DHCP should be 10-50)
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.1.5" // .5 is outside range 10-50
+		globalSettings.WiFiMode = WifiModeAp
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("empty_ip_defaults_to_192_168_10_1", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = ""
+		globalSettings.WiFiMode = WifiModeAp
+		globalSettings.WiFiChannel = 1
+		globalSettings.WiFiSSID = "Stratux"
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("zero_channel_defaults_to_1", func(t *testing.T) {
 		hasChanged = true
 		globalSettings.WiFiIPAddress = "192.168.10.1"
-		applyNetworkSettings(false, true)
+		globalSettings.WiFiMode = WifiModeAp
+		globalSettings.WiFiChannel = 0 // Should default to 1
+		globalSettings.WiFiSSID = "TestNet"
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("empty_ssid_defaults_to_Stratux", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		globalSettings.WiFiMode = WifiModeAp
+		globalSettings.WiFiChannel = 1
+		globalSettings.WiFiSSID = "" // Should default to "Stratux"
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("security_enabled_includes_passphrase", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		globalSettings.WiFiMode = WifiModeAp
+		globalSettings.WiFiChannel = 1
+		globalSettings.WiFiSSID = "SecureNet"
+		globalSettings.WiFiSecurityEnabled = true
+		globalSettings.WiFiPassphrase = "MySecurePassword"
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("wifi_direct_mode_includes_passphrase", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		globalSettings.WiFiMode = WifiModeDirect
+		globalSettings.WiFiChannel = 1
+		globalSettings.WiFiSSID = "DirectNet"
+		globalSettings.WiFiSecurityEnabled = false // Even if false, Direct mode should include passphrase
+		globalSettings.WiFiPassphrase = "DirectPassword"
+		globalSettings.WiFiDirectPin = "12345678"
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("wifi_apclient_mode", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.10.1"
+		globalSettings.WiFiMode = WifiModeApClient
+		globalSettings.WiFiChannel = 6
+		globalSettings.WiFiSSID = "StratuxAP"
+		globalSettings.WiFiClientNetworks = []wifiClientNetwork{
+			{SSID: "HomeNetwork", Password: "homepass"},
+			{SSID: "WorkNetwork", Password: "workpass"},
+		}
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("internet_passthrough_enabled", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "10.0.0.1"
+		globalSettings.WiFiMode = WifiModeApClient
+		globalSettings.WiFiChannel = 11
+		globalSettings.WiFiSSID = "Stratux"
+		globalSettings.WiFiInternetPassThroughEnabled = true
+		globalSettings.WiFiClientNetworks = []wifiClientNetwork{
+			{SSID: "InternetSource", Password: "password123"},
+		}
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("different_ip_prefix", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "10.42.0.1"
+		globalSettings.WiFiMode = WifiModeAp
+		globalSettings.WiFiChannel = 1
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("ip_at_boundary_10", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.1.10" // Exactly at lower boundary
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("ip_at_boundary_50", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.1.50" // Exactly at upper boundary
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("ip_at_boundary_9", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.1.9" // Just below lower boundary
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("ip_at_boundary_51", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "192.168.1.51" // Just above upper boundary
+		applyNetworkSettings(true, true)
+	})
+
+	t.Run("all_wifi_modes", func(t *testing.T) {
+		modes := []int{WifiModeAp, WifiModeDirect, WifiModeApClient}
+		for _, mode := range modes {
+			hasChanged = true
+			globalSettings.WiFiIPAddress = "192.168.10.1"
+			globalSettings.WiFiMode = mode
+			globalSettings.WiFiChannel = 1
+			globalSettings.WiFiSSID = "Stratux"
+			applyNetworkSettings(true, true)
+		}
+	})
+
+	t.Run("complete_settings", func(t *testing.T) {
+		hasChanged = true
+		globalSettings.WiFiIPAddress = "172.16.0.1"
+		globalSettings.WiFiMode = WifiModeApClient
+		globalSettings.WiFiChannel = 11
+		globalSettings.WiFiSSID = "Stratux-Test"
+		globalSettings.WiFiCountry = "GB"
+		globalSettings.WiFiSecurityEnabled = true
+		globalSettings.WiFiPassphrase = "SecurePassword123"
+		globalSettings.WiFiDirectPin = "87654321"
+		globalSettings.WiFiClientNetworks = []wifiClientNetwork{
+			{SSID: "Network1", Password: "pass1"},
+			{SSID: "Network2", Password: "pass2"},
+		}
+		globalSettings.WiFiInternetPassThroughEnabled = true
+		applyNetworkSettings(true, true)
 	})
 }
