@@ -1,9 +1,12 @@
 package main
 
 import (
+	"database/sql"
 	"reflect"
 	"testing"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // TestBoolMarshal tests boolean to string conversion for SQL
@@ -1156,25 +1159,25 @@ func TestLogTraffic(t *testing.T) {
 	}()
 
 	testTraffic := TrafficInfo{
-		Icao_addr:        0xABCDEF,
-		Tail:             "N12345",
-		Last_seen:        time.Now(),
-		Position_valid:   true,
-		Lat:              45.5,
-		Lng:              -122.5,
-		Alt:              10000,
-		Track:            270,
-		Speed:            150,
-		Speed_valid:      true,
-		Vvel:             0,
-		TargetType:       TARGET_TYPE_ADSB,
-		SignalLevel:      -20,
-		Age:              1.5,
-		AgeLastAlt:       2.0,
+		Icao_addr:            0xABCDEF,
+		Tail:                 "N12345",
+		Last_seen:            time.Now(),
+		Position_valid:       true,
+		Lat:                  45.5,
+		Lng:                  -122.5,
+		Alt:                  10000,
+		Track:                270,
+		Speed:                150,
+		Speed_valid:          true,
+		Vvel:                 0,
+		TargetType:           TARGET_TYPE_ADSB,
+		SignalLevel:          -20,
+		Age:                  1.5,
+		AgeLastAlt:           2.0,
 		ExtrapolatedPosition: false,
-		BearingDist_valid: true,
-		Bearing:          90,
-		Distance:         5000,
+		BearingDist_valid:    true,
+		Bearing:              90,
+		Distance:             5000,
 	}
 
 	t.Run("logs_when_conditions_met", func(t *testing.T) {
@@ -1631,4 +1634,935 @@ func TestLogAISTermMessage(t *testing.T) {
 			t.Log("Correctly did not log when ReplayLog disabled")
 		}
 	})
+}
+
+// TestMakeTable tests the makeTable function that creates SQLite tables
+func TestMakeTable(t *testing.T) {
+	// Create a temporary database for testing
+	tmpDir := t.TempDir()
+	dbPath := tmpDir + "/test.db"
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+
+	t.Run("create_simple_table", func(t *testing.T) {
+		type SimpleStruct struct {
+			id       int64
+			Name     string
+			Age      int
+			Active   bool
+			Score    float64
+			UintVal  uint
+			Int8Val  int8
+			Int16Val int16
+			Int32Val int32
+			Int64Val int64
+		}
+
+		makeTable(SimpleStruct{}, "simple_test", db)
+
+		// Verify the table was created
+		var tableName string
+		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='simple_test'").Scan(&tableName)
+		if err != nil {
+			t.Errorf("Table 'simple_test' was not created: %v", err)
+		}
+		if tableName != "simple_test" {
+			t.Errorf("Expected table name 'simple_test', got %q", tableName)
+		}
+
+		// Verify columns exist by trying to query the table structure
+		rows, err := db.Query("PRAGMA table_info(simple_test)")
+		if err != nil {
+			t.Fatalf("Failed to get table info: %v", err)
+		}
+		defer rows.Close()
+
+		columnCount := 0
+		expectedColumns := map[string]string{
+			"Name":     "TEXT",
+			"Age":      "INTEGER",
+			"Active":   "INTEGER",
+			"Score":    "REAL",
+			"UintVal":  "INTEGER",
+			"Int8Val":  "INTEGER",
+			"Int16Val": "INTEGER",
+			"Int32Val": "INTEGER",
+			"Int64Val": "INTEGER",
+		}
+
+		for rows.Next() {
+			var cid int
+			var name, dtype string
+			var notnull, pk int
+			var dfltValue interface{}
+			err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk)
+			if err != nil {
+				t.Fatalf("Failed to scan column info: %v", err)
+			}
+
+			if name != "id" {
+				columnCount++
+				if expectedType, ok := expectedColumns[name]; ok {
+					if dtype != expectedType {
+						t.Errorf("Column %q has type %q, expected %q", name, dtype, expectedType)
+					}
+				}
+			}
+		}
+
+		t.Logf("Created table 'simple_test' with %d columns (plus id)", columnCount)
+	})
+
+	t.Run("create_table_with_timestamp_id", func(t *testing.T) {
+		type DataStruct struct {
+			id    int64
+			Value string
+		}
+
+		makeTable(DataStruct{}, "data_test", db)
+
+		// Verify the table has timestamp_id column
+		rows, err := db.Query("PRAGMA table_info(data_test)")
+		if err != nil {
+			t.Fatalf("Failed to get table info: %v", err)
+		}
+		defer rows.Close()
+
+		hasTimestampID := false
+		for rows.Next() {
+			var cid int
+			var name, dtype string
+			var notnull, pk int
+			var dfltValue interface{}
+			err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk)
+			if err != nil {
+				t.Fatalf("Failed to scan column info: %v", err)
+			}
+			if name == "timestamp_id" {
+				hasTimestampID = true
+				if dtype != "INTEGER" {
+					t.Errorf("timestamp_id has type %q, expected INTEGER", dtype)
+				}
+			}
+		}
+
+		if !hasTimestampID {
+			t.Error("Table 'data_test' should have timestamp_id column")
+		}
+		t.Log("Table 'data_test' correctly has timestamp_id column")
+	})
+
+	t.Run("create_timestamp_table_no_timestamp_id", func(t *testing.T) {
+		type TimestampStruct struct {
+			id    int64
+			Value string
+		}
+
+		makeTable(TimestampStruct{}, "timestamp", db)
+
+		// Verify the table does NOT have timestamp_id column
+		rows, err := db.Query("PRAGMA table_info(timestamp)")
+		if err != nil {
+			t.Fatalf("Failed to get table info: %v", err)
+		}
+		defer rows.Close()
+
+		hasTimestampID := false
+		for rows.Next() {
+			var cid int
+			var name, dtype string
+			var notnull, pk int
+			var dfltValue interface{}
+			err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk)
+			if err != nil {
+				t.Fatalf("Failed to scan column info: %v", err)
+			}
+			if name == "timestamp_id" {
+				hasTimestampID = true
+			}
+		}
+
+		if hasTimestampID {
+			t.Error("Table 'timestamp' should NOT have timestamp_id column")
+		}
+		t.Log("Table 'timestamp' correctly has no timestamp_id column")
+	})
+
+	t.Run("create_startup_table_no_timestamp_id", func(t *testing.T) {
+		type StartupStruct struct {
+			id    int64
+			Value string
+		}
+
+		makeTable(StartupStruct{}, "startup", db)
+
+		// Verify the table does NOT have timestamp_id column
+		rows, err := db.Query("PRAGMA table_info(startup)")
+		if err != nil {
+			t.Fatalf("Failed to get table info: %v", err)
+		}
+		defer rows.Close()
+
+		hasTimestampID := false
+		for rows.Next() {
+			var cid int
+			var name, dtype string
+			var notnull, pk int
+			var dfltValue interface{}
+			err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk)
+			if err != nil {
+				t.Fatalf("Failed to scan column info: %v", err)
+			}
+			if name == "timestamp_id" {
+				hasTimestampID = true
+			}
+		}
+
+		if hasTimestampID {
+			t.Error("Table 'startup' should NOT have timestamp_id column")
+		}
+		t.Log("Table 'startup' correctly has no timestamp_id column")
+	})
+
+	t.Run("create_table_with_struct_with_string_method", func(t *testing.T) {
+		type TableWithStruct struct {
+			id       int64
+			Name     string
+			StrField TestStructWithString
+		}
+
+		makeTable(TableWithStruct{}, "struct_test", db)
+
+		// Verify the table was created and has the struct field
+		rows, err := db.Query("PRAGMA table_info(struct_test)")
+		if err != nil {
+			t.Fatalf("Failed to get table info: %v", err)
+		}
+		defer rows.Close()
+
+		hasStrField := false
+		for rows.Next() {
+			var cid int
+			var name, dtype string
+			var notnull, pk int
+			var dfltValue interface{}
+			err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk)
+			if err != nil {
+				t.Fatalf("Failed to scan column info: %v", err)
+			}
+			if name == "StrField" {
+				hasStrField = true
+				if dtype != "STRING" {
+					t.Errorf("StrField has type %q, expected STRING", dtype)
+				}
+			}
+		}
+
+		if !hasStrField {
+			t.Error("Table should have StrField column")
+		}
+		t.Log("Table 'struct_test' correctly has StrField with STRING type")
+	})
+
+	t.Run("create_table_skips_struct_without_string_method", func(t *testing.T) {
+		type TableWithBadStruct struct {
+			id       int64
+			Name     string
+			BadField TestStructWithoutString
+		}
+
+		makeTable(TableWithBadStruct{}, "bad_struct_test", db)
+
+		// Verify the table was created but does NOT have the bad struct field
+		rows, err := db.Query("PRAGMA table_info(bad_struct_test)")
+		if err != nil {
+			t.Fatalf("Failed to get table info: %v", err)
+		}
+		defer rows.Close()
+
+		hasBadField := false
+		for rows.Next() {
+			var cid int
+			var name, dtype string
+			var notnull, pk int
+			var dfltValue interface{}
+			err := rows.Scan(&cid, &name, &dtype, &notnull, &dfltValue, &pk)
+			if err != nil {
+				t.Fatalf("Failed to scan column info: %v", err)
+			}
+			if name == "BadField" {
+				hasBadField = true
+			}
+		}
+
+		if hasBadField {
+			t.Error("Table should NOT have BadField column (struct without String() method)")
+		}
+		t.Log("Table 'bad_struct_test' correctly skipped BadField")
+	})
+}
+
+// TestInsertData tests the insertData function
+func TestInsertData(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Create a temporary database for testing
+	tmpDir := t.TempDir()
+	dbPath := tmpDir + "/test_insert.db"
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+
+	// Initialize the global maps
+	insertString = make(map[string]string)
+	insertBatchIfs = make(map[string][][]interface{})
+
+	// Save original state
+	origTimestamps := dataLogTimestamps
+	origCurTimestamp := dataLogCurTimestamp
+	origStartupID := stratuxStartupID
+	defer func() {
+		dataLogTimestamps = origTimestamps
+		dataLogCurTimestamp = origCurTimestamp
+		stratuxStartupID = origStartupID
+	}()
+
+	t.Run("insert_simple_data", func(t *testing.T) {
+		type SimpleData struct {
+			id    int64
+			Name  string
+			Value int
+		}
+
+		makeTable(SimpleData{}, "simple_insert", db)
+
+		// Setup timestamp
+		dataLogTimestamps = []StratuxTimestamp{
+			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+		}
+		dataLogCurTimestamp = 0
+
+		data := SimpleData{Name: "test", Value: 42}
+		insertData(data, "simple_insert", db, 0)
+
+		// Verify the insert statement was prepared
+		if _, ok := insertString["simple_insert"]; !ok {
+			t.Error("Insert statement for 'simple_insert' was not prepared")
+		}
+
+		// Verify data was queued for batch insert
+		if _, ok := insertBatchIfs["simple_insert"]; !ok {
+			t.Error("Data for 'simple_insert' was not queued")
+		}
+		if len(insertBatchIfs["simple_insert"]) != 1 {
+			t.Errorf("Expected 1 row queued, got %d", len(insertBatchIfs["simple_insert"]))
+		}
+
+		t.Logf("Successfully queued insert for 'simple_insert' table")
+	})
+
+	t.Run("insert_timestamp_immediate", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		makeTable(StratuxTimestamp{}, "test_timestamp", db)
+
+		ts := StratuxTimestamp{
+			id:                   0,
+			Time_type_preference: 0,
+			StratuxClock_value:   stratuxClock.Time,
+			PreferredTime_value:  stratuxClock.Time,
+		}
+
+		dataLogTimestamps = []StratuxTimestamp{ts}
+		dataLogCurTimestamp = 0
+
+		returnedID := insertData(ts, "test_timestamp", db, 0)
+
+		// Timestamp should be inserted immediately
+		if returnedID == 0 {
+			t.Error("Expected non-zero ID returned from timestamp insert")
+		}
+
+		// Batch should be cleared after immediate insert
+		if len(insertBatchIfs["test_timestamp"]) != 0 {
+			t.Errorf("Expected empty batch after immediate insert, got %d rows", len(insertBatchIfs["test_timestamp"]))
+		}
+
+		// Verify the timestamp ID was updated in the structure
+		if dataLogTimestamps[0].id == 0 {
+			t.Error("Expected timestamp ID to be updated in dataLogTimestamps")
+		}
+
+		t.Logf("Timestamp inserted immediately with ID: %d", returnedID)
+	})
+
+	t.Run("insert_startup_immediate", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		makeTable(StratuxStartup{}, "test_startup", db)
+
+		startup := StratuxStartup{Fill: "test"}
+
+		returnedID := insertData(startup, "test_startup", db, 0)
+
+		// Startup should be inserted immediately
+		if returnedID == 0 {
+			t.Error("Expected non-zero ID returned from startup insert")
+		}
+
+		t.Logf("Startup inserted immediately with ID: %d", returnedID)
+	})
+
+	t.Run("insert_with_zero_timestamp_id_creates_timestamp", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		type DataWithTS struct {
+			id    int64
+			Value string
+		}
+
+		makeTable(DataWithTS{}, "data_with_ts", db)
+		makeTable(StratuxTimestamp{}, "ts_table", db)
+
+		// Setup timestamp with id=0 (not yet inserted)
+		dataLogTimestamps = []StratuxTimestamp{
+			{
+				id:                   0,
+				Time_type_preference: 0,
+				StratuxClock_value:   stratuxClock.Time,
+				PreferredTime_value:  stratuxClock.Time,
+			},
+		}
+		dataLogCurTimestamp = 0
+		stratuxStartupID = 1
+
+		data := DataWithTS{Value: "test"}
+		insertData(data, "data_with_ts", db, 0)
+
+		// The timestamp should have been inserted and gotten an ID
+		if dataLogTimestamps[0].id == 0 {
+			t.Error("Expected timestamp to be inserted and get an ID")
+		}
+
+		t.Logf("Timestamp was auto-inserted with ID: %d", dataLogTimestamps[0].id)
+	})
+
+	t.Run("insert_multiple_rows_same_table", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		type MultiData struct {
+			id    int64
+			Name  string
+			Value int
+		}
+
+		makeTable(MultiData{}, "multi_insert", db)
+
+		dataLogTimestamps = []StratuxTimestamp{
+			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+		}
+		dataLogCurTimestamp = 0
+
+		// Insert multiple rows
+		for i := 0; i < 5; i++ {
+			data := MultiData{Name: "test", Value: i}
+			insertData(data, "multi_insert", db, 0)
+		}
+
+		// Verify all rows were queued
+		if len(insertBatchIfs["multi_insert"]) != 5 {
+			t.Errorf("Expected 5 rows queued, got %d", len(insertBatchIfs["multi_insert"]))
+		}
+
+		t.Logf("Successfully queued %d rows for batch insert", len(insertBatchIfs["multi_insert"]))
+	})
+}
+
+// TestBulkInsert tests the bulkInsert function
+func TestBulkInsert(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Create a temporary database for testing
+	tmpDir := t.TempDir()
+	dbPath := tmpDir + "/test_bulk.db"
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+
+	// Save original state
+	origTimestamps := dataLogTimestamps
+	origCurTimestamp := dataLogCurTimestamp
+	defer func() {
+		dataLogTimestamps = origTimestamps
+		dataLogCurTimestamp = origCurTimestamp
+	}()
+
+	t.Run("bulk_insert_single_row", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		type BulkData struct {
+			id    int64
+			Name  string
+			Value int
+		}
+
+		makeTable(BulkData{}, "bulk_single", db)
+
+		dataLogTimestamps = []StratuxTimestamp{
+			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+		}
+		dataLogCurTimestamp = 0
+
+		// Insert one row
+		data := BulkData{Name: "test", Value: 42}
+		insertData(data, "bulk_single", db, 0)
+
+		// Perform bulk insert
+		res, err := bulkInsert("bulk_single", db)
+		if err != nil {
+			t.Errorf("bulkInsert failed: %v", err)
+		}
+
+		// Verify row was inserted
+		rowsAffected, _ := res.RowsAffected()
+		if rowsAffected != 1 {
+			t.Errorf("Expected 1 row inserted, got %d", rowsAffected)
+		}
+
+		// Verify batch was cleared
+		if _, ok := insertBatchIfs["bulk_single"]; ok {
+			t.Error("Expected insertBatchIfs to be cleared after bulk insert")
+		}
+		if _, ok := insertString["bulk_single"]; ok {
+			t.Error("Expected insertString to be cleared after bulk insert")
+		}
+
+		t.Logf("Successfully inserted 1 row via bulkInsert")
+	})
+
+	t.Run("bulk_insert_multiple_rows", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		type BulkData struct {
+			id    int64
+			Name  string
+			Value int
+		}
+
+		makeTable(BulkData{}, "bulk_multi", db)
+
+		dataLogTimestamps = []StratuxTimestamp{
+			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+		}
+		dataLogCurTimestamp = 0
+
+		// Insert multiple rows
+		numRows := 10
+		for i := 0; i < numRows; i++ {
+			data := BulkData{Name: "test", Value: i}
+			insertData(data, "bulk_multi", db, 0)
+		}
+
+		// Perform bulk insert
+		res, err := bulkInsert("bulk_multi", db)
+		if err != nil {
+			t.Errorf("bulkInsert failed: %v", err)
+		}
+
+		// Verify rows were inserted
+		rowsAffected, _ := res.RowsAffected()
+		if rowsAffected != int64(numRows) {
+			t.Errorf("Expected %d rows inserted, got %d", numRows, rowsAffected)
+		}
+
+		// Verify we can read the data back
+		var count int
+		err = db.QueryRow("SELECT COUNT(*) FROM bulk_multi").Scan(&count)
+		if err != nil {
+			t.Errorf("Failed to count rows: %v", err)
+		}
+		if count != numRows {
+			t.Errorf("Expected %d rows in table, got %d", numRows, count)
+		}
+
+		t.Logf("Successfully inserted %d rows via bulkInsert", numRows)
+	})
+
+	t.Run("bulk_insert_large_batch", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		type BulkData struct {
+			id    int64
+			Name  string
+			Value int
+		}
+
+		makeTable(BulkData{}, "bulk_large", db)
+
+		dataLogTimestamps = []StratuxTimestamp{
+			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+		}
+		dataLogCurTimestamp = 0
+
+		// Insert a large number of rows (more than the 999 variable limit would allow in one batch)
+		numRows := 2000
+		for i := 0; i < numRows; i++ {
+			data := BulkData{Name: "test", Value: i}
+			insertData(data, "bulk_large", db, 0)
+		}
+
+		// Perform bulk insert (should split into multiple batches)
+		res, err := bulkInsert("bulk_large", db)
+		if err != nil {
+			t.Errorf("bulkInsert failed: %v", err)
+		}
+
+		// The last result should still be valid
+		if res == nil {
+			t.Error("Expected non-nil result from bulkInsert")
+		}
+
+		// Verify we can read the data back
+		var count int
+		err = db.QueryRow("SELECT COUNT(*) FROM bulk_large").Scan(&count)
+		if err != nil {
+			t.Errorf("Failed to count rows: %v", err)
+		}
+		if count != numRows {
+			t.Errorf("Expected %d rows in table, got %d", numRows, count)
+		}
+
+		t.Logf("Successfully inserted %d rows via bulkInsert (with batching)", numRows)
+	})
+
+	t.Run("bulk_insert_no_data_returns_error", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		_, err := bulkInsert("nonexistent_table", db)
+		if err == nil {
+			t.Error("Expected error when bulk inserting with no data")
+		}
+		t.Logf("Correctly returned error: %v", err)
+	})
+
+	t.Run("bulk_insert_preserves_data_integrity", func(t *testing.T) {
+		// Clear maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		type DetailedData struct {
+			id      int64
+			Name    string
+			Value   int
+			Active  bool
+			Score   float64
+			Counter uint
+		}
+
+		makeTable(DetailedData{}, "bulk_detailed", db)
+
+		dataLogTimestamps = []StratuxTimestamp{
+			{id: 1, StratuxClock_value: stratuxClock.Time, PreferredTime_value: stratuxClock.Time},
+		}
+		dataLogCurTimestamp = 0
+
+		// Insert rows with specific values
+		testData := []DetailedData{
+			{Name: "Alice", Value: 100, Active: true, Score: 95.5, Counter: 10},
+			{Name: "Bob", Value: 200, Active: false, Score: 87.3, Counter: 20},
+			{Name: "Charlie", Value: 300, Active: true, Score: 92.1, Counter: 30},
+		}
+
+		for _, data := range testData {
+			insertData(data, "bulk_detailed", db, 0)
+		}
+
+		// Perform bulk insert
+		_, err := bulkInsert("bulk_detailed", db)
+		if err != nil {
+			t.Errorf("bulkInsert failed: %v", err)
+		}
+
+		// Verify data integrity
+		rows, err := db.Query("SELECT Name, Value, Active, Score, Counter FROM bulk_detailed ORDER BY Value")
+		if err != nil {
+			t.Errorf("Failed to query data: %v", err)
+		}
+		defer rows.Close()
+
+		idx := 0
+		for rows.Next() {
+			var name string
+			var value, active int
+			var score float64
+			var counter uint
+
+			err := rows.Scan(&name, &value, &active, &score, &counter)
+			if err != nil {
+				t.Errorf("Failed to scan row: %v", err)
+			}
+
+			if idx >= len(testData) {
+				t.Errorf("More rows returned than expected")
+				break
+			}
+
+			expected := testData[idx]
+			if name != expected.Name {
+				t.Errorf("Row %d: expected Name %q, got %q", idx, expected.Name, name)
+			}
+			if value != expected.Value {
+				t.Errorf("Row %d: expected Value %d, got %d", idx, expected.Value, value)
+			}
+			activeExpected := 0
+			if expected.Active {
+				activeExpected = 1
+			}
+			if active != activeExpected {
+				t.Errorf("Row %d: expected Active %d, got %d", idx, activeExpected, active)
+			}
+			if score != expected.Score {
+				t.Errorf("Row %d: expected Score %f, got %f", idx, expected.Score, score)
+			}
+			if counter != expected.Counter {
+				t.Errorf("Row %d: expected Counter %d, got %d", idx, expected.Counter, counter)
+			}
+
+			idx++
+		}
+
+		if idx != len(testData) {
+			t.Errorf("Expected %d rows, got %d", len(testData), idx)
+		}
+
+		t.Logf("Successfully verified data integrity for %d rows", idx)
+	})
+}
+
+// TestInitDataLog tests the initDataLog function
+func TestInitDataLog(t *testing.T) {
+	// Save original state
+	origInsertString := insertString
+	origInsertBatchIfs := insertBatchIfs
+	defer func() {
+		insertString = origInsertString
+		insertBatchIfs = origInsertBatchIfs
+	}()
+
+	t.Run("initializes_maps", func(t *testing.T) {
+		// Clear the maps
+		insertString = nil
+		insertBatchIfs = nil
+
+		initDataLog()
+
+		// Give the watchdog goroutine time to start
+		time.Sleep(100 * time.Millisecond)
+
+		if insertString == nil {
+			t.Error("Expected insertString map to be initialized")
+		}
+		if insertBatchIfs == nil {
+			t.Error("Expected insertBatchIfs map to be initialized")
+		}
+
+		t.Logf("initDataLog successfully initialized maps")
+	})
+}
+
+// TestDataLogRow tests the DataLogRow struct
+func TestDataLogRow(t *testing.T) {
+	t.Run("create_datalog_row", func(t *testing.T) {
+		row := DataLogRow{
+			tbl:    "test_table",
+			data:   "test_data",
+			ts_num: 42,
+		}
+
+		if row.tbl != "test_table" {
+			t.Errorf("Expected tbl='test_table', got %q", row.tbl)
+		}
+		if row.data != "test_data" {
+			t.Errorf("Expected data='test_data', got %v", row.data)
+		}
+		if row.ts_num != 42 {
+			t.Errorf("Expected ts_num=42, got %d", row.ts_num)
+		}
+
+		t.Logf("DataLogRow struct works correctly")
+	})
+}
+
+// TestStratuxTimestamp tests the StratuxTimestamp struct
+func TestStratuxTimestamp(t *testing.T) {
+	t.Run("create_stratux_timestamp", func(t *testing.T) {
+		now := time.Now()
+		ts := StratuxTimestamp{
+			id:                   123,
+			Time_type_preference: 1,
+			StratuxClock_value:   now,
+			GPSClock_value:       now.Add(1 * time.Second),
+			PreferredTime_value:  now.Add(2 * time.Second),
+			StartupID:            456,
+		}
+
+		if ts.id != 123 {
+			t.Errorf("Expected id=123, got %d", ts.id)
+		}
+		if ts.Time_type_preference != 1 {
+			t.Errorf("Expected Time_type_preference=1, got %d", ts.Time_type_preference)
+		}
+		if !ts.StratuxClock_value.Equal(now) {
+			t.Errorf("Expected StratuxClock_value=%v, got %v", now, ts.StratuxClock_value)
+		}
+		if ts.StartupID != 456 {
+			t.Errorf("Expected StartupID=456, got %d", ts.StartupID)
+		}
+
+		t.Logf("StratuxTimestamp struct works correctly")
+	})
+}
+
+// TestStratuxStartup tests the StratuxStartup struct
+func TestStratuxStartup(t *testing.T) {
+	t.Run("create_stratux_startup", func(t *testing.T) {
+		startup := StratuxStartup{
+			id:   789,
+			Fill: "test_fill",
+		}
+
+		if startup.id != 789 {
+			t.Errorf("Expected id=789, got %d", startup.id)
+		}
+		if startup.Fill != "test_fill" {
+			t.Errorf("Expected Fill='test_fill', got %q", startup.Fill)
+		}
+
+		t.Logf("StratuxStartup struct works correctly")
+	})
+}
+
+// TestSQLTypeMappings tests the sqlTypeMap mapping
+func TestSQLTypeMappings(t *testing.T) {
+	testCases := []struct {
+		kind     reflect.Kind
+		expected string
+	}{
+		{reflect.Bool, "bool"},
+		{reflect.Int, "int"},
+		{reflect.Int8, "int"},
+		{reflect.Int16, "int"},
+		{reflect.Int32, "int"},
+		{reflect.Int64, "int"},
+		{reflect.Uint, "uint"},
+		{reflect.Uint8, "uint"},
+		{reflect.Uint16, "uint"},
+		{reflect.Uint32, "uint"},
+		{reflect.Uint64, "uint"},
+		{reflect.Float32, "float"},
+		{reflect.Float64, "float"},
+		{reflect.String, "string"},
+		{reflect.Struct, "struct"},
+		{reflect.Complex64, "notsupported"},
+		{reflect.Complex128, "notsupported"},
+		{reflect.Array, "notsupported"},
+		{reflect.Chan, "notsupported"},
+		{reflect.Func, "notsupported"},
+		{reflect.Interface, "notsupported"},
+		{reflect.Map, "notsupported"},
+		{reflect.Ptr, "notsupported"},
+		{reflect.Slice, "notsupported"},
+		{reflect.Uintptr, "notsupported"},
+		{reflect.UnsafePointer, "notsupported"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.kind.String(), func(t *testing.T) {
+			sqlType, ok := sqlTypeMap[tc.kind]
+			if !ok {
+				t.Errorf("Kind %s not found in sqlTypeMap", tc.kind)
+			}
+			if sqlType != tc.expected {
+				t.Errorf("Expected sqlType %q for kind %s, got %q", tc.expected, tc.kind, sqlType)
+			}
+		})
+	}
+}
+
+// TestSQLiteMarshalFunctions tests the sqliteMarshalFunctions map
+func TestSQLiteMarshalFunctions(t *testing.T) {
+	testCases := []struct {
+		key          string
+		expectedType string
+		shouldHaveFn bool
+	}{
+		{"bool", "INTEGER", true},
+		{"int", "INTEGER", true},
+		{"uint", "INTEGER", true},
+		{"float", "REAL", true},
+		{"string", "TEXT", true},
+		{"struct", "STRING", true},
+		{"notsupported", "notsupported", true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.key, func(t *testing.T) {
+			marshal, ok := sqliteMarshalFunctions[tc.key]
+			if !ok {
+				t.Errorf("Key %q not found in sqliteMarshalFunctions", tc.key)
+				return
+			}
+			if marshal.FieldType != tc.expectedType {
+				t.Errorf("Expected FieldType %q for key %q, got %q", tc.expectedType, tc.key, marshal.FieldType)
+			}
+			if tc.shouldHaveFn && marshal.Marshal == nil {
+				t.Errorf("Expected Marshal function for key %q, got nil", tc.key)
+			}
+		})
+	}
+}
+
+// TestLogTimestampResolution tests the LOG_TIMESTAMP_RESOLUTION constant
+func TestLogTimestampResolution(t *testing.T) {
+	expectedResolution := 250 * time.Millisecond
+
+	if LOG_TIMESTAMP_RESOLUTION != expectedResolution {
+		t.Errorf("Expected LOG_TIMESTAMP_RESOLUTION to be %v, got %v", expectedResolution, LOG_TIMESTAMP_RESOLUTION)
+	}
+
+	t.Logf("LOG_TIMESTAMP_RESOLUTION is correctly set to %v", LOG_TIMESTAMP_RESOLUTION)
 }

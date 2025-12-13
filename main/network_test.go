@@ -483,11 +483,11 @@ func TestParseBleUuid_128BitUUID(t *testing.T) {
 // TestParseBleUuid_InvalidInput tests parsing invalid UUID strings
 func TestParseBleUuid_InvalidInput(t *testing.T) {
 	testCases := []string{
-		"",           // empty string
-		"ZZZ",        // invalid hex
-		"12345",      // 5 characters (not 4 or full UUID)
-		"GGG0",       // invalid hex chars
-		"invalid",    // completely invalid
+		"",        // empty string
+		"ZZZ",     // invalid hex
+		"12345",   // 5 characters (not 4 or full UUID)
+		"GGG0",    // invalid hex chars
+		"invalid", // completely invalid
 	}
 
 	for _, input := range testCases {
@@ -556,11 +556,11 @@ func TestGetNetworkConn_InvalidKey(t *testing.T) {
 	clientConnections = make(map[string]connection)
 
 	testCases := []string{
-		"",                    // empty string
-		"192.168.10.100",      // missing port
-		"invalid",             // no colon
-		"192.168.10.100:",     // missing port number
-		":4000",               // missing IP
+		"",                // empty string
+		"192.168.10.100",  // missing port
+		"invalid",         // no colon
+		"192.168.10.100:", // missing port number
+		":4000",           // missing IP
 	}
 
 	for _, key := range testCases {
@@ -1570,8 +1570,8 @@ func TestCollectMessages_MaxMsgLenTracking(t *testing.T) {
 	}
 
 	// Add messages of increasing size
-	smallMsg := []byte{0x7E, 0x00, 0x7E} // 3 bytes
-	mediumMsg := []byte{0x7E, 0x00, 0x01, 0x02, 0x03, 0x7E} // 6 bytes
+	smallMsg := []byte{0x7E, 0x00, 0x7E}                                                 // 3 bytes
+	mediumMsg := []byte{0x7E, 0x00, 0x01, 0x02, 0x03, 0x7E}                              // 6 bytes
 	largeMsg := []byte{0x7E, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x7E} // 11 bytes
 
 	conn.Queue.Put(0, 5*time.Second, smallMsg)
@@ -1600,7 +1600,7 @@ func TestCollectMessages_PacketSizeLimitWithLargeMessage(t *testing.T) {
 	}
 
 	// Add a large message that almost fills the packet, then small messages
-	largeMsg := make([]byte, 900) // 900 bytes
+	largeMsg := make([]byte, 900)              // 900 bytes
 	smallMsg := []byte{0x7E, 0x00, 0x01, 0x7E} // 4 bytes
 
 	conn.Queue.Put(0, 5*time.Second, largeMsg)
@@ -1782,9 +1782,9 @@ func TestCollectMessages_MixedPrioritiesOnActiveConnection(t *testing.T) {
 	msg2 := []byte{0x7E, 0x02, 0x7E}
 	msg3 := []byte{0x7E, 0x03, 0x7E}
 
-	conn.Queue.Put(10, 5*time.Second, msg1)   // high positive priority
-	conn.Queue.Put(0, 5*time.Second, msg2)    // zero priority
-	conn.Queue.Put(-20, 5*time.Second, msg3)  // high negative priority
+	conn.Queue.Put(10, 5*time.Second, msg1)  // high positive priority
+	conn.Queue.Put(0, 5*time.Second, msg2)   // zero priority
+	conn.Queue.Put(-20, 5*time.Second, msg3) // high negative priority
 
 	result := collectMessages(conn)
 
@@ -1835,22 +1835,22 @@ func TestCollectMessages_EmptyAfterPriorityFilter(t *testing.T) {
 
 // mockConnection is a test helper that allows full control over sleeping and throttling states
 type mockConnection struct {
-	queue            *MessageQueue
-	capability       uint8
+	queue             *MessageQueue
+	capability        uint8
 	desiredPacketSize int
-	sleeping         bool
-	throttled        bool
+	sleeping          bool
+	throttled         bool
 }
 
-func (m *mockConnection) GetConnectionKey() string        { return "mock:test" }
-func (m *mockConnection) MessageQueue() *MessageQueue     { return m.queue }
-func (m *mockConnection) Writer() io.Writer                { return nil }
-func (m *mockConnection) IsThrottled() bool               { return m.throttled }
-func (m *mockConnection) IsSleeping() bool                { return m.sleeping }
-func (m *mockConnection) Capabilities() uint8             { return m.capability }
-func (m *mockConnection) GetDesiredPacketSize() int       { return m.desiredPacketSize }
-func (m *mockConnection) OnError(error)                   {}
-func (m *mockConnection) Close()                          {}
+func (m *mockConnection) GetConnectionKey() string    { return "mock:test" }
+func (m *mockConnection) MessageQueue() *MessageQueue { return m.queue }
+func (m *mockConnection) Writer() io.Writer           { return nil }
+func (m *mockConnection) IsThrottled() bool           { return m.throttled }
+func (m *mockConnection) IsSleeping() bool            { return m.sleeping }
+func (m *mockConnection) Capabilities() uint8         { return m.capability }
+func (m *mockConnection) GetDesiredPacketSize() int   { return m.desiredPacketSize }
+func (m *mockConnection) OnError(error)               {}
+func (m *mockConnection) Close()                      {}
 
 // TestCollectMessages_MockSleepingConnection tests sleeping connection behavior with mock
 func TestCollectMessages_MockSleepingConnection(t *testing.T) {
@@ -1859,11 +1859,11 @@ func TestCollectMessages_MockSleepingConnection(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         true,
-		throttled:        false,
+		sleeping:          true,
+		throttled:         false,
 	}
 
 	// Add regular priority message (priority 0) - should NOT be collected when sleeping
@@ -1885,11 +1885,11 @@ func TestCollectMessages_MockSleepingConnectionHighPriority(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         true,
-		throttled:        false,
+		sleeping:          true,
+		throttled:         false,
 	}
 
 	// Add heartbeat message with priority -11 (should be sent even when sleeping)
@@ -1911,11 +1911,11 @@ func TestCollectMessages_MockSleepingConnectionPriorityBoundary(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         true,
-		throttled:        false,
+		sleeping:          true,
+		throttled:         false,
 	}
 
 	// Test priority exactly at -10 (should be sent, condition is prio > -10, which is false for -10)
@@ -1947,11 +1947,11 @@ func TestCollectMessages_MockSleepingConnectionPartialCollection(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         true,
-		throttled:        false,
+		sleeping:          true,
+		throttled:         false,
 	}
 
 	// Add high priority message first
@@ -1983,11 +1983,11 @@ func TestCollectMessages_MockThrottledConnection(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         false,
-		throttled:        true,
+		sleeping:          false,
+		throttled:         true,
 	}
 
 	// Add low priority message (priority 1) - should NOT be sent when throttled
@@ -2009,11 +2009,11 @@ func TestCollectMessages_MockThrottledConnectionZeroPriority(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         false,
-		throttled:        true,
+		sleeping:          false,
+		throttled:         true,
 	}
 
 	// Add priority 0 message (should be sent when throttled, prio > 0 is false)
@@ -2035,11 +2035,11 @@ func TestCollectMessages_MockThrottledConnectionHighPriority(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         false,
-		throttled:        true,
+		sleeping:          false,
+		throttled:         true,
 	}
 
 	// Add high priority message (priority -1) - should be sent when throttled
@@ -2061,11 +2061,11 @@ func TestCollectMessages_MockThrottledConnectionPartialCollection(t *testing.T) 
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         false,
-		throttled:        true,
+		sleeping:          false,
+		throttled:         true,
 	}
 
 	// Add important message (priority 0)
@@ -2097,11 +2097,11 @@ func TestCollectMessages_MockSleepingAndThrottled(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         true,
-		throttled:        true,
+		sleeping:          true,
+		throttled:         true,
 	}
 
 	// When both sleeping and throttled, sleeping check comes first
@@ -2135,11 +2135,11 @@ func TestCollectMessages_SmallPacketSize(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(100),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(100),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 20, // Very small packet size
-		sleeping:         false,
-		throttled:        false,
+		sleeping:          false,
+		throttled:         false,
 	}
 
 	// Add multiple small messages
@@ -2169,11 +2169,11 @@ func TestCollectMessages_TCPConnection(t *testing.T) {
 
 	// Use a mock to avoid needing actual TCP connection (which would make it not sleeping)
 	mock := &mockConnection{
-		queue:            NewMessageQueue(50),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(50),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 512, // TCP packet size
-		sleeping:         false,
-		throttled:        false,
+		sleeping:          false,
+		throttled:         false,
 	}
 
 	// Add messages
@@ -2203,11 +2203,11 @@ func TestCollectMessages_SerialConnection(t *testing.T) {
 
 	// Use a mock to avoid needing actual serial port (which would make it sleeping)
 	mock := &mockConnection{
-		queue:            NewMessageQueue(50),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(50),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 128, // Serial packet size
-		sleeping:         false,
-		throttled:        false,
+		sleeping:          false,
+		throttled:         false,
 	}
 
 	// Add messages
@@ -2267,11 +2267,11 @@ func TestCollectMessages_PacketSizeOne(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_POSITION_FFSIM,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_POSITION_FFSIM,
 		desiredPacketSize: 1, // X-Plane mode
-		sleeping:         false,
-		throttled:        false,
+		sleeping:          false,
+		throttled:         false,
 	}
 
 	// Add small messages
@@ -2301,17 +2301,17 @@ func TestCollectMessages_MaxMsgLenUpdates(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(10),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(10),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 1024,
-		sleeping:         false,
-		throttled:        false,
+		sleeping:          false,
+		throttled:         false,
 	}
 
 	// Add messages of varying sizes
 	smallMsg := []byte{0x7E, 0x01, 0x7E} // 3 bytes
-	mediumMsg := make([]byte, 50) // 50 bytes
-	largeMsg := make([]byte, 200) // 200 bytes
+	mediumMsg := make([]byte, 50)        // 50 bytes
+	largeMsg := make([]byte, 200)        // 200 bytes
 
 	mock.queue.Put(0, 5*time.Second, smallMsg)
 	mock.queue.Put(0, 5*time.Second, mediumMsg)
@@ -2332,11 +2332,11 @@ func TestCollectMessages_StopsBeforePacketSizeExceeded(t *testing.T) {
 	}
 
 	mock := &mockConnection{
-		queue:            NewMessageQueue(100),
-		capability:       NETWORK_GDL90_STANDARD,
+		queue:             NewMessageQueue(100),
+		capability:        NETWORK_GDL90_STANDARD,
 		desiredPacketSize: 100,
-		sleeping:         false,
-		throttled:        false,
+		sleeping:          false,
+		throttled:         false,
 	}
 
 	// Add a message that is 80 bytes, then smaller messages
@@ -2360,5 +2360,333 @@ func TestCollectMessages_StopsBeforePacketSizeExceeded(t *testing.T) {
 	// Should not exceed packet size significantly
 	if len(result) > 200 {
 		t.Errorf("Result exceeded reasonable packet size: got %d bytes", len(result))
+	}
+}
+
+// mockConnectionWithWriter extends mockConnection to support testing Write errors
+type mockConnectionWithWriter struct {
+	mockConnection
+	writer     io.Writer
+	errorCount int
+}
+
+func (m *mockConnectionWithWriter) Writer() io.Writer {
+	return m.writer
+}
+
+func (m *mockConnectionWithWriter) OnError(err error) {
+	m.errorCount++
+}
+
+// failWriter always returns an error on Write
+type failWriter struct {
+	writeCount int
+}
+
+func (fw *failWriter) Write(p []byte) (n int, err error) {
+	fw.writeCount++
+	return 0, io.ErrShortWrite
+}
+
+// partialWriter simulates partial writes
+type partialWriter struct {
+	bytesToWritePerCall int
+	writeCount          int
+	totalBytesWritten   int
+}
+
+func (pw *partialWriter) Write(p []byte) (n int, err error) {
+	pw.writeCount++
+	bytesToWrite := pw.bytesToWritePerCall
+	if bytesToWrite > len(p) {
+		bytesToWrite = len(p)
+	}
+	pw.totalBytesWritten += bytesToWrite
+	return bytesToWrite, nil
+}
+
+// successWriter always succeeds
+type successWriter struct {
+	writeCount        int
+	totalBytesWritten int
+}
+
+func (sw *successWriter) Write(p []byte) (n int, err error) {
+	sw.writeCount++
+	sw.totalBytesWritten += len(p)
+	return len(p), nil
+}
+
+// TestConnectionWriter_WriteError tests connectionWriter with write errors
+func TestConnectionWriter_WriteError(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Create a mock writer that always fails
+	fw := &failWriter{}
+
+	mock := &mockConnectionWithWriter{
+		mockConnection: mockConnection{
+			queue:             NewMessageQueue(10),
+			capability:        NETWORK_GDL90_STANDARD,
+			desiredPacketSize: 1024,
+			sleeping:          false,
+			throttled:         false,
+		},
+		writer:     fw,
+		errorCount: 0,
+	}
+
+	// Add a message
+	testMsg := []byte{0x7E, 0x01, 0x02, 0x7E}
+	mock.queue.Put(0, 5*time.Second, testMsg)
+
+	// Close the queue after a short delay to stop the writer
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		mock.queue.Close()
+	}()
+
+	// Run the connection writer - it should handle the error and exit cleanly
+	connectionWriter(mock)
+
+	// Writer should have been called at least once
+	if fw.writeCount == 0 {
+		t.Error("Writer should have been called at least once")
+	}
+
+	// OnError should have been called due to write failure
+	if mock.errorCount == 0 {
+		t.Error("OnError should have been called on write failure")
+	}
+}
+
+// TestConnectionWriter_PartialWrite tests handling partial writes
+func TestConnectionWriter_PartialWrite(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Create a mock writer that only writes part of the data on first call
+	pw := &partialWriter{bytesToWritePerCall: 2}
+
+	mock := &mockConnectionWithWriter{
+		mockConnection: mockConnection{
+			queue:             NewMessageQueue(10),
+			capability:        NETWORK_GDL90_STANDARD,
+			desiredPacketSize: 1024,
+			sleeping:          false,
+			throttled:         false,
+		},
+		writer:     pw,
+		errorCount: 0,
+	}
+
+	// Add a message
+	testMsg := []byte{0x7E, 0x01, 0x02, 0x03, 0x04, 0x7E} // 6 bytes
+	mock.queue.Put(0, 5*time.Second, testMsg)
+
+	// Close the queue after a short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		mock.queue.Close()
+	}()
+
+	// Run the connection writer
+	connectionWriter(mock)
+
+	// All bytes should have been written eventually
+	if pw.totalBytesWritten != len(testMsg) {
+		t.Errorf("Expected %d bytes written, got %d", len(testMsg), pw.totalBytesWritten)
+	}
+
+	// Should have required multiple write calls due to partial writes
+	if pw.writeCount < 2 {
+		t.Errorf("Expected at least 2 write calls for partial writes, got %d", pw.writeCount)
+	}
+}
+
+// TestConnectionWriter_QueueClosed tests that writer exits when queue is closed
+func TestConnectionWriter_QueueClosed(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	successWriter := &successWriter{}
+
+	mock := &mockConnectionWithWriter{
+		mockConnection: mockConnection{
+			queue:             NewMessageQueue(10),
+			capability:        NETWORK_GDL90_STANDARD,
+			desiredPacketSize: 1024,
+			sleeping:          false,
+			throttled:         false,
+		},
+		writer:     successWriter,
+		errorCount: 0,
+	}
+
+	// Close the queue immediately
+	mock.queue.Close()
+
+	// Run the connection writer - should exit immediately
+	done := make(chan bool)
+	go func() {
+		connectionWriter(mock)
+		done <- true
+	}()
+
+	// Wait for completion with timeout
+	select {
+	case <-done:
+		// Success - writer exited cleanly
+	case <-time.After(100 * time.Millisecond):
+		t.Error("connectionWriter did not exit when queue was closed")
+	}
+}
+
+// TestConnectionWriter_DataAvailableChannel tests that writer waits on DataAvailable
+func TestConnectionWriter_DataAvailableChannel(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	sw := &successWriter{}
+
+	mock := &mockConnectionWithWriter{
+		mockConnection: mockConnection{
+			queue:             NewMessageQueue(10),
+			capability:        NETWORK_GDL90_STANDARD,
+			desiredPacketSize: 1024,
+			sleeping:          false,
+			throttled:         false,
+		},
+		writer:     sw,
+		errorCount: 0,
+	}
+
+	// Start the connection writer
+	go connectionWriter(mock)
+
+	// Give it time to start and wait on the channel
+	time.Sleep(10 * time.Millisecond)
+
+	// Add a message - this should trigger the DataAvailable channel
+	testMsg := []byte{0x7E, 0x01, 0x02, 0x7E}
+	mock.queue.Put(0, 5*time.Second, testMsg)
+
+	// Give time for message to be written
+	time.Sleep(50 * time.Millisecond)
+
+	// Close the queue to stop the writer
+	mock.queue.Close()
+
+	// Give time for clean exit
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify message was written
+	if sw.totalBytesWritten != len(testMsg) {
+		t.Errorf("Expected %d bytes written, got %d", len(testMsg), sw.totalBytesWritten)
+	}
+}
+
+// TestConnectionWriter_MultipleMessages tests writing multiple messages in sequence
+func TestConnectionWriter_MultipleMessages(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	sw := &successWriter{}
+
+	mock := &mockConnectionWithWriter{
+		mockConnection: mockConnection{
+			queue:             NewMessageQueue(10),
+			capability:        NETWORK_GDL90_STANDARD,
+			desiredPacketSize: 1024,
+			sleeping:          false,
+			throttled:         false,
+		},
+		writer:     sw,
+		errorCount: 0,
+	}
+
+	// Start the connection writer
+	go connectionWriter(mock)
+
+	// Add multiple messages
+	msg1 := []byte{0x7E, 0x01, 0x7E}
+	msg2 := []byte{0x7E, 0x02, 0x7E}
+	msg3 := []byte{0x7E, 0x03, 0x7E}
+
+	mock.queue.Put(0, 5*time.Second, msg1)
+	mock.queue.Put(0, 5*time.Second, msg2)
+	mock.queue.Put(0, 5*time.Second, msg3)
+
+	// Give time for messages to be written
+	time.Sleep(100 * time.Millisecond)
+
+	// Close the queue
+	mock.queue.Close()
+
+	// Give time for clean exit
+	time.Sleep(50 * time.Millisecond)
+
+	expectedBytes := len(msg1) + len(msg2) + len(msg3)
+	if sw.totalBytesWritten != expectedBytes {
+		t.Errorf("Expected %d bytes written, got %d", expectedBytes, sw.totalBytesWritten)
+	}
+}
+
+// TestConnectionWriter_GlobalStats tests that global stats are updated
+func TestConnectionWriter_GlobalStats(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Save initial stats
+	initialMessagesSent := globalStatus.NetworkDataMessagesSent
+	initialBytesSent := globalStatus.NetworkDataBytesSent
+
+	sw := &successWriter{}
+
+	mock := &mockConnectionWithWriter{
+		mockConnection: mockConnection{
+			queue:             NewMessageQueue(10),
+			capability:        NETWORK_GDL90_STANDARD,
+			desiredPacketSize: 1024,
+			sleeping:          false,
+			throttled:         false,
+		},
+		writer:     sw,
+		errorCount: 0,
+	}
+
+	// Start the connection writer
+	go connectionWriter(mock)
+
+	// Add a message
+	testMsg := []byte{0x7E, 0x01, 0x02, 0x03, 0x7E}
+	mock.queue.Put(0, 5*time.Second, testMsg)
+
+	// Give time for message to be written
+	time.Sleep(50 * time.Millisecond)
+
+	// Close the queue
+	mock.queue.Close()
+
+	// Give time for clean exit
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify global stats were incremented
+	messagesSent := globalStatus.NetworkDataMessagesSent - initialMessagesSent
+	bytesSent := globalStatus.NetworkDataBytesSent - initialBytesSent
+
+	if messagesSent < 1 {
+		t.Errorf("Expected at least 1 message sent, got %d", messagesSent)
+	}
+
+	if bytesSent < uint64(len(testMsg)) {
+		t.Errorf("Expected at least %d bytes sent, got %d", len(testMsg), bytesSent)
 	}
 }

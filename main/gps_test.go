@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -9,6 +10,40 @@ import (
 
 	"github.com/tarm/serial"
 )
+
+// setUp initializes required global state for GPS tests
+func setUp() {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	// Initialize mySituation mutexes if needed
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+}
+
+// tearDown cleans up after GPS tests
+func tearDown() {
+	// Currently no cleanup needed
+}
 
 // TestChksumUBX tests UBX checksum calculation
 func TestChksumUBX(t *testing.T) {
@@ -427,6 +462,8 @@ func TestUpdateConstellation(t *testing.T) {
 	// Initialize mySituation mutexes
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 
 	// Save original state
@@ -491,6 +528,8 @@ func TestUpdateConstellation_StaleSatellites(t *testing.T) {
 	// Initialize mySituation mutexes
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 
 	// Save original state
@@ -556,6 +595,8 @@ func TestUpdateConstellation_SolutionTimeout(t *testing.T) {
 	// Initialize mySituation mutexes
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 
 	// Save original state
@@ -701,8 +742,11 @@ func TestProcessNMEALine_GPVTG(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
@@ -797,8 +841,11 @@ func TestProcessNMEALine_GPGGA(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
@@ -929,8 +976,11 @@ func TestProcessNMEALine_GPRMC(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
@@ -1028,14 +1078,19 @@ func TestProcessNMEALine_AdditionalBranches(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
 	}
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muBaro == nil {
 		mySituation.muBaro = &sync.Mutex{}
@@ -1282,8 +1337,11 @@ func TestProcessNMEALine_InvalidMessages(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
@@ -2386,14 +2444,19 @@ func TestProcessNMEALine_GPGSA(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
 	}
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 
 	// Save original satellites
@@ -2531,8 +2594,11 @@ func TestProcessNMEALine_GPGST(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
@@ -2649,14 +2715,19 @@ func TestProcessNMEALine_GPGSV(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
 	}
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 
 	// Save original satellites
@@ -2800,8 +2871,11 @@ func TestProcessNMEALine_POGNB(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
@@ -2890,8 +2964,11 @@ func TestProcessNMEALineLow_PGRMZ(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muBaro == nil {
 		mySituation.muBaro = &sync.Mutex{}
@@ -3027,8 +3104,11 @@ func TestProcessNMEALineLow_PFLAU_PFLAA(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 
 	testCases := []struct {
@@ -3078,14 +3158,19 @@ func TestProcessNMEALineLow_EdgeCases(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
 	}
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 
 	testCases := []struct {
@@ -3343,8 +3428,11 @@ func TestProcessNMEALineLow_GPSTypeDetection(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
@@ -3422,11 +3510,16 @@ func TestProcessNMEALineLow_SatelliteTypes(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 
 	testCases := []struct {
@@ -3521,14 +3614,19 @@ func TestProcessNMEALineLow_Comprehensive(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
 	}
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muBaro == nil {
 		mySituation.muBaro = &sync.Mutex{}
@@ -4297,14 +4395,19 @@ func TestProcessNMEALineLow_BoundsChecking(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
 	}
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muBaro == nil {
 		mySituation.muBaro = &sync.Mutex{}
@@ -4421,14 +4524,19 @@ func TestProcessNMEALineLow_AdditionalEdgeCases(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
-	if mySituation.muGPS == nil {
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
 		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muGPSPerformance == nil {
 		mySituation.muGPSPerformance = &sync.Mutex{}
 	}
 	if mySituation.muSatellite == nil {
 		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
 	}
 	if mySituation.muBaro == nil {
 		mySituation.muBaro = &sync.Mutex{}
@@ -4799,4 +4907,680 @@ func TestProcessNMEALineLow_AdditionalEdgeCases(t *testing.T) {
 			t.Error("Expected GPRMC to be processed even with invalid date")
 		}
 	})
+}
+
+// TestIsGPSConnected tests GPS connection validation
+func TestIsGPSConnected(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	t.Run("GPS connected - recent message", func(t *testing.T) {
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time
+		if !isGPSConnected() {
+			t.Error("Expected GPS to be connected with recent NMEA message")
+		}
+	})
+
+	t.Run("GPS not connected - old message", func(t *testing.T) {
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time.Add(-10 * time.Second)
+		if isGPSConnected() {
+			t.Error("Expected GPS to not be connected with old NMEA message")
+		}
+	})
+
+	t.Run("GPS connected - exactly 4 seconds ago", func(t *testing.T) {
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time.Add(-4 * time.Second)
+		if !isGPSConnected() {
+			t.Error("Expected GPS to be connected at 4 seconds")
+		}
+	})
+
+	t.Run("GPS not connected - exactly 5 seconds ago", func(t *testing.T) {
+		mySituation.GPSLastValidNMEAMessageTime = stratuxClock.Time.Add(-5 * time.Second)
+		if isGPSConnected() {
+			t.Error("Expected GPS to not be connected at 5 seconds")
+		}
+	})
+}
+
+// TestIsGPSClockValid tests GPS clock validity
+func TestIsGPSClockValid(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	t.Run("GPS clock valid - recent time", func(t *testing.T) {
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time
+		if !isGPSClockValid() {
+			t.Error("Expected GPS clock to be valid with recent GPS time")
+		}
+	})
+
+	t.Run("GPS clock invalid - old time", func(t *testing.T) {
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time.Add(-20 * time.Second)
+		if isGPSClockValid() {
+			t.Error("Expected GPS clock to be invalid with old GPS time")
+		}
+	})
+
+	t.Run("GPS clock invalid - zero time", func(t *testing.T) {
+		mySituation.GPSLastGPSTimeStratuxTime = time.Time{}
+		if isGPSClockValid() {
+			t.Error("Expected GPS clock to be invalid with zero time")
+		}
+	})
+
+	t.Run("GPS clock valid - exactly 14 seconds ago", func(t *testing.T) {
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time.Add(-14 * time.Second)
+		if !isGPSClockValid() {
+			t.Error("Expected GPS clock to be valid at 14 seconds")
+		}
+	})
+
+	t.Run("GPS clock invalid - exactly 15 seconds ago", func(t *testing.T) {
+		mySituation.GPSLastGPSTimeStratuxTime = stratuxClock.Time.Add(-15 * time.Second)
+		if isGPSClockValid() {
+			t.Error("Expected GPS clock to be invalid at 15 seconds")
+		}
+	})
+}
+
+// TestSetTrueCourse tests true course setting logic
+func TestSetTrueCourse(t *testing.T) {
+	t.Run("Ground speed too low", func(t *testing.T) {
+		mySituation.GPSGroundSpeed = 5.0
+		setTrueCourse(6, 45.0)
+		// Function currently does nothing, just verify it doesn't crash
+	})
+
+	t.Run("Both speeds high enough", func(t *testing.T) {
+		mySituation.GPSGroundSpeed = 50.0
+		setTrueCourse(50, 270.0)
+		// Function currently does nothing, just verify it doesn't crash
+	})
+
+	t.Run("Current speed low, input speed high", func(t *testing.T) {
+		mySituation.GPSGroundSpeed = 3.0
+		setTrueCourse(50, 90.0)
+		// Function currently does nothing, just verify it doesn't crash
+	})
+}
+
+// TestRegisterSituationUpdate tests situation update registration
+func TestRegisterSituationUpdate(t *testing.T) {
+	// This will call the function; we just want to ensure it doesn't panic
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("registerSituationUpdate() panicked: %v", r)
+		}
+	}()
+	registerSituationUpdate()
+}
+
+// Helper function for float32 absolute value
+func abs32(x float32) float32 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// Helper to add NMEA checksum
+func addNMEAChecksum(sentence string) string {
+	// Remove existing checksum if present
+	if idx := strings.Index(sentence, "*"); idx > 0 {
+		sentence = sentence[:idx]
+	}
+
+	// Calculate checksum
+	sentence = strings.TrimPrefix(sentence, "$")
+	cs := byte(0)
+	for i := 0; i < len(sentence); i++ {
+		cs ^= sentence[i]
+	}
+
+	return "$" + sentence + "*" + strings.ToUpper(fmt.Sprintf("%02x", cs))
+}
+
+// TestProcessNMEALine_DatelineCrossing tests position handling near dateline
+func TestProcessNMEALine_DatelineCrossing(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+
+	// Initialize mySituation mutexes if needed
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name        string
+		sentence    string
+		expectedLon float32
+		expectedLat float32
+	}{
+		{
+			name:        "Near international dateline - East",
+			sentence:    "$GPGGA,123519,4807.038,N,17959.999,E,1,08,0.9,545.4,M,46.9,M,,*47",
+			expectedLat: 48.117298,
+			expectedLon: 179.99998,
+		},
+		{
+			name:        "Near international dateline - West",
+			sentence:    "$GPGGA,123519,4807.038,N,17959.999,W,1,08,0.9,545.4,M,46.9,M,,*55",
+			expectedLat: 48.117298,
+			expectedLon: -179.99998,
+		},
+		{
+			name:        "Equator crossing - North",
+			sentence:    "$GPGGA,123519,0000.100,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4F",
+			expectedLat: 0.0016666667,
+			expectedLon: 11.516667,
+		},
+		{
+			name:        "Equator crossing - South",
+			sentence:    "$GPGGA,123519,0000.100,S,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4D",
+			expectedLat: -0.0016666667,
+			expectedLon: 11.516667,
+		},
+		{
+			name:        "Prime meridian crossing - East",
+			sentence:    "$GPGGA,123519,5130.000,N,00001.000,E,1,08,0.9,545.4,M,46.9,M,,*40",
+			expectedLat: 51.5,
+			expectedLon: 0.016666667,
+		},
+		{
+			name:        "Prime meridian crossing - West",
+			sentence:    "$GPGGA,123519,5130.000,N,00001.000,W,1,08,0.9,545.4,M,46.9,M,,*52",
+			expectedLat: 51.5,
+			expectedLon: -0.016666667,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := processNMEALine(tc.sentence)
+			if !result {
+				t.Errorf("Failed to process: %s", tc.sentence)
+				return
+			}
+
+			if abs32(mySituation.GPSLatitude-tc.expectedLat) > 0.0001 {
+				t.Errorf("Latitude: expected %.6f, got %.6f", tc.expectedLat, mySituation.GPSLatitude)
+			}
+			if abs32(mySituation.GPSLongitude-tc.expectedLon) > 0.0001 {
+				t.Errorf("Longitude: expected %.6f, got %.6f", tc.expectedLon, mySituation.GPSLongitude)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_ExtremeDates tests date parsing edge cases
+func TestProcessNMEALine_ExtremeDates(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name          string
+		sentence      string
+		shouldSucceed bool
+	}{
+		{
+			name:          "Year 2000",
+			sentence:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,010100,003.1,W*63",
+			shouldSucceed: true,
+		},
+		{
+			name:          "Year 2099",
+			sentence:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,311299,003.1,W*6C",
+			shouldSucceed: true,
+		},
+		{
+			name:          "Leap year Feb 29",
+			sentence:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,290220,003.1,W*65",
+			shouldSucceed: true,
+		},
+		{
+			name:          "Invalid month 13",
+			sentence:      "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,011320,003.1,W*61",
+			shouldSucceed: true, // Parser doesn't validate month range
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := processNMEALine(tc.sentence)
+			if result != tc.shouldSucceed {
+				t.Errorf("Expected success=%v, got %v for %s", tc.shouldSucceed, result, tc.sentence)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_HighPrecisionCoordinates tests coordinate parsing precision
+func TestProcessNMEALine_HighPrecisionCoordinates(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	// Test with many decimal places
+	sentence := "$GPGGA,123519.123,4807.0383456,N,01131.0001234,E,1,08,0.9,545.4,M,46.9,M,,*67"
+	result := processNMEALine(sentence)
+	if !result {
+		t.Error("Failed to process high-precision coordinates")
+	}
+
+	// Verify precision is maintained (within floating point limits)
+	expectedLat := float32(48.0 + 7.0383456/60.0)
+	expectedLon := float32(11.0 + 31.0001234/60.0)
+
+	if abs32(mySituation.GPSLatitude-expectedLat) > 0.00001 {
+		t.Errorf("Latitude precision loss: expected %.8f, got %.8f", expectedLat, mySituation.GPSLatitude)
+	}
+	if abs32(mySituation.GPSLongitude-expectedLon) > 0.00001 {
+		t.Errorf("Longitude precision loss: expected %.8f, got %.8f", expectedLon, mySituation.GPSLongitude)
+	}
+}
+
+// TestProcessNMEALine_MultipleSatelliteSystems tests different GNSS constellations
+func TestProcessNMEALine_MultipleSatelliteSystems(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	Satellites = make(map[string]SatelliteInfo)
+
+	// GPS satellites
+	gpsGSV := "$GPGSV,3,1,10,01,45,180,42,02,45,090,43,03,30,270,40,04,60,045,45*7A"
+	processNMEALine(gpsGSV)
+
+	// GLONASS satellites
+	glonassGSV := "$GLGSV,2,1,06,65,45,180,42,66,45,090,43,67,30,270,40,68,60,045,45*64"
+	processNMEALine(glonassGSV)
+
+	// Galileo satellites
+	galileoGSV := "$GAGSV,2,1,05,11,45,180,42,12,45,090,43,21,30,270,40,31,60,045,45*66"
+	processNMEALine(galileoGSV)
+
+	// Beidou satellites
+	beidouGSV := "$GBGSV,2,1,05,201,45,180,42,202,45,090,43,210,30,270,40,220,60,045,45*66"
+	processNMEALine(beidouGSV)
+
+	// Verify satellites from different systems were recorded
+	if len(Satellites) == 0 {
+		t.Error("No satellites recorded from multiple GNSS systems")
+	}
+
+	// Look for satellites from different constellations
+	hasGPS := false
+	hasGLONASS := false
+	hasGalileo := false
+	hasBeidou := false
+
+	for id, sat := range Satellites {
+		switch sat.Type {
+		case SAT_TYPE_GPS:
+			hasGPS = true
+			t.Logf("Found GPS satellite: %s", id)
+		case SAT_TYPE_GLONASS:
+			hasGLONASS = true
+			t.Logf("Found GLONASS satellite: %s", id)
+		case SAT_TYPE_GALILEO:
+			hasGalileo = true
+			t.Logf("Found Galileo satellite: %s", id)
+		case SAT_TYPE_BEIDOU:
+			hasBeidou = true
+			t.Logf("Found Beidou satellite: %s", id)
+		}
+	}
+
+	if !hasGPS {
+		t.Error("Expected GPS satellites to be recorded")
+	}
+	if !hasGLONASS {
+		t.Error("Expected GLONASS satellites to be recorded")
+	}
+	if !hasGalileo {
+		t.Error("Expected Galileo satellites to be recorded")
+	}
+	if !hasBeidou {
+		t.Error("Expected Beidou satellites to be recorded")
+	}
+}
+
+// TestProcessNMEALine_RMCSpeedVariations tests RMC with various speed values
+func TestProcessNMEALine_RMCSpeedVariations(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name          string
+		speedKnots    string
+		expectedSpeed float64
+	}{
+		{"Zero speed", "0.0", 0.0},
+		{"Very slow", "0.1", 0.1},
+		{"Walking speed", "2.0", 2.0},
+		{"Cruise speed", "120.5", 120.5},
+		{"High speed", "450.0", 450.0},
+		{"Supersonic", "600.0", 600.0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sentence := "$GPRMC,123519,A,4807.038,N,01131.000,E," + tc.speedKnots + ",084.4,230394,003.1,W*XX"
+			// Calculate proper checksum
+			sentence = addNMEAChecksum(sentence)
+
+			result := processNMEALine(sentence)
+			if !result {
+				t.Errorf("Failed to process RMC with speed %s", tc.speedKnots)
+				return
+			}
+
+			if abs32(float32(mySituation.GPSGroundSpeed-tc.expectedSpeed)) > 0.01 {
+				t.Errorf("Speed: expected %.1f, got %.1f", tc.expectedSpeed, mySituation.GPSGroundSpeed)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_GPSFixQualityVariations tests all GPS fix quality values
+func TestProcessNMEALine_GPSFixQualityVariations(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name            string
+		fixQuality      string
+		expectedQuality uint8
+	}{
+		{"No fix", "0", 0},
+		{"GPS fix", "1", 1},
+		{"DGPS fix", "2", 2},
+		{"PPS fix", "3", 3},
+		{"RTK fixed", "4", 4},
+		{"RTK float", "5", 5},
+		{"Estimated", "6", 6},
+		{"Manual", "7", 7},
+		{"Simulation", "8", 8},
+		{"WAAS", "9", 9},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sentence := "$GPGGA,123519,4807.038,N,01131.000,E," + tc.fixQuality + ",08,0.9,545.4,M,46.9,M,,*XX"
+			sentence = addNMEAChecksum(sentence)
+
+			result := processNMEALine(sentence)
+			if !result {
+				t.Errorf("Failed to process GGA with fix quality %s", tc.fixQuality)
+				return
+			}
+
+			if mySituation.GPSFixQuality != tc.expectedQuality {
+				t.Errorf("Fix quality: expected %d, got %d", tc.expectedQuality, mySituation.GPSFixQuality)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_NegativeAltitudes tests handling of negative altitudes
+func TestProcessNMEALine_NegativeAltitudes(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name        string
+		altMeters   string
+		geoidSep    string
+		expectedMSL float32
+		expectedHAE float32
+	}{
+		{
+			name:        "Below sea level - Dead Sea",
+			altMeters:   "-400.0",
+			geoidSep:    "46.9",
+			expectedMSL: -400.0 * 3.28084,
+			expectedHAE: (-400.0 + 46.9) * 3.28084,
+		},
+		{
+			name:        "Sea level",
+			altMeters:   "0.0",
+			geoidSep:    "0.0",
+			expectedMSL: 0.0,
+			expectedHAE: 0.0,
+		},
+		{
+			name:        "Negative geoid separation",
+			altMeters:   "100.0",
+			geoidSep:    "-20.0",
+			expectedMSL: 100.0 * 3.28084,
+			expectedHAE: (100.0 - 20.0) * 3.28084,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sentence := "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9," + tc.altMeters + ",M," + tc.geoidSep + ",M,,*XX"
+			sentence = addNMEAChecksum(sentence)
+
+			result := processNMEALine(sentence)
+			if !result {
+				t.Errorf("Failed to process GGA with altitude %s", tc.altMeters)
+				return
+			}
+
+			if abs32(mySituation.GPSAltitudeMSL-tc.expectedMSL) > 0.1 {
+				t.Errorf("MSL altitude: expected %.2f, got %.2f", tc.expectedMSL, mySituation.GPSAltitudeMSL)
+			}
+			if abs32(mySituation.GPSHeightAboveEllipsoid-tc.expectedHAE) > 0.1 {
+				t.Errorf("HAE: expected %.2f, got %.2f", tc.expectedHAE, mySituation.GPSHeightAboveEllipsoid)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_VTGVariations tests VTG message variations
+func TestProcessNMEALine_VTGVariations(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name            string
+		sentence        string
+		expectedSpeed   float64
+		expectedCourse  float32
+		shouldSetCourse bool
+	}{
+		{
+			name:            "High speed with course",
+			sentence:        "$GPVTG,054.7,T,034.4,M,120.0,N,222.2,K*XX",
+			expectedSpeed:   120.0,
+			expectedCourse:  54.7,
+			shouldSetCourse: true,
+		},
+		{
+			name:            "Low speed - no course update",
+			sentence:        "$GPVTG,054.7,T,034.4,M,2.0,N,3.7,K*XX",
+			expectedSpeed:   2.0,
+			shouldSetCourse: false,
+		},
+		{
+			name:            "Zero speed",
+			sentence:        "$GPVTG,0.0,T,0.0,M,0.0,N,0.0,K*XX",
+			expectedSpeed:   0.0,
+			shouldSetCourse: false,
+		},
+		{
+			name:            "GNVTG instead of GPVTG",
+			sentence:        "$GNVTG,180.5,T,160.2,M,100.5,N,186.1,K*XX",
+			expectedSpeed:   100.5,
+			expectedCourse:  180.5,
+			shouldSetCourse: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sentence := addNMEAChecksum(tc.sentence)
+			oldCourse := mySituation.GPSTrueCourse
+
+			result := processNMEALine(sentence)
+			if !result {
+				t.Errorf("Failed to process: %s", sentence)
+				return
+			}
+
+			if abs32(float32(mySituation.GPSGroundSpeed-tc.expectedSpeed)) > 0.1 {
+				t.Errorf("Speed: expected %.1f, got %.1f", tc.expectedSpeed, mySituation.GPSGroundSpeed)
+			}
+
+			if tc.shouldSetCourse {
+				if abs32(mySituation.GPSTrueCourse-tc.expectedCourse) > 0.1 {
+					t.Errorf("Course: expected %.1f, got %.1f", tc.expectedCourse, mySituation.GPSTrueCourse)
+				}
+			} else if tc.expectedSpeed <= 3 {
+				// For low speed, course should not be updated
+				if mySituation.GPSTrueCourse != oldCourse && oldCourse != 0 {
+					t.Errorf("Course should not be updated at low speed, old=%.1f, new=%.1f",
+						oldCourse, mySituation.GPSTrueCourse)
+				}
+			}
+		})
+	}
+}
+
+// TestProcessNMEALine_GSAWithDifferentModes tests GSA with various dilution values
+func TestProcessNMEALine_GSAWithDifferentModes(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name         string
+		sentence     string
+		expectedSats uint16
+	}{
+		{
+			name:         "No satellites in solution",
+			sentence:     "$GPGSA,A,1,,,,,,,,,,,,,99.9,99.9,99.9*XX",
+			expectedSats: 0,
+		},
+		{
+			name:         "4 satellites",
+			sentence:     "$GPGSA,A,3,01,02,03,04,,,,,,,,,2.5,1.2,2.1*XX",
+			expectedSats: 4,
+		},
+		{
+			name:         "Full constellation - 12 satellites",
+			sentence:     "$GPGSA,A,3,01,02,03,04,05,06,07,08,09,10,11,12,1.0,0.5,0.8*XX",
+			expectedSats: 12,
+		},
+		{
+			name:         "GNGSA multi-constellation",
+			sentence:     "$GNGSA,A,3,01,02,03,04,05,06,07,08,,,,,1.5,0.8,1.2*XX",
+			expectedSats: 8,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sentence := addNMEAChecksum(tc.sentence)
+
+			result := processNMEALine(sentence)
+			if !result {
+				t.Errorf("Failed to process: %s", sentence)
+				return
+			}
+
+			if mySituation.GPSSatellites != tc.expectedSats {
+				t.Errorf("Satellite count: expected %d, got %d", tc.expectedSats, mySituation.GPSSatellites)
+			}
+		})
+	}
 }

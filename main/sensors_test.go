@@ -11,6 +11,8 @@
 	- ResetAHRSGLoad: Tests G-load reset functionality
 	- updateExtraLogging: Tests logging data map updates
 	- getMinAccelDirection: Tests accelerometer axis detection (100% coverage)
+	- CageAHRS: Tests AHRS caging calibration
+	- CalibrateAHRS: Tests AHRS gyro calibration
 */
 
 package main
@@ -20,6 +22,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stratux/goflying/ahrs"
 )
@@ -538,6 +541,87 @@ func (m *mockIMUReaderForGetMinAccel) ReadOne() (T int64, G1, G2, G3, A1, A2, A3
 
 func (m *mockIMUReaderForGetMinAccel) Close() {
 	// No-op for mock
+}
+
+// TestCageAHRS tests the CageAHRS function
+func TestCageAHRS(t *testing.T) {
+	// Initialize the cal channel if not already initialized
+	if cal == nil {
+		cal = make(chan string, 1)
+	}
+
+	// Clear any existing messages
+	select {
+	case <-cal:
+	default:
+	}
+
+	// Call CageAHRS
+	CageAHRS()
+
+	// Verify the "level" message was sent
+	select {
+	case msg := <-cal:
+		if msg != "level" {
+			t.Errorf("Expected 'level' message, got '%s'", msg)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Expected message on cal channel, but none received")
+	}
+}
+
+// TestCalibrateAHRS tests the CalibrateAHRS function
+func TestCalibrateAHRS(t *testing.T) {
+	// Initialize the cal channel if not already initialized
+	if cal == nil {
+		cal = make(chan string, 1)
+	}
+
+	// Clear any existing messages
+	select {
+	case <-cal:
+	default:
+	}
+
+	// Call CalibrateAHRS
+	CalibrateAHRS()
+
+	// Verify the "cal" message was sent
+	select {
+	case msg := <-cal:
+		if msg != "cal" {
+			t.Errorf("Expected 'cal' message, got '%s'", msg)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Expected message on cal channel, but none received")
+	}
+}
+
+// TestCageAndCalibrateAHRS tests both functions in sequence
+func TestCageAndCalibrateAHRS(t *testing.T) {
+	// Initialize the cal channel if not already initialized
+	if cal == nil {
+		cal = make(chan string, 1)
+	}
+
+	// Clear any existing messages
+	select {
+	case <-cal:
+	default:
+	}
+
+	// Test CalibrateAHRS followed by CageAHRS
+	CalibrateAHRS()
+	msg1 := <-cal
+	if msg1 != "cal" {
+		t.Errorf("Expected 'cal' message, got '%s'", msg1)
+	}
+
+	CageAHRS()
+	msg2 := <-cal
+	if msg2 != "level" {
+		t.Errorf("Expected 'level' message, got '%s'", msg2)
+	}
 }
 
 // TestGetMinAccelDirection tests the getMinAccelDirection function

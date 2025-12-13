@@ -91,6 +91,53 @@ func TestGetPPM(t *testing.T) {
 			serial:   "stratux:978:42:extra",
 			expected: 42,
 		},
+		{
+			name:     "Serial with only colon separator",
+			serial:   "stratux:1090:",
+			expected: globalSettings.PPM,
+		},
+		{
+			name:     "Serial with PPM overflow value",
+			serial:   "stratux:978:99999999999999999999",
+			expected: globalSettings.PPM,
+		},
+		{
+			// Regex requires 'x' at end: str?a?t?u?x - partial prefix without 'x' won't match
+			name:     "Serial matching str prefix only (missing x)",
+			serial:   "str:978:10",
+			expected: globalSettings.PPM,
+		},
+		{
+			name:     "Serial matching stra prefix only (missing x)",
+			serial:   "stra:1090:20",
+			expected: globalSettings.PPM,
+		},
+		{
+			name:     "Serial matching strat prefix only (missing x)",
+			serial:   "strat:868:30",
+			expected: globalSettings.PPM,
+		},
+		{
+			name:     "Serial matching stratu prefix only (missing x)",
+			serial:   "stratu:162:40",
+			expected: globalSettings.PPM,
+		},
+		{
+			// stx matches: s t (skip r) (skip a) (skip t) (skip u) x
+			name:     "Serial with minimal prefix stx",
+			serial:   "stx:978:50",
+			expected: 50,
+		},
+		{
+			name:     "Serial with single digit frequency",
+			serial:   "stratux:9:5",
+			expected: 5,
+		},
+		{
+			name:     "Serial with PPM but no trailing colon",
+			serial:   "stratux:978:123",
+			expected: 123,
+		},
 	}
 
 	for _, tt := range tests {

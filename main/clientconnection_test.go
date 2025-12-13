@@ -1772,3 +1772,572 @@ func TestConnectionCapabilitiesCombinations(t *testing.T) {
 		})
 	}
 }
+
+// TestNetworkConnection_GetConnectionKey_EdgeCases tests edge cases for GetConnectionKey
+func TestNetworkConnection_GetConnectionKey_EdgeCases(t *testing.T) {
+	testCases := []struct {
+		name     string
+		ip       string
+		port     uint32
+		expected string
+	}{
+		{"Zero port", "192.168.1.1", 0, "192.168.1.1:0"},
+		{"Max port", "10.0.0.1", 65535, "10.0.0.1:65535"},
+		{"Empty IP", "", 4000, ":4000"},
+		{"IPv6 localhost", "::1", 8080, "::1:8080"},
+		{"IPv6 full", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 443, "2001:0db8:85a3:0000:0000:8a2e:0370:7334:443"},
+		{"Large port number", "172.16.0.1", 60000, "172.16.0.1:60000"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := &networkConnection{
+				Ip:   tc.ip,
+				Port: tc.port,
+			}
+			if key := conn.GetConnectionKey(); key != tc.expected {
+				t.Errorf("GetConnectionKey() = %s, expected %s", key, tc.expected)
+			}
+		})
+	}
+}
+
+// TestNetworkConnection_IsThrottled_Boundaries tests boundary conditions
+func TestNetworkConnection_IsThrottled_Boundaries(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	conn := &networkConnection{
+		Ip:   "192.168.10.100",
+		Port: 4000,
+	}
+
+	// Exactly at 15 second boundary
+	conn.LastUnreachable = stratuxClock.Time.Add(-15 * time.Second)
+	notThrottledCount := 0
+	testRuns := 100
+	for i := 0; i < testRuns; i++ {
+		if !conn.IsThrottled() {
+			notThrottledCount++
+		}
+	}
+	// At exactly 15s, should not be throttled most of the time
+	if notThrottledCount < 90 {
+		t.Errorf("At 15s boundary, was not throttled %d/%d times (expected ~99%%)", notThrottledCount, testRuns)
+	}
+
+	// Just before 15 second threshold
+	conn.LastUnreachable = stratuxClock.Time.Add(-14*time.Second - 999*time.Millisecond)
+	throttledCount := 0
+	for i := 0; i < testRuns; i++ {
+		if conn.IsThrottled() {
+			throttledCount++
+		}
+	}
+	// Just under 15s should still be throttled most of the time
+	if throttledCount < 90 {
+		t.Errorf("Just under 15s, was throttled %d/%d times (expected ~99%%)", throttledCount, testRuns)
+	}
+}
+
+// TestSerialConnection_Multiple tests multiple serial connections
+func TestSerialConnection_Multiple(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	devices := []string{"/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyAMA0", "/dev/serial0"}
+	connections := make([]*serialConnection, len(devices))
+
+	// Create multiple connections
+	for i, device := range devices {
+		connections[i] = &serialConnection{
+			DeviceString: device,
+			Baud:         38400,
+			Capability:   NETWORK_GDL90_STANDARD,
+		}
+	}
+
+	// Verify each has unique key
+	keys := make(map[string]bool)
+	for _, conn := range connections {
+		key := conn.GetConnectionKey()
+		if keys[key] {
+			t.Errorf("Duplicate connection key: %s", key)
+		}
+		keys[key] = true
+	}
+
+	// Verify each can get its own queue
+	for i, conn := range connections {
+		queue := conn.MessageQueue()
+		if queue == nil {
+			t.Errorf("Connection %d: MessageQueue returned nil", i)
+		}
+		// Each should get a different queue instance
+		for j := i + 1; j < len(connections); j++ {
+			otherQueue := connections[j].MessageQueue()
+			if queue == otherQueue {
+				t.Errorf("Connections %d and %d share the same queue", i, j)
+			}
+		}
+	}
+}
+
+// TestTCPConnection_Multiple tests multiple TCP connections
+func TestTCPConnection_Multiple(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	keys := []string{
+		"TCP:192.168.10.1:30000",
+		"TCP:192.168.10.2:30001",
+		"TCP:192.168.10.3:30002",
+	}
+
+	connections := make([]*tcpConnection, len(keys))
+	for i, key := range keys {
+		connections[i] = &tcpConnection{
+			Key:        key,
+			Capability: NETWORK_GDL90_STANDARD,
+		}
+	}
+
+	// Verify each has unique key
+	connKeys := make(map[string]bool)
+	for _, conn := range connections {
+		key := conn.GetConnectionKey()
+		if connKeys[key] {
+			t.Errorf("Duplicate connection key: %s", key)
+		}
+		connKeys[key] = true
+	}
+
+	// All should be sleeping (no Conn set)
+	for i, conn := range connections {
+		if !conn.IsSleeping() {
+			t.Errorf("Connection %d should be sleeping when Conn is nil", i)
+		}
+	}
+}
+
+// TestBLEConnection_Multiple tests multiple BLE connections
+func TestBLEConnection_Multiple(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	uuids := []string{"0xFFE0", "0xFFE1", "0xFFE2", "0x1234", "custom-uuid-1"}
+	connections := make([]*bleConnection, len(uuids))
+
+	for i, uuid := range uuids {
+		connections[i] = &bleConnection{
+			UUIDService: uuid,
+			Capability:  NETWORK_GDL90_STANDARD,
+		}
+	}
+
+	// Verify each has unique key
+	keys := make(map[string]bool)
+	for _, conn := range connections {
+		key := conn.GetConnectionKey()
+		if keys[key] {
+			t.Errorf("Duplicate connection key: %s", key)
+		}
+		keys[key] = true
+	}
+
+	// All should never be sleeping or throttled
+	for i, conn := range connections {
+		if conn.IsSleeping() {
+			t.Errorf("BLE connection %d should never be sleeping", i)
+		}
+		if conn.IsThrottled() {
+			t.Errorf("BLE connection %d should never be throttled", i)
+		}
+	}
+}
+
+// TestNetworkConnection_Concurrent tests concurrent access to connection methods
+func TestNetworkConnection_Concurrent(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Create a real UDP connection
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("Cannot resolve UDP address: %v", err)
+	}
+	udpConn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		t.Skipf("Cannot create UDP connection: %v", err)
+	}
+	defer udpConn.Close()
+
+	conn := &networkConnection{
+		Conn:             udpConn,
+		Ip:               "192.168.10.200",
+		Port:             5000,
+		Capability:       NETWORK_GDL90_STANDARD,
+		LastPongResponse: stratuxClock.Time,
+		LastPingResponse: stratuxClock.Time,
+		LastUnreachable:  stratuxClock.Time.Add(-10 * time.Second),
+	}
+
+	// Test concurrent access to various methods
+	var wg sync.WaitGroup
+	iterations := 100
+
+	// Concurrent GetConnectionKey calls
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.GetConnectionKey()
+		}
+	}()
+
+	// Concurrent Capabilities calls
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.Capabilities()
+		}
+	}()
+
+	// Concurrent GetDesiredPacketSize calls
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.GetDesiredPacketSize()
+		}
+	}()
+
+	// Concurrent IsThrottled calls
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.IsThrottled()
+		}
+	}()
+
+	// Concurrent MessageQueue calls
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.MessageQueue()
+		}
+	}()
+
+	// Concurrent Writer calls
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.Writer()
+		}
+	}()
+
+	wg.Wait()
+
+	// If we get here without data races or panics, test passes
+	t.Log("Concurrent access to connection methods succeeded")
+}
+
+// TestSerialConnection_Concurrent tests concurrent access to serial connection methods
+func TestSerialConnection_Concurrent(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	conn := &serialConnection{
+		DeviceString: "/dev/ttyUSB0",
+		Baud:         38400,
+		Capability:   NETWORK_GDL90_STANDARD,
+	}
+
+	var wg sync.WaitGroup
+	iterations := 100
+
+	// Concurrent method calls
+	wg.Add(5)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.GetConnectionKey()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.IsThrottled()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.IsSleeping()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.GetDesiredPacketSize()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.MessageQueue()
+		}
+	}()
+
+	wg.Wait()
+	t.Log("Concurrent access to serial connection methods succeeded")
+}
+
+// TestTCPConnection_Concurrent tests concurrent access to TCP connection methods
+func TestTCPConnection_Concurrent(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	conn := &tcpConnection{
+		Key:        "TCP:192.168.10.50:30000",
+		Capability: NETWORK_GDL90_STANDARD,
+	}
+
+	var wg sync.WaitGroup
+	iterations := 100
+
+	// Concurrent method calls
+	wg.Add(5)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.GetConnectionKey()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.IsThrottled()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.IsSleeping()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.GetDesiredPacketSize()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = conn.MessageQueue()
+		}
+	}()
+
+	wg.Wait()
+	t.Log("Concurrent access to TCP connection methods succeeded")
+}
+
+// TestAllConnectionTypes_CapabilityMatrix tests all connection types with all capability combinations
+func TestAllConnectionTypes_CapabilityMatrix(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	capabilities := []uint8{
+		0,
+		NETWORK_GDL90_STANDARD,
+		NETWORK_AHRS_FFSIM,
+		NETWORK_AHRS_GDL90,
+		NETWORK_FLARM_NMEA,
+		NETWORK_POSITION_FFSIM,
+		NETWORK_GDL90_STANDARD | NETWORK_AHRS_GDL90,
+		NETWORK_AHRS_FFSIM | NETWORK_POSITION_FFSIM,
+		0xFF, // All bits set
+	}
+
+	for _, cap := range capabilities {
+		t.Run("NetworkConnection", func(t *testing.T) {
+			conn := &networkConnection{
+				Ip:         "192.168.10.100",
+				Port:       4000,
+				Capability: cap,
+			}
+			if conn.Capabilities() != cap {
+				t.Errorf("Capability mismatch: got %d, expected %d", conn.Capabilities(), cap)
+			}
+		})
+
+		t.Run("SerialConnection", func(t *testing.T) {
+			conn := &serialConnection{
+				DeviceString: "/dev/ttyUSB0",
+				Capability:   cap,
+			}
+			if conn.Capabilities() != cap {
+				t.Errorf("Capability mismatch: got %d, expected %d", conn.Capabilities(), cap)
+			}
+		})
+
+		t.Run("TCPConnection", func(t *testing.T) {
+			conn := &tcpConnection{
+				Key:        "TCP:192.168.10.50:30000",
+				Capability: cap,
+			}
+			if conn.Capabilities() != cap {
+				t.Errorf("Capability mismatch: got %d, expected %d", conn.Capabilities(), cap)
+			}
+		})
+
+		t.Run("BLEConnection", func(t *testing.T) {
+			conn := &bleConnection{
+				UUIDService: "0xFFE0",
+				Capability:  cap,
+			}
+			if conn.Capabilities() != cap {
+				t.Errorf("Capability mismatch: got %d, expected %d", conn.Capabilities(), cap)
+			}
+		})
+	}
+}
+
+// TestNetworkConnection_StateTransitions tests state transitions for sleeping/throttling
+func TestNetworkConnection_StateTransitions(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Save and restore settings
+	origNoSleep := globalSettings.NoSleep
+	defer func() { globalSettings.NoSleep = origNoSleep }()
+	globalSettings.NoSleep = false
+
+	// Skip if in x86 debug mode
+	if runtime.GOARCH == "i386" || runtime.GOARCH == "amd64" {
+		t.Skip("Skipping state transition tests in x86 debug mode")
+	}
+
+	conn := &networkConnection{
+		Ip:   "192.168.10.100",
+		Port: 4000,
+	}
+
+	// State 1: Initial state (all times zero) -> should be sleeping
+	if !conn.IsSleeping() {
+		t.Error("Initial state: should be sleeping")
+	}
+
+	// State 2: Client wakes up (recent ping/pong) -> should be awake
+	conn.LastPingResponse = stratuxClock.Time
+	conn.LastPongResponse = stratuxClock.Time
+	conn.LastUnreachable = time.Time{}
+	if conn.IsSleeping() {
+		t.Error("After wake up: should not be sleeping")
+	}
+
+	// State 3: Client becomes unreachable -> should be sleeping
+	conn.LastUnreachable = stratuxClock.Time.Add(-2 * time.Second)
+	if !conn.IsSleeping() {
+		t.Error("After unreachable: should be sleeping")
+	}
+
+	// State 4: Unreachable timeout expires -> should be awake again
+	conn.LastUnreachable = stratuxClock.Time.Add(-6 * time.Second)
+	if conn.IsSleeping() {
+		t.Error("After unreachable timeout: should not be sleeping")
+	}
+
+	// State 5: Ping times out -> should be sleeping
+	conn.LastPingResponse = stratuxClock.Time.Add(-11 * time.Second)
+	if !conn.IsSleeping() {
+		t.Error("After ping timeout: should be sleeping")
+	}
+}
+
+// TestConnectionInterface_AllMethods verifies all connection types implement all interface methods
+func TestConnectionInterface_AllMethods(t *testing.T) {
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	testConnection := func(t *testing.T, conn connection, name string) {
+		// Test all interface methods are callable
+		_ = conn.GetConnectionKey()
+		_ = conn.MessageQueue()
+		_ = conn.Writer()
+		_ = conn.IsThrottled()
+		_ = conn.IsSleeping()
+		_ = conn.Capabilities()
+		_ = conn.GetDesiredPacketSize()
+		conn.OnError(errors.New("test error"))
+		conn.Close()
+		t.Logf("%s: all interface methods are callable", name)
+	}
+
+	t.Run("NetworkConnection", func(t *testing.T) {
+		conn := &networkConnection{
+			Ip:         "192.168.10.100",
+			Port:       4000,
+			Capability: NETWORK_GDL90_STANDARD,
+		}
+		testConnection(t, conn, "NetworkConnection")
+	})
+
+	t.Run("SerialConnection", func(t *testing.T) {
+		conn := &serialConnection{
+			DeviceString: "/dev/ttyUSB0",
+			Baud:         38400,
+			Capability:   NETWORK_GDL90_STANDARD,
+		}
+		testConnection(t, conn, "SerialConnection")
+	})
+
+	t.Run("TCPConnection", func(t *testing.T) {
+		conn := &tcpConnection{
+			Key:        "TCP:192.168.10.50:30000",
+			Capability: NETWORK_GDL90_STANDARD,
+		}
+		testConnection(t, conn, "TCPConnection")
+	})
+
+	t.Run("BLEConnection", func(t *testing.T) {
+		conn := &bleConnection{
+			UUIDService: "0xFFE0",
+			Capability:  NETWORK_GDL90_STANDARD,
+		}
+		testConnection(t, conn, "BLEConnection")
+	})
+}

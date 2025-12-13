@@ -7,3 +7,4 @@ flarm_nmea_input_test.go
 flarm_nmea_output_test.go
 ogn-aprs_test.go
 traffic_coverage_test.go
+coverage.out
