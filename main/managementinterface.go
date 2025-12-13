@@ -42,6 +42,9 @@ import (
 	"github.com/stratux/stratux/common"
 )
 
+// varLogDir is the directory for log files (reduces string literal duplication)
+const varLogDir = "/var/log"
+
 type SettingMessage struct {
 	Setting string `json:"setting"`
 	Value   bool   `json:"state"`
@@ -624,7 +627,7 @@ func handleDeleteLogFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteAHRSLogFiles(w http.ResponseWriter, r *http.Request) {
-	files, err := os.ReadDir("/var/log")
+	files, err := os.ReadDir(varLogDir)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error deleting AHRS logs: %s", err), http.StatusNotFound)
 		return
@@ -634,7 +637,7 @@ func handleDeleteAHRSLogFiles(w http.ResponseWriter, r *http.Request) {
 	for _, f := range files {
 		fn = f.Name()
 		if v, _ := filepath.Match("sensors_*.csv", fn); v {
-			os.Remove("/var/log/" + fn)
+			os.Remove(filepath.Join(varLogDir, fn))
 			log.Printf("Deleting AHRS log file %s\n", fn)
 		}
 		analysisLogger = nil
@@ -776,7 +779,7 @@ func delayReboot() {
 func handleDownloadLogRequest(w http.ResponseWriter, r *http.Request) {
 	//w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", "attachment; filename=stratux.log")
-	http.ServeFile(w, r, "/var/log/stratux.log")
+	http.ServeFile(w, r, filepath.Join(varLogDir, "stratux.log"))
 }
 
 func handleDownloadAHRSLogsRequest(w http.ResponseWriter, r *http.Request) {
@@ -785,7 +788,7 @@ func handleDownloadAHRSLogsRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("error zipping AHRS logs: %s", e), http.StatusNotFound)
 	}
 
-	files, err := os.ReadDir("/var/log")
+	files, err := os.ReadDir(varLogDir)
 	if err != nil {
 		httpErr(w, err)
 		return
@@ -802,7 +805,7 @@ func handleDownloadAHRSLogsRequest(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		unzippedFile, err := os.Open("/var/log/" + fn)
+		unzippedFile, err := os.Open(filepath.Join(varLogDir, fn))
 		if err != nil {
 			httpErr(w, err)
 			return
@@ -837,7 +840,7 @@ func handleDownloadAHRSLogsRequest(w http.ResponseWriter, r *http.Request) {
 func handleDownloadDBRequest(w http.ResponseWriter, r *http.Request) {
 	//w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", "attachment; filename=stratux.sqlite")
-	http.ServeFile(w, r, "/var/log/stratux.sqlite")
+	http.ServeFile(w, r, filepath.Join(varLogDir, "stratux.sqlite"))
 }
 
 // Upload an update file.
@@ -1017,18 +1020,16 @@ type dirlisting struct {
 
 // FIXME: This needs to be switched to show a "sessions log" from the sqlite database.
 func viewLogs(w http.ResponseWriter, r *http.Request) {
-	const baseDir = "/var/log"
-
 	// Extract and clean the requested path
 	urlpath := strings.TrimPrefix(r.URL.Path, "/logs/")
 
 	// Build the full path using filepath.Join (which cleans the path)
-	requestedPath := filepath.Join(baseDir, urlpath)
+	requestedPath := filepath.Join(varLogDir, urlpath)
 
 	// Security: Validate that the resolved path is within /var/log
 	// This prevents path traversal attacks (../, absolute paths, etc.)
 	cleanPath := filepath.Clean(requestedPath)
-	if !strings.HasPrefix(cleanPath, baseDir) {
+	if !strings.HasPrefix(cleanPath, varLogDir) {
 		log.Printf("viewLogs: path traversal attempt blocked: %s", r.URL.Path)
 		http.Error(w, "Access denied", http.StatusForbidden)
 		return
