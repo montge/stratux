@@ -2,7 +2,7 @@ module github.com/stratux/stratux
 
 go 1.24.0
 
-toolchain go1.24.11
+toolchain go1.24.1
 
 require (
 	github.com/BertoldVdb/go-ais v0.4.0

@@ -13,11 +13,12 @@ RUN apt-get update \
   && apt-get -y install wget \
   && apt-get -y install libusb-1.0-0-dev
 
-# Install Go 1.23.12 (Debian Bookworm only has Go 1.20 which doesn't support toolchain directive)
+# Install Go 1.24.1 (Debian Bookworm only has Go 1.20 which doesn't support toolchain directive)
+# Note: golang.org/x/net v0.47.0 requires Go 1.24+
 RUN cd /tmp \
-    && wget https://go.dev/dl/go1.23.12.linux-arm64.tar.gz \
-    && tar -C /usr/local -xzf go1.23.12.linux-arm64.tar.gz \
-    && rm go1.23.12.linux-arm64.tar.gz
+    && wget https://go.dev/dl/go1.24.1.linux-arm64.tar.gz \
+    && tar -C /usr/local -xzf go1.24.1.linux-arm64.tar.gz \
+    && rm go1.24.1.linux-arm64.tar.gz
 
 ENV PATH="/usr/local/go/bin:${PATH}"
 
