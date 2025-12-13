@@ -30,7 +30,7 @@ var debugLogf string // Set according to OS config.
 var logFileHandle *os.File
 
 func getStratuxLogFiles() []string {
-	entries, err := os.ReadDir(logDir)
+	entries, err := os.ReadDir(logDirPath)
 	stratuxLogs := make([]string, 0)
 	if err != nil {
 		return stratuxLogs
