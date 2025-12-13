@@ -22,10 +22,10 @@
 - [x] 3.2 Update other test files (updated 18 test files to use getters)
 
 ## 4. CI Update
-- [ ] 4.1 Enable -race flag in CI workflow test command
-- [ ] 4.2 Verify tests pass with -race flag
+- [x] 4.1 Enable -race flag in CI workflow test command
+- [x] 4.2 Verify tests pass with -race flag
 
 ## 5. Verification
-- [ ] 5.1 Run tests locally with -race flag
-- [ ] 5.2 Verify no race conditions detected
+- [x] 5.1 Run tests locally with -race flag
+- [x] 5.2 Verify no race conditions detected
 - [ ] 5.3 Benchmark to ensure minimal performance impact
