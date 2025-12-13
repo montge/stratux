@@ -1720,25 +1720,25 @@ func TestCollectMessages_SleepingWithBoundaryPriority(t *testing.T) {
 		t.Skip("Connection is not sleeping, cannot test sleeping boundary behavior")
 	}
 
-	// Test priority exactly at -10 (should NOT be sent when sleeping, prio > -10)
+	// Test priority exactly at -10 (SHOULD be sent - condition is prio > -10, -10 > -10 is false, so no early return)
 	boundaryMsg := []byte{0x7E, 0xF6, 0x7E}
 	conn.Queue.Put(-10, 5*time.Second, boundaryMsg)
 
 	result := collectMessages(conn)
 
-	// Priority -10 should NOT pass (condition is prio > -10, so -10 > -10 is false, message blocked)
-	if len(result) != 0 {
-		t.Errorf("Expected no message with priority -10 on sleeping connection, got %d bytes", len(result))
+	// Priority -10 SHOULD pass (prio > -10 is false when prio == -10, so we don't return early)
+	if len(result) != len(boundaryMsg) {
+		t.Errorf("Expected message with priority -10 on sleeping connection (%d bytes), got %d bytes", len(boundaryMsg), len(result))
 	}
 
-	// Now test priority -11 (should be sent when sleeping)
-	heartbeatMsg := []byte{0x7E, 0xF5, 0x7E}
-	conn.Queue.Put(-11, 5*time.Second, heartbeatMsg)
+	// Test priority -9 (should NOT be sent when sleeping, -9 > -10 is true)
+	lowPrioMsg := []byte{0x7E, 0xF7, 0x7E}
+	conn.Queue.Put(-9, 5*time.Second, lowPrioMsg)
 
 	result = collectMessages(conn)
 
-	if len(result) != len(heartbeatMsg) {
-		t.Errorf("Expected message with priority -11 on sleeping connection, got %d bytes", len(result))
+	if len(result) != 0 {
+		t.Errorf("Expected no message with priority -9 on sleeping connection, got %d bytes", len(result))
 	}
 }
 
