@@ -36,15 +36,8 @@ jobs:
         wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb
         sudo dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb
 
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+    # Note: actions/setup-go@v5 has built-in caching enabled by default
+    # No need for explicit actions/cache step
 
     - name: Download dependencies
       run: go mod download
