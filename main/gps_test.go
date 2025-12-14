@@ -6650,3 +6650,642 @@ func TestProcessSerialInput(t *testing.T) {
 		}
 	})
 }
+
+// TestProcessNMEALineLow_ErrorPaths tests all error paths for 100% coverage
+func TestProcessNMEALineLow_ErrorPaths(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	// Initialize Satellites map
+	Satellites = make(map[string]SatelliteInfo)
+
+	testCases := []struct {
+		name       string
+		sentence   string
+		expectUsed bool
+	}{
+		// GPVTG error paths
+		{
+			name:       "GPVTG too short",
+			sentence:   "$GPVTG,054.7,T,034.4,M*4E",
+			expectUsed: false,
+		},
+		{
+			name:       "GPVTG invalid groundspeed",
+			sentence:   "$GPVTG,054.7,T,034.4,M,ABC,N,010.2,K*26",
+			expectUsed: false,
+		},
+		{
+			name:       "GPVTG invalid true course",
+			sentence:   "$GPVTG,XYZ,T,034.4,M,005.5,N,010.2,K*3B",
+			expectUsed: false,
+		},
+		{
+			name:       "GNVTG too short",
+			sentence:   "$GNVTG,120.5,T,110.2*30",
+			expectUsed: false,
+		},
+
+		// GPGGA error paths
+		{
+			name:       "GPGGA too short",
+			sentence:   "$GPGGA,123519,4807.038,N*27",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA short timestamp",
+			sentence:   "$GPGGA,12351,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*7E",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid timestamp hour",
+			sentence:   "$GPGGA,XX3519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*44",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid timestamp minute",
+			sentence:   "$GPGGA,12XX19,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*41",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid timestamp second",
+			sentence:   "$GPGGA,1235XX,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4F",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA short latitude",
+			sentence:   "$GPGGA,123519,480,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*65",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid latitude degrees",
+			sentence:   "$GPGGA,123519,XX07.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4B",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid latitude minutes",
+			sentence:   "$GPGGA,123519,48XX.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*40",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA short longitude",
+			sentence:   "$GPGGA,123519,4807.038,N,0113,E,1,08,0.9,545.4,M,46.9,M,,*68",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid longitude degrees",
+			sentence:   "$GPGGA,123519,4807.038,N,XXX31.000,E,1,08,0.9,545.4,M,46.9,M,,*2F",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid longitude minutes",
+			sentence:   "$GPGGA,123519,4807.038,N,011XX.000,E,1,08,0.9,545.4,M,46.9,M,,*45",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid altitude",
+			sentence:   "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,ABC,M,46.9,M,,*29",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGGA invalid geoid separation",
+			sentence:   "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,XYZ,M,,*09",
+			expectUsed: false,
+		},
+		{
+			name:       "GNGGA too short",
+			sentence:   "$GNGGA,123519,4807.038*5B",
+			expectUsed: false,
+		},
+
+		// GPRMC error paths
+		{
+			name:       "GPRMC too short",
+			sentence:   "$GPRMC,123519,A,4807.038,N*57",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid status",
+			sentence:   "$GPRMC,123519,V,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*7D",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC short timestamp",
+			sentence:   "$GPRMC,12351,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*53",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid timestamp hour",
+			sentence:   "$GPRMC,XX3519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*69",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid timestamp minute",
+			sentence:   "$GPRMC,12XX19,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6C",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid timestamp second",
+			sentence:   "$GPRMC,1235XX,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*62",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC short latitude",
+			sentence:   "$GPRMC,123519,A,480,N,01131.000,E,022.4,084.4,230394,003.1,W*48",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid latitude degrees",
+			sentence:   "$GPRMC,123519,A,XX07.038,N,01131.000,E,022.4,084.4,230394,003.1,W*66",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid latitude minutes",
+			sentence:   "$GPRMC,123519,A,48XX.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6D",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC short longitude",
+			sentence:   "$GPRMC,123519,A,4807.038,N,0113,E,022.4,084.4,230394,003.1,W*45",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid longitude degrees",
+			sentence:   "$GPRMC,123519,A,4807.038,N,XXX31.000,E,022.4,084.4,230394,003.1,W*02",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid longitude minutes",
+			sentence:   "$GPRMC,123519,A,4807.038,N,011XX.000,E,022.4,084.4,230394,003.1,W*68",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid groundspeed",
+			sentence:   "$GPRMC,123519,A,4807.038,N,01131.000,E,ABC,084.4,230394,003.1,W*00",
+			expectUsed: false,
+		},
+		{
+			name:       "GPRMC invalid true course with high speed",
+			sentence:   "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,XYZ,230394,003.1,W*17",
+			expectUsed: false,
+		},
+		{
+			name:       "GNRMC too short",
+			sentence:   "$GNRMC,123519,A,4807.038*2B",
+			expectUsed: false,
+		},
+
+		// GPGSA error paths
+		{
+			name:       "GPGSA too short",
+			sentence:   "$GPGSA,A,3,04,05*31",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSA no solution",
+			sentence:   "$GPGSA,A,1,04,05,09,12,24,,,,,,,16.9,10.0,13.6*2A",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSA empty solution",
+			sentence:   "$GPGSA,A,,04,05,09,12,24,,,,,,,16.9,10.0,13.6*1B",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSA invalid HDOP",
+			sentence:   "$GPGSA,A,3,04,05,09,12,24,,,,,,,XYZ,10.0,13.6*63",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSA invalid VDOP",
+			sentence:   "$GPGSA,A,3,04,05,09,12,24,,,,,,,16.9,10.0,ABC*72",
+			expectUsed: false,
+		},
+		{
+			name:       "GNGSA too short",
+			sentence:   "$GNGSA,A,3*2E",
+			expectUsed: false,
+		},
+
+		// GPGST error paths
+		{
+			name:       "GPGST too short",
+			sentence:   "$GPGST,205246.00,1.19*69",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGST invalid stdDevLat",
+			sentence:   "$GPGST,205246.00,1.19,0.02,0.01,-2.4501,ABC,0.01,0.03*19",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGST invalid stdDevLon",
+			sentence:   "$GPGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,XYZ,0.03*01",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGST invalid stdDevAlt",
+			sentence:   "$GPGST,205246.00,1.19,0.02,0.01,-2.4501,0.02,0.01,ABC*18",
+			expectUsed: false,
+		},
+		{
+			name:       "GNGST too short",
+			sentence:   "$GNGST,205246.00*4C",
+			expectUsed: false,
+		},
+
+		// GPGSV error paths
+		{
+			name:       "GPGSV too short",
+			sentence:   "$GPGSV,3*4A",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSV invalid message number",
+			sentence:   "$GPGSV,3,X,12,01,40,083,46,02,17,308,41*17",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSV invalid message index",
+			sentence:   "$GPGSV,3,Y,12,01,40,083,46,02,17,308,41*16",
+			expectUsed: false,
+		},
+		{
+			name:       "GPGSV invalid satellite number",
+			sentence:   "$GPGSV,1,1,1,XX,60,270,40*7F",
+			expectUsed: false,
+		},
+		{
+			name:       "GLGSV too short",
+			sentence:   "$GLGSV,2*57",
+			expectUsed: false,
+		},
+		{
+			name:       "GAGSV too short",
+			sentence:   "$GAGSV,1*59",
+			expectUsed: false,
+		},
+		{
+			name:       "GBGSV too short",
+			sentence:   "$GBGSV,1*5A",
+			expectUsed: false,
+		},
+
+		// POGNB error paths
+		{
+			name:       "POGNB too short",
+			sentence:   "$POGNB,22.0,+29.1*75",
+			expectUsed: false,
+		},
+		{
+			name:       "POGNB invalid pressure altitude",
+			sentence:   "$POGNB,22.0,+29.1,100972.3,3.8,ABC,+87.2,-0.04,+32.6*3D",
+			expectUsed: false,
+		},
+		{
+			name:       "POGNB invalid vertical speed",
+			sentence:   "$POGNB,22.0,+29.1,100972.3,3.8,+29.4,+87.2,XYZ,+32.6*2B",
+			expectUsed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			used := processNMEALineLow(tc.sentence, false)
+			if used != tc.expectUsed {
+				t.Errorf("%s: Expected used=%v, got %v", tc.name, tc.expectUsed, used)
+			}
+		})
+	}
+}
+
+// TestProcessNMEALineLow_PGRMZ_Additional tests additional PGRMZ error cases
+func TestProcessNMEALineLow_PGRMZ_Additional(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	testCases := []struct {
+		name         string
+		sentence     string
+		gpsType      uint
+		expectUsed   bool
+		expectAlt    float32
+		shouldSetAlt bool
+	}{
+		{
+			name:         "PGRMZ too short",
+			sentence:     "$PGRMZ,1089*2D",
+			gpsType:      GPS_TYPE_SERIAL,
+			expectUsed:   false,
+			shouldSetAlt: false,
+		},
+		{
+			name:         "PGRMZ invalid altitude",
+			sentence:     "$PGRMZ,ABC,f,3*57",
+			gpsType:      GPS_TYPE_SERIAL,
+			expectUsed:   false,
+			shouldSetAlt: false,
+		},
+		{
+			name:         "PGRMZ valid feet - GPS_TYPE_SERIAL",
+			sentence:     "$PGRMZ,1089,f,3*2B",
+			gpsType:      GPS_TYPE_SERIAL,
+			expectUsed:   true,
+			expectAlt:    1089.0,
+			shouldSetAlt: true,
+		},
+		{
+			name:         "PGRMZ valid meters - GPS_TYPE_SOFTRF",
+			sentence:     "$PGRMZ,332,m,3*12",
+			gpsType:      GPS_TYPE_SOFTRF,
+			expectUsed:   true,
+			expectAlt:    1089.23888, // 332 * 3.28084
+			shouldSetAlt: true,
+		},
+		{
+			name:         "PGRMZ valid - GPS_TYPE_SOFTRF_DONGLE",
+			sentence:     "$PGRMZ,1000,f,3*2A",
+			gpsType:      GPS_TYPE_SOFTRF_DONGLE,
+			expectUsed:   true,
+			expectAlt:    1000.0,
+			shouldSetAlt: true,
+		},
+		{
+			name:         "PGRMZ wrong GPS type - should not process",
+			sentence:     "$PGRMZ,1089,f,3*2B",
+			gpsType:      GPS_TYPE_UBX8,
+			expectUsed:   false,
+			shouldSetAlt: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset state
+			globalStatus.GPS_detected_type = tc.gpsType
+			mySituation.BaroPressureAltitude = 0
+			mySituation.BaroSourceType = BARO_TYPE_NONE
+
+			used := processNMEALineLow(tc.sentence, false)
+			if used != tc.expectUsed {
+				t.Errorf("%s: Expected used=%v, got %v", tc.name, tc.expectUsed, used)
+			}
+
+			if tc.shouldSetAlt {
+				if mySituation.BaroPressureAltitude != tc.expectAlt {
+					t.Errorf("%s: Expected altitude %.2f, got %.2f", tc.name, tc.expectAlt, mySituation.BaroPressureAltitude)
+				}
+				if mySituation.BaroSourceType != BARO_TYPE_NMEA {
+					t.Errorf("%s: Expected BaroSourceType BARO_TYPE_NMEA, got %d", tc.name, mySituation.BaroSourceType)
+				}
+			}
+		})
+	}
+}
+
+// TestProcessNMEALineLow_SatelliteEdgeCases tests satellite type edge cases in GPGSA
+func TestProcessNMEALineLow_SatelliteEdgeCases(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	Satellites = make(map[string]SatelliteInfo)
+
+	testCases := []struct {
+		name       string
+		sentence   string
+		expectUsed bool
+		satNum     int
+		expectType uint8
+		expectID   string
+	}{
+		{
+			name:       "GPGSA with QZSS satellite (193-202)",
+			sentence:   "$GPGSA,A,3,193,194,,,,,,,,,,,16.9,10.0,13.6*0E",
+			expectUsed: true,
+			satNum:     193,
+			expectType: SAT_TYPE_QZSS,
+			expectID:   "Q1",
+		},
+		{
+			name:       "GPGSA with Galileo satellite (301-336)",
+			sentence:   "$GPGSA,A,3,301,302,,,,,,,,,,,16.9,10.0,13.6*0A",
+			expectUsed: true,
+			satNum:     301,
+			expectType: SAT_TYPE_GALILEO,
+			expectID:   "E1",
+		},
+		{
+			name:       "GPGSA with Beidou satellite (401-463)",
+			sentence:   "$GPGSA,A,3,401,402,,,,,,,,,,,16.9,10.0,13.6*0A",
+			expectUsed: true,
+			satNum:     401,
+			expectType: SAT_TYPE_BEIDOU,
+			expectID:   "B1",
+		},
+		{
+			name:       "GPGSA with unknown satellite (>463)",
+			sentence:   "$GPGSA,A,3,500,501,,,,,,,,,,,16.9,10.0,13.6*08",
+			expectUsed: true,
+			satNum:     500,
+			expectType: SAT_TYPE_UNKNOWN,
+			expectID:   "U500",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			Satellites = make(map[string]SatelliteInfo)
+			used := processNMEALineLow(tc.sentence, false)
+			if used != tc.expectUsed {
+				t.Errorf("%s: Expected used=%v, got %v", tc.name, tc.expectUsed, used)
+			}
+
+			if tc.expectUsed {
+				if sat, ok := Satellites[tc.expectID]; ok {
+					if sat.Type != tc.expectType {
+						t.Errorf("%s: Expected type %d, got %d", tc.name, tc.expectType, sat.Type)
+					}
+					if !sat.InSolution {
+						t.Errorf("%s: Expected satellite in solution", tc.name)
+					}
+				} else {
+					t.Errorf("%s: Satellite %s not found", tc.name, tc.expectID)
+				}
+			}
+		})
+	}
+}
+
+// TestProcessNMEALineLow_GPSVSatelliteEdgeCases tests satellite parsing in GPGSV with edge cases
+func TestProcessNMEALineLow_GPSVSatelliteEdgeCases(t *testing.T) {
+	// Initialize test environment
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+	}
+	if mySituation.muGPS == nil || mySituation.muSatellite == nil {
+		mySituation.muGPS = &sync.Mutex{}
+		mySituation.muSatellite = &sync.Mutex{}
+		mySituation.muBaro = &sync.Mutex{}
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	// Enable DEBUG mode to trigger debug logging paths
+	originalDebug := globalSettings.DEBUG
+	globalSettings.DEBUG = true
+	defer func() {
+		globalSettings.DEBUG = originalDebug
+	}()
+
+	testCases := []struct {
+		name         string
+		sentence     string
+		expectUsed   bool
+		satNum       int
+		expectType   uint8
+		expectID     string
+		expectElev   int16
+		expectAz     int16
+		expectSignal int8
+	}{
+		{
+			name:         "GPGSV with QZSS satellite",
+			sentence:     "$GPGSV,1,1,1,193,45,180,35*4D",
+			expectUsed:   true,
+			satNum:       193,
+			expectType:   SAT_TYPE_QZSS,
+			expectID:     "Q1",
+			expectElev:   45,
+			expectAz:     180,
+			expectSignal: 35,
+		},
+		{
+			name:         "GPGSV with Galileo satellite",
+			sentence:     "$GPGSV,1,1,1,301,30,90,40*74",
+			expectUsed:   true,
+			satNum:       301,
+			expectType:   SAT_TYPE_GALILEO,
+			expectID:     "E1",
+			expectElev:   30,
+			expectAz:     90,
+			expectSignal: 40,
+		},
+		{
+			name:         "GPGSV with Beidou satellite",
+			sentence:     "$GPGSV,1,1,1,401,60,270,45*4F",
+			expectUsed:   true,
+			satNum:       401,
+			expectType:   SAT_TYPE_BEIDOU,
+			expectID:     "B1",
+			expectElev:   60,
+			expectAz:     270,
+			expectSignal: 45,
+		},
+		{
+			name:         "GPGSV with unknown satellite",
+			sentence:     "$GPGSV,1,1,1,500,50,45,30*7A",
+			expectUsed:   true,
+			satNum:       500,
+			expectType:   SAT_TYPE_UNKNOWN,
+			expectID:     "U500",
+			expectElev:   50,
+			expectAz:     45,
+			expectSignal: 30,
+		},
+		{
+			name:         "GPGSV with invalid elevation (blank)",
+			sentence:     "$GPGSV,1,1,1,25,,270,40*7E",
+			expectUsed:   true,
+			satNum:       25,
+			expectType:   SAT_TYPE_GPS,
+			expectID:     "G25",
+			expectElev:   -999,
+			expectAz:     270,
+			expectSignal: 40,
+		},
+		{
+			name:         "GPGSV with invalid azimuth (blank)",
+			sentence:     "$GPGSV,1,1,1,25,60,,40*4D",
+			expectUsed:   true,
+			satNum:       25,
+			expectType:   SAT_TYPE_GPS,
+			expectID:     "G25",
+			expectElev:   60,
+			expectAz:     -999,
+			expectSignal: 40,
+		},
+		{
+			name:         "GPGSV with invalid signal (blank)",
+			sentence:     "$GPGSV,1,1,1,25,60,270,*7C",
+			expectUsed:   true,
+			satNum:       25,
+			expectType:   SAT_TYPE_GPS,
+			expectID:     "G25",
+			expectElev:   60,
+			expectAz:     270,
+			expectSignal: -99,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			Satellites = make(map[string]SatelliteInfo)
+			used := processNMEALineLow(tc.sentence, false)
+			if used != tc.expectUsed {
+				t.Errorf("%s: Expected used=%v, got %v", tc.name, tc.expectUsed, used)
+			}
+
+			if tc.expectUsed {
+				if sat, ok := Satellites[tc.expectID]; ok {
+					if sat.Type != tc.expectType {
+						t.Errorf("%s: Expected type %d, got %d", tc.name, tc.expectType, sat.Type)
+					}
+					if sat.Elevation != tc.expectElev {
+						t.Errorf("%s: Expected elevation %d, got %d", tc.name, tc.expectElev, sat.Elevation)
+					}
+					if sat.Azimuth != tc.expectAz {
+						t.Errorf("%s: Expected azimuth %d, got %d", tc.name, tc.expectAz, sat.Azimuth)
+					}
+					if sat.Signal != tc.expectSignal {
+						t.Errorf("%s: Expected signal %d, got %d", tc.name, tc.expectSignal, sat.Signal)
+					}
+				} else {
+					t.Errorf("%s: Satellite %s not found in map", tc.name, tc.expectID)
+				}
+			}
+		})
+	}
+}

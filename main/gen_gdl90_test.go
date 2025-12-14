@@ -2827,6 +2827,50 @@ func TestSdrKillWithConnectedDevice(t *testing.T) {
 			t.Error("sdrKill timed out with nil devices")
 		}
 	})
+
+	t.Run("with_device_that_becomes_nil", func(t *testing.T) {
+		// Save original values
+		originalShutdown := sdrShutdown
+		originalUATDev := UATDev
+		defer func() {
+			sdrShutdown = originalShutdown
+			UATDev = originalUATDev
+		}()
+
+		// Create a mock UAT device to simulate a connected device
+		mockDevice := &UAT{}
+		UATDev = mockDevice
+		ESDev = nil
+		OGNDev = nil
+		AISDev = nil
+
+		// Start sdrKill in a goroutine
+		done := make(chan bool, 1)
+		go func() {
+			sdrKill()
+			done <- true
+		}()
+
+		// Wait a bit for sdrKill to enter the loop
+		time.Sleep(100 * time.Millisecond)
+
+		// Verify sdrShutdown flag is set
+		if !sdrShutdown {
+			t.Error("sdrShutdown should be true")
+		}
+
+		// Simulate the device being cleaned up by another goroutine
+		time.Sleep(1500 * time.Millisecond)
+		UATDev = nil
+
+		// Now sdrKill should complete
+		select {
+		case <-done:
+			t.Log("sdrKill completed after device became nil")
+		case <-time.After(3 * time.Second):
+			t.Error("sdrKill timed out even after device became nil")
+		}
+	})
 }
 
 // TestPingKillWithConnectedDevice tests the pingKill function wait loop

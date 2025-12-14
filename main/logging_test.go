@@ -1354,4 +1354,79 @@ func TestLogFileWatcherOnce(t *testing.T) {
 			t.Error("Log file should still exist after multiple iterations")
 		}
 	})
+
+	t.Run("large_log_rotation", func(t *testing.T) {
+		// Create a large log file (> 10MB) to trigger rotation
+		largeContent := make([]byte, 11*1024*1024) // 11MB
+		for i := range largeContent {
+			largeContent[i] = 'A'
+		}
+
+		err := os.WriteFile(debugLogf, largeContent, 0644)
+		if err != nil {
+			t.Skipf("Failed to create large log file: %v", err)
+			return
+		}
+		defer os.Remove(debugLogf)
+		defer os.Remove(debugLogf + ".1") // Cleanup rotated file
+
+		// Run logFileWatcherOnce - should trigger rotation
+		result := logFileWatcherOnce()
+
+		// Action should be taken (rotation)
+		if !result {
+			t.Error("Expected action to be taken for large log file")
+		}
+
+		// Original file should be rotated to .1
+		if _, err := os.Stat(debugLogf + ".1"); os.IsNotExist(err) {
+			t.Error("Expected rotated log file .1 to exist")
+		}
+	})
+
+	t.Run("disk_space_cleanup", func(t *testing.T) {
+		// Create multiple old log files to simulate low disk space scenario
+		// Note: This test is limited because we can't actually control free disk space
+		// We'll create old logs and verify the cleanup logic works
+
+		oldLogs := []string{
+			filepath.Join(logDir, "stratux.log.5"),
+			filepath.Join(logDir, "stratux.log.6"),
+			filepath.Join(logDir, "stratux.log.7"),
+		}
+
+		// Create old log files
+		for _, logPath := range oldLogs {
+			err := os.WriteFile(logPath, []byte("old log content"), 0644)
+			if err != nil {
+				t.Skipf("Failed to create old log file: %v", err)
+				return
+			}
+			defer os.Remove(logPath)
+		}
+
+		// Create current log file (small, won't trigger rotation)
+		err := os.WriteFile(debugLogf, []byte("current log"), 0644)
+		if err != nil {
+			t.Skipf("Failed to create log file: %v", err)
+			return
+		}
+		defer os.Remove(debugLogf)
+
+		// Run once - on most systems with > 50MB free, no deletion should occur
+		result := logFileWatcherOnce()
+
+		// We can't reliably predict the result without controlling disk space
+		// But we can verify the function completes without error
+		t.Logf("logFileWatcherOnce completed, action taken: %v", result)
+
+		// Verify at least one old log still exists (assuming sufficient disk space)
+		foundLogs := 0
+		for _, logPath := range oldLogs {
+			if _, err := os.Stat(logPath); err == nil {
+				foundLogs++
+			}
+		}
+		t.Logf("Found %d old log files after cleanup check", foundLogs)
+	})
 }

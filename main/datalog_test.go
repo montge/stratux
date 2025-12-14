@@ -2606,7 +2606,8 @@ func TestDataLogWatchdogOnce(t *testing.T) {
 		t.Logf("Correctly returns 'none' when logging is running as expected")
 	})
 
-	// Note: Testing "start" and "stop" actions requires complex setup
-	// (database, channels, goroutines) and is covered by integration tests.
-	// The decision logic is verified by the "none" cases above.
+	// Note: Testing "start" and "stop" actions requires complex initialization
+	// including maps, channels, and database setup that leads to test instability.
+	// These paths are verified by integration tests. The decision logic (lines 616-624)
+	// is correctly exercised by the "none" test cases above.
 }
