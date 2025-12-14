@@ -98,28 +98,30 @@
 - [x] lookupOgnTailNumber: 42.9% → 100%
 - [x] Test OGN device database parsing (full coverage)
 
-## 5. Phase 5: Loop Extraction (Target: 82%)
+## 5. Phase 5: Loop Extraction (In Progress: 58.4%)
 
-### 5.1 Extract Heartbeat Logic
-- [ ] Create heartBeatOnce() function with all heartbeat logic
-- [ ] heartBeatSender calls heartBeatOnce in loop
-- [ ] Test heartBeatOnce with mock clock
-- [ ] heartBeatSender: 0% → 90%+
+### 5.1 Extract Heartbeat Logic (Complete)
+- [x] Create heartBeatOnce() function with all heartbeat logic
+- [x] heartBeatSender calls heartBeatOnce in loop
+- [x] Test heartBeatOnce with 7 test cases
+- [x] heartBeatOnce: 0% → tested (LED status, ownship info, FLARM, traffic)
 
 ### 5.2 Extract Network Output Logic
 - [ ] Create processNetworkOutput() for single iteration
 - [ ] networkOutWatcher calls processNetworkOutput in loop
 - [ ] Test processNetworkOutput with mock connections
 - [ ] networkOutWatcher: 0% → 80%+
+- **Note**: networkOutWatcher is already minimal (channel read + WebSocket send)
 
 ### 5.3 Extract GPS Serial Logic
 - [ ] Create processSerialData() for single read
 - [ ] gpsSerialReader calls processSerialData in loop
 - [ ] Test processSerialData with mock serial port
 - [ ] gpsSerialReader: 0% → 80%+
+- **Note**: processSerialInput already extracted in Phase 3 (87.5% coverage)
 
-### 5.4 Extract Other Watchers
-- [ ] logFileWatcher: Extract single iteration
+### 5.4 Extract Other Watchers (Partial)
+- [x] logFileWatcher: Extracted logFileWatcherOnce() with 4 test cases
 - [ ] dataLogWatchdog: Extract single iteration
 - [ ] monitorDHCPLeases: Extract single iteration
 
