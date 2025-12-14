@@ -609,18 +609,26 @@ func initDataLog() {
 		and dataLogWriter goroutines.
 */
 
+// dataLogWatchdogOnce performs a single iteration of the data log watchdog.
+// It checks if logging needs to be started or stopped based on globalSettings.ReplayLog.
+// Returns a string describing the action taken ("start", "stop", or "none").
+func dataLogWatchdogOnce() string {
+	if !dataLogStarted && globalSettings.ReplayLog { // case 1: sqlite logging isn't running, and we want to start it
+		log.Printf("datalog.go: Watchdog wants to START logging.\n")
+		go dataLog()
+		return "start"
+	} else if dataLogStarted && !globalSettings.ReplayLog { // case 2: sqlite logging is running, and we want to shut it down
+		log.Printf("datalog.go: Watchdog wants to STOP logging.\n")
+		closeDataLog()
+		return "stop"
+	}
+	return "none"
+}
+
 func dataLogWatchdog() {
 	for {
-		if !dataLogStarted && globalSettings.ReplayLog { // case 1: sqlite logging isn't running, and we want to start it
-			log.Printf("datalog.go: Watchdog wants to START logging.\n")
-			go dataLog()
-		} else if dataLogStarted && !globalSettings.ReplayLog { // case 2:  sqlite logging is running, and we want to shut it down
-			log.Printf("datalog.go: Watchdog wants to STOP logging.\n")
-			closeDataLog()
-		}
-		//log.Printf("Watchdog iterated.\n") //REMOVE -- DEBUG
+		dataLogWatchdogOnce()
 		time.Sleep(1 * time.Second)
-		//log.Printf("Watchdog sleep over.\n") //REMOVE -- DEBUG
 	}
 }
 

@@ -122,8 +122,8 @@
 
 ### 5.4 Extract Other Watchers (Partial)
 - [x] logFileWatcher: Extracted logFileWatcherOnce() with 4 test cases
-- [ ] dataLogWatchdog: Extract single iteration
-- [ ] monitorDHCPLeases: Extract single iteration
+- [x] dataLogWatchdog: Extracted dataLogWatchdogOnce() with 2 test cases
+- **Deferred**: monitorDHCPLeases: Too trivial (just calls refreshConnectedClients)
 
 ## 6. Phase 6: Integration Tests (Target: 88%)
 
