@@ -13,6 +13,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"database/sql"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -864,4 +868,274 @@ func TestReadMbTilesMetadata_EmptyValue(t *testing.T) {
 	if _, ok := metadata["bounds"]; !ok {
 		t.Error("Expected 'bounds' in metadata")
 	}
+}
+
+// =============================================================================
+// Tests for handleTilesets function (currently 50% coverage)
+// =============================================================================
+
+func TestHandleTilesets_EmptyDirectory(t *testing.T) {
+	mapdataDir, cleanup := setupTileTestDir(t)
+	defer cleanup()
+	_ = mapdataDir // mapdataDir is already created by setupTileTestDir
+
+	// Create a request
+	req := httptest.NewRequest("GET", "/tiles/tilesets", nil)
+	w := httptest.NewRecorder()
+
+	handleTilesets(w, req)
+
+	resp := w.Result()
+	body, _ := io.ReadAll(resp.Body)
+
+	// Should return 200 with empty JSON object
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK for empty directory, got %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Should be valid JSON
+	var result map[string]map[string]string
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Errorf("Expected valid JSON response, got error: %v, body: %s", err, string(body))
+	}
+
+	// Should be empty
+	if len(result) != 0 {
+		t.Errorf("Expected empty result for empty directory, got %d entries", len(result))
+	}
+	t.Logf("Empty directory returns valid empty JSON: %s", string(body))
+}
+
+func TestHandleTilesets_WithMbTilesFiles(t *testing.T) {
+	mapdataDir, cleanup := setupTileTestDir(t)
+	defer cleanup()
+
+	// Create a valid .mbtiles file
+	dbPath := filepath.Join(mapdataDir, "test_tileset.mbtiles")
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Skipf("Failed to create database: %v", err)
+		return
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE tiles (
+			zoom_level INTEGER,
+			tile_column INTEGER,
+			tile_row INTEGER,
+			tile_data BLOB
+		);
+		CREATE TABLE metadata (name TEXT, value TEXT);
+		INSERT INTO metadata (name, value) VALUES ('format', 'png');
+		INSERT INTO metadata (name, value) VALUES ('name', 'Test Tileset');
+		INSERT INTO metadata (name, value) VALUES ('bounds', '-180,-90,180,90');
+	`)
+	if err != nil {
+		db.Close()
+		t.Skipf("Failed to create schema: %v", err)
+		return
+	}
+	db.Close()
+
+	// Create a request
+	req := httptest.NewRequest("GET", "/tiles/tilesets", nil)
+	w := httptest.NewRecorder()
+
+	handleTilesets(w, req)
+
+	resp := w.Result()
+	body, _ := io.ReadAll(resp.Body)
+
+	// Should return 200
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK, got %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Should be valid JSON with our tileset
+	var result map[string]map[string]string
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Errorf("Expected valid JSON response, got error: %v, body: %s", err, string(body))
+	}
+
+	// Should contain our test tileset
+	if _, ok := result["test_tileset.mbtiles"]; !ok {
+		t.Errorf("Expected 'test_tileset.mbtiles' in result, got: %v", result)
+	}
+
+	// Verify metadata is present
+	if result["test_tileset.mbtiles"]["format"] != "png" {
+		t.Errorf("Expected format='png', got %s", result["test_tileset.mbtiles"]["format"])
+	}
+	t.Logf("Found tileset with metadata: %v", result["test_tileset.mbtiles"])
+}
+
+func TestHandleTilesets_WithSubdirectories(t *testing.T) {
+	mapdataDir, cleanup := setupTileTestDir(t)
+	defer cleanup()
+
+	// Create a subdirectory (should be skipped)
+	subdir := filepath.Join(mapdataDir, "subdir")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatalf("Failed to create subdirectory: %v", err)
+	}
+
+	// Create a request
+	req := httptest.NewRequest("GET", "/tiles/tilesets", nil)
+	w := httptest.NewRecorder()
+
+	handleTilesets(w, req)
+
+	resp := w.Result()
+	body, _ := io.ReadAll(resp.Body)
+
+	// Should return 200
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK, got %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Should be empty JSON (subdirectory should be skipped)
+	var result map[string]map[string]string
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Errorf("Expected valid JSON response, got error: %v", err)
+	}
+
+	// Subdirectory should not appear in results
+	if _, ok := result["subdir"]; ok {
+		t.Error("Subdirectory should not appear in tilesets")
+	}
+	t.Logf("Subdirectories correctly skipped")
+}
+
+func TestHandleTilesets_WithNonMbTilesFiles(t *testing.T) {
+	mapdataDir, cleanup := setupTileTestDir(t)
+	defer cleanup()
+
+	// Create a non-.mbtiles file
+	nonMbTiles := filepath.Join(mapdataDir, "readme.txt")
+	if err := os.WriteFile(nonMbTiles, []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to create non-mbtiles file: %v", err)
+	}
+
+	// Create a request
+	req := httptest.NewRequest("GET", "/tiles/tilesets", nil)
+	w := httptest.NewRecorder()
+
+	handleTilesets(w, req)
+
+	resp := w.Result()
+	body, _ := io.ReadAll(resp.Body)
+
+	// Should return 200
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK, got %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Should be empty JSON (non-.mbtiles file should be skipped)
+	var result map[string]map[string]string
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Errorf("Expected valid JSON response, got error: %v", err)
+	}
+
+	// Non-mbtiles file should not appear in results
+	if _, ok := result["readme.txt"]; ok {
+		t.Error("Non-mbtiles file should not appear in tilesets")
+	}
+	t.Logf("Non-mbtiles files correctly skipped")
+}
+
+func TestHandleTilesets_WithInvalidMbTilesFile(t *testing.T) {
+	mapdataDir, cleanup := setupTileTestDir(t)
+	defer cleanup()
+
+	// Create an invalid .mbtiles file (not a valid SQLite database)
+	invalidMbTiles := filepath.Join(mapdataDir, "invalid.mbtiles")
+	if err := os.WriteFile(invalidMbTiles, []byte("not a database"), 0644); err != nil {
+		t.Fatalf("Failed to create invalid mbtiles file: %v", err)
+	}
+
+	// Create a request
+	req := httptest.NewRequest("GET", "/tiles/tilesets", nil)
+	w := httptest.NewRecorder()
+
+	handleTilesets(w, req)
+
+	resp := w.Result()
+	body, _ := io.ReadAll(resp.Body)
+
+	// Should return 200 (invalid files return with nil metadata, not errors)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK, got %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Should be valid JSON
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Errorf("Expected valid JSON response, got error: %v", err)
+	}
+
+	// Note: Invalid files appear in result with null metadata
+	// This is the current behavior - connectMbTilesArchive returns nil metadata
+	// but doesn't return an error for invalid files
+	if _, ok := result["invalid.mbtiles"]; ok {
+		t.Logf("Invalid mbtiles file appears with null metadata (current behavior)")
+	} else {
+		t.Logf("Invalid mbtiles file was skipped")
+	}
+}
+
+func TestHandleTilesets_WithDbFile(t *testing.T) {
+	mapdataDir, cleanup := setupTileTestDir(t)
+	defer cleanup()
+
+	// Create a valid .db file (should be treated same as .mbtiles)
+	dbPath := filepath.Join(mapdataDir, "test_db.db")
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Skipf("Failed to create database: %v", err)
+		return
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE tiles (
+			zoom_level INTEGER,
+			tile_column INTEGER,
+			tile_row INTEGER,
+			tile_data BLOB
+		);
+		CREATE TABLE metadata (name TEXT, value TEXT);
+		INSERT INTO metadata (name, value) VALUES ('format', 'pbf');
+		INSERT INTO metadata (name, value) VALUES ('name', 'Test DB');
+	`)
+	if err != nil {
+		db.Close()
+		t.Skipf("Failed to create schema: %v", err)
+		return
+	}
+	db.Close()
+
+	// Create a request
+	req := httptest.NewRequest("GET", "/tiles/tilesets", nil)
+	w := httptest.NewRecorder()
+
+	handleTilesets(w, req)
+
+	resp := w.Result()
+	body, _ := io.ReadAll(resp.Body)
+
+	// Should return 200
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 OK, got %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Should be valid JSON with our .db file
+	var result map[string]map[string]string
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Errorf("Expected valid JSON response, got error: %v, body: %s", err, string(body))
+	}
+
+	// Should contain our test .db file
+	if _, ok := result["test_db.db"]; !ok {
+		t.Errorf("Expected 'test_db.db' in result, got: %v", result)
+	}
+	t.Logf("Found .db file with metadata: %v", result["test_db.db"])
 }
