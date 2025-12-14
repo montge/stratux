@@ -37,15 +37,21 @@
 - [x] 6.1 Run gofmt on test files with formatting issues
 - [x] 6.2 Verify formatting check passes in CI
 
-## 7. Consolidate Workflow Duplication (Future)
+## 7. Fix Cache Conflicts
 
-- [ ] 7.1 Create reusable composite action for Go build setup
-- [ ] 7.2 Update all workflows to use the composite action
-- [ ] 7.3 Remove duplicated dependency installation steps
+- [x] 7.1 Remove redundant `actions/cache@v4` step from ci.yml
+- [x] 7.2 Use built-in caching from `actions/setup-go@v5` (enabled by default)
+- [x] 7.3 Verify "Cannot open: File exists" warnings are eliminated
 
-## 8. Verification
+## 8. Consolidate Workflow Duplication (Future)
 
-- [x] 8.1 Run all Go tests locally (all pass with Go 1.24.1)
-- [x] 8.2 Run web UI tests locally (77 tests pass)
-- [x] 8.3 Verify all workflows pass in CI after changes (master CI passed)
-- [x] 8.4 Verify SonarCloud receives coverage data (scan completed successfully)
+- [ ] 8.1 Create reusable composite action for Go build setup
+- [ ] 8.2 Update all workflows to use the composite action
+- [ ] 8.3 Remove duplicated dependency installation steps
+
+## 9. Verification
+
+- [x] 9.1 Run all Go tests locally (all pass with Go 1.24.1)
+- [x] 9.2 Run web UI tests locally (77 tests pass)
+- [x] 9.3 Verify all workflows pass in CI after changes (master CI passed)
+- [x] 9.4 Verify SonarCloud receives coverage data (scan completed successfully)
