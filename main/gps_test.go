@@ -5607,61 +5607,61 @@ func TestProcessNMEALine_VTGLowSpeedThreshold(t *testing.T) {
 	defer tearDown()
 
 	testCases := []struct {
-		name        string
-		speed       string
-		course      string
+		name         string
+		speed        string
+		course       string
 		shouldUpdate bool
-		description string
+		description  string
 	}{
 		{
-			name:        "Speed exactly 3 knots",
-			speed:       "3.0",
-			course:      "90.0",
+			name:         "Speed exactly 3 knots",
+			speed:        "3.0",
+			course:       "90.0",
 			shouldUpdate: false,
-			description: "Speed at 3 knots should not update course",
+			description:  "Speed at 3 knots should not update course",
 		},
 		{
-			name:        "Speed 2.9 knots",
-			speed:       "2.9",
-			course:      "90.0",
+			name:         "Speed 2.9 knots",
+			speed:        "2.9",
+			course:       "90.0",
 			shouldUpdate: false,
-			description: "Speed below 3 knots should not update course",
+			description:  "Speed below 3 knots should not update course",
 		},
 		{
-			name:        "Speed 3.1 knots",
-			speed:       "3.1",
-			course:      "90.0",
+			name:         "Speed 3.1 knots",
+			speed:        "3.1",
+			course:       "90.0",
 			shouldUpdate: true,
-			description: "Speed above 3 knots should update course",
+			description:  "Speed above 3 knots should update course",
 		},
 		{
-			name:        "Speed 0 knots",
-			speed:       "0.0",
-			course:      "0.0",
+			name:         "Speed 0 knots",
+			speed:        "0.0",
+			course:       "0.0",
 			shouldUpdate: false,
-			description: "Zero speed should not update course",
+			description:  "Zero speed should not update course",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mySituation.GPSTrueCourse = 999.0 // Invalid initial value
-			
+
 			sentence := fmt.Sprintf("$GPVTG,%s,T,,M,%s,N,,K*XX", tc.course, tc.speed)
 			sentence = addNMEAChecksum(sentence)
-			
+
 			result := processNMEALine(sentence)
 			if !result {
 				t.Errorf("%s: Failed to process VTG", tc.description)
 			}
-			
+
 			if tc.shouldUpdate && mySituation.GPSTrueCourse == 999.0 {
 				t.Errorf("%s: Course not updated", tc.description)
 			} else if !tc.shouldUpdate && mySituation.GPSTrueCourse != 999.0 {
 				// Actually course might be set to 0 for low speed, that's ok
 				t.Logf("%s: Course set to %.1f (expected not updated)", tc.description, mySituation.GPSTrueCourse)
 			}
-			
+
 			t.Logf("%s: Speed=%.1f, Course=%.1f", tc.description, mySituation.GPSGroundSpeed, mySituation.GPSTrueCourse)
 		})
 	}
@@ -5673,41 +5673,41 @@ func TestProcessNMEALine_GGABoundsChecking(t *testing.T) {
 	defer tearDown()
 
 	testCases := []struct {
-		name         string
-		fixQuality   string
+		name          string
+		fixQuality    string
 		expectClamped uint8
-		description  string
+		description   string
 	}{
 		{
-			name:        "Fix quality -1",
-			fixQuality:  "-1",
+			name:          "Fix quality -1",
+			fixQuality:    "-1",
 			expectClamped: 0,
-			description: "Negative fix quality should clamp to 0",
+			description:   "Negative fix quality should clamp to 0",
 		},
 		{
-			name:        "Fix quality 10",
-			fixQuality:  "10",
+			name:          "Fix quality 10",
+			fixQuality:    "10",
 			expectClamped: 9,
-			description: "Fix quality over 9 should clamp to 9",
+			description:   "Fix quality over 9 should clamp to 9",
 		},
 		{
-			name:        "Fix quality 99",
-			fixQuality:  "99",
+			name:          "Fix quality 99",
+			fixQuality:    "99",
 			expectClamped: 9,
-			description: "Fix quality way over max should clamp to 9",
+			description:   "Fix quality way over max should clamp to 9",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mySituation.GPSFixQuality = 255
-			
+
 			sentence := fmt.Sprintf("$GPGGA,123519.0,4807.038,N,01131.000,E,%s,08,0.9,545.4,M,46.9,M,,*XX",
 				tc.fixQuality)
 			sentence = addNMEAChecksum(sentence)
-			
+
 			processNMEALine(sentence)
-			
+
 			if mySituation.GPSFixQuality != tc.expectClamped {
 				t.Errorf("%s: Expected %d, got %d", tc.description, tc.expectClamped, mySituation.GPSFixQuality)
 			}
@@ -5729,46 +5729,46 @@ func TestProcessNMEALine_GSASatelliteBounds(t *testing.T) {
 		description  string
 	}{
 		{
-			name:        "GPS satellite 32",
-			satellites:  []string{"32"},
+			name:         "GPS satellite 32",
+			satellites:   []string{"32"},
 			expectedType: SAT_TYPE_GPS,
-			expectedID:  "G32",
-			description: "GPS satellite at upper bound",
+			expectedID:   "G32",
+			description:  "GPS satellite at upper bound",
 		},
 		{
-			name:        "SBAS satellite 33",
-			satellites:  []string{"33"},
+			name:         "SBAS satellite 33",
+			satellites:   []string{"33"},
 			expectedType: SAT_TYPE_SBAS,
-			expectedID:  "S120",
-			description: "SBAS satellite 33 = PRN 120",
+			expectedID:   "S120",
+			description:  "SBAS satellite 33 = PRN 120",
 		},
 		{
-			name:        "GLONASS satellite 65",
-			satellites:  []string{"65"},
+			name:         "GLONASS satellite 65",
+			satellites:   []string{"65"},
 			expectedType: SAT_TYPE_GLONASS,
-			expectedID:  "R1",
-			description: "GLONASS satellite at lower bound",
+			expectedID:   "R1",
+			description:  "GLONASS satellite at lower bound",
 		},
 		{
-			name:        "Galileo satellite 301",
-			satellites:  []string{"301"},
+			name:         "Galileo satellite 301",
+			satellites:   []string{"301"},
 			expectedType: SAT_TYPE_GALILEO,
-			expectedID:  "E1",
-			description: "Galileo satellite at lower bound",
+			expectedID:   "E1",
+			description:  "Galileo satellite at lower bound",
 		},
 		{
-			name:        "BeiDou satellite 401",
-			satellites:  []string{"401"},
+			name:         "BeiDou satellite 401",
+			satellites:   []string{"401"},
 			expectedType: SAT_TYPE_BEIDOU,
-			expectedID:  "B1",
-			description: "BeiDou satellite at lower bound",
+			expectedID:   "B1",
+			description:  "BeiDou satellite at lower bound",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			Satellites = make(map[string]SatelliteInfo)
-			
+
 			satFields := make([]string, 12)
 			for i := 0; i < 12; i++ {
 				if i < len(tc.satellites) {
@@ -5777,15 +5777,15 @@ func TestProcessNMEALine_GSASatelliteBounds(t *testing.T) {
 					satFields[i] = ""
 				}
 			}
-			
+
 			sentence := fmt.Sprintf("$GPGSA,A,3,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,2.5,1.2,2.1*XX",
 				satFields[0], satFields[1], satFields[2], satFields[3],
 				satFields[4], satFields[5], satFields[6], satFields[7],
 				satFields[8], satFields[9], satFields[10], satFields[11])
 			sentence = addNMEAChecksum(sentence)
-			
+
 			processNMEALine(sentence)
-			
+
 			if sat, ok := Satellites[tc.expectedID]; ok {
 				if sat.Type != tc.expectedType {
 					t.Errorf("%s: Expected type %d, got %d", tc.description, tc.expectedType, sat.Type)
@@ -5885,17 +5885,17 @@ func TestProcessNMEALine_GSVBoundsChecking(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			Satellites = make(map[string]SatelliteInfo)
-			
+
 			sentence := fmt.Sprintf("$GPGSV,1,1,1,%s,%s,%s,%s*XX",
 				tc.svID, tc.elevation, tc.azimuth, tc.signal)
 			sentence = addNMEAChecksum(sentence)
-			
+
 			result := processNMEALine(sentence)
 			if !result {
 				t.Errorf("%s: Failed to parse GSV", tc.description)
 				return
 			}
-			
+
 			expectedID := fmt.Sprintf("G%s", tc.svID)
 			if sat, ok := Satellites[expectedID]; ok {
 				if sat.Elevation != tc.expectElev {

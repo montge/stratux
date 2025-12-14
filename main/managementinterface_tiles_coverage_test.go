@@ -611,12 +611,12 @@ func TestReadMbTilesMetadata_QueryError(t *testing.T) {
 
 func TestTileToDegree_ExtendedCoverage(t *testing.T) {
 	testCases := []struct {
-		name          string
-		z, x, y       int
-		expectedLon   float64
-		expectedLat   float64
-		toleranceLon  float64
-		toleranceLat  float64
+		name         string
+		z, x, y      int
+		expectedLon  float64
+		expectedLat  float64
+		toleranceLon float64
+		toleranceLat float64
 	}{
 		{
 			name:         "zoom_0_origin",
@@ -634,7 +634,7 @@ func TestTileToDegree_ExtendedCoverage(t *testing.T) {
 			x:            1,
 			y:            0,
 			expectedLon:  0.0,
-			expectedLat:  0.0,  // Y coordinate is inverted in OSM schema
+			expectedLat:  0.0, // Y coordinate is inverted in OSM schema
 			toleranceLon: 0.1,
 			toleranceLat: 0.1,
 		},
@@ -644,7 +644,7 @@ func TestTileToDegree_ExtendedCoverage(t *testing.T) {
 			x:            0,
 			y:            1,
 			expectedLon:  -180.0,
-			expectedLat:  85.0511,  // Y coordinate is inverted in OSM schema
+			expectedLat:  85.0511, // Y coordinate is inverted in OSM schema
 			toleranceLon: 0.1,
 			toleranceLat: 0.1,
 		},

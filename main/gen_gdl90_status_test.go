@@ -3406,45 +3406,45 @@ func TestUpdateStatus_GPSSolutions(t *testing.T) {
 	Satellites = make(map[string]SatelliteInfo)
 
 	testCases := []struct {
-		name           string
-		fixQuality     uint8
-		gpsConnected   bool
+		name             string
+		fixQuality       uint8
+		gpsConnected     bool
 		expectedSolution string
 	}{
 		{
-			name:           "3D GPS + SBAS",
-			fixQuality:     2,
-			gpsConnected:   true,
+			name:             "3D GPS + SBAS",
+			fixQuality:       2,
+			gpsConnected:     true,
 			expectedSolution: "3D GPS + SBAS",
 		},
 		{
-			name:           "3D GPS",
-			fixQuality:     1,
-			gpsConnected:   true,
+			name:             "3D GPS",
+			fixQuality:       1,
+			gpsConnected:     true,
 			expectedSolution: "3D GPS",
 		},
 		{
-			name:           "Dead Reckoning",
-			fixQuality:     6,
-			gpsConnected:   true,
+			name:             "Dead Reckoning",
+			fixQuality:       6,
+			gpsConnected:     true,
 			expectedSolution: "Dead Reckoning",
 		},
 		{
-			name:           "No Fix",
-			fixQuality:     0,
-			gpsConnected:   true,
+			name:             "No Fix",
+			fixQuality:       0,
+			gpsConnected:     true,
 			expectedSolution: "No Fix",
 		},
 		{
-			name:           "Unknown fix quality",
-			fixQuality:     99, // Unknown value
-			gpsConnected:   true,
+			name:             "Unknown fix quality",
+			fixQuality:       99, // Unknown value
+			gpsConnected:     true,
 			expectedSolution: "Unknown",
 		},
 		{
-			name:           "GPS Disconnected",
-			fixQuality:     2,
-			gpsConnected:   false,
+			name:             "GPS Disconnected",
+			fixQuality:       2,
+			gpsConnected:     false,
 			expectedSolution: "Disconnected",
 		},
 	}

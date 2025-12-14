@@ -25,3 +25,9 @@ These failures block nightly builds, waste CI resources, and prevent visibility 
   - Enable SonarCloud quality gate
   - Reduce workflow maintenance burden
   - Faster issue identification through reliable CI
+
+## Known Limitations
+- **SonarCloud Free Tier**: Only scans the default branch (master). Branch analysis
+  for open source projects is expected in 2026. Until then, gitflow develop branch
+  will not get SonarCloud analysis. CI triggers for develop branch are in place for
+  future compatibility.
