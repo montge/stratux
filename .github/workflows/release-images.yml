@@ -32,10 +32,15 @@ jobs:
       - name: Update submodules
         run: git submodule update --init --recursive
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc make golang-go ncurses-dev libusb-1.0-0-dev wget \
+          sudo apt-get install -y gcc make ncurses-dev libusb-1.0-0-dev wget \
             coreutils quilt parted qemu-user-static debootstrap zerofree zip dosfstools \
             libarchive-tools libcap2-bin rsync grep udev xz-utils curl xxd file kmod bc \
             binfmt-support ca-certificates
@@ -100,10 +105,15 @@ jobs:
       - name: Update submodules
         run: git submodule update --init --recursive
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc make golang-go ncurses-dev libusb-1.0-0-dev wget \
+          sudo apt-get install -y gcc make ncurses-dev libusb-1.0-0-dev wget \
             coreutils quilt parted qemu-user-static debootstrap zerofree zip dosfstools \
             libarchive-tools libcap2-bin rsync grep udev xz-utils curl xxd file kmod bc \
             binfmt-support ca-certificates

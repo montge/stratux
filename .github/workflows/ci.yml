@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, develop ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, develop ]
   workflow_dispatch:
 
 # Explicit permissions following least privilege principle
@@ -24,7 +24,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.21'
+        go-version-file: 'go.mod'
 
     - name: Install build dependencies
       run: |
