@@ -774,6 +774,203 @@ func TestGetPPMRegexPatterns(t *testing.T) {
 	}
 }
 
+// TestGetPPMEdgeCases tests additional edge cases for getPPM to achieve 100% coverage
+func TestGetPPMEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		serial   string
+		expected int
+	}{
+		{
+			// Test when regex compile fails (simulated by invalid pattern in actual code)
+			// This case is already handled by returning globalSettings.PPM
+			name:     "Valid serial with PPM after successful regex compile",
+			serial:   "stratux:978:42",
+			expected: 42,
+		},
+		{
+			// Test when FindStringSubmatch returns nil (no match)
+			name:     "Serial that doesn't match regex pattern",
+			serial:   "random-serial-number",
+			expected: globalSettings.PPM,
+		},
+		{
+			// Test when Atoi fails on the PPM value
+			name:     "Serial with non-numeric PPM",
+			serial:   "stratux:978:not-a-number",
+			expected: globalSettings.PPM,
+		},
+		{
+			// Test edge case with just minus sign
+			name:     "Serial with just minus sign as PPM",
+			serial:   "stratux:978:-",
+			expected: globalSettings.PPM,
+		},
+		{
+			// Test edge case with plus sign (strconv.Atoi fails on leading +)
+			name:     "Serial with plus sign in PPM",
+			serial:   "stratux:978:+10",
+			expected: globalSettings.PPM,
+		},
+		{
+			// Test very long PPM string that causes Atoi to fail
+			name:     "Serial with extremely long PPM value",
+			serial:   "stratux:978:12345678901234567890123456789012345678901234567890",
+			expected: globalSettings.PPM,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getPPM(tt.serial)
+			if result != tt.expected {
+				t.Errorf("getPPM(%q) = %d, want %d", tt.serial, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestSDrKillBasic tests the sdrKill function in a basic scenario
+func TestSDrKillBasic(t *testing.T) {
+	// Save original state
+	originalShutdown := sdrShutdown
+	originalUATDev := UATDev
+	originalESDev := ESDev
+	originalOGNDev := OGNDev
+	originalAISDev := AISDev
+
+	// Reset to known state
+	sdrShutdown = false
+	UATDev = nil
+	ESDev = nil
+	OGNDev = nil
+	AISDev = nil
+
+	// Restore original state after test
+	defer func() {
+		sdrShutdown = originalShutdown
+		UATDev = originalUATDev
+		ESDev = originalESDev
+		OGNDev = originalOGNDev
+		AISDev = originalAISDev
+	}()
+
+	// Test with no devices initialized
+	sdrKill()
+
+	if !sdrShutdown {
+		t.Error("sdrKill() should set sdrShutdown to true")
+	}
+
+	// Verify all devices are still nil
+	if UATDev != nil || ESDev != nil || OGNDev != nil || AISDev != nil {
+		t.Error("All devices should remain nil when none were initialized")
+	}
+}
+
+// TestReCompileValidPatterns tests reCompile with various valid patterns
+func TestReCompileValidPatterns(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		testStr string
+		wantNil bool
+		matches bool
+	}{
+		{
+			name:    "UAT pattern matches correctly",
+			pattern: "str?a?t?u?x:978",
+			testStr: "stratux:978",
+			wantNil: false,
+			matches: true,
+		},
+		{
+			name:    "ES pattern matches correctly",
+			pattern: "str?a?t?u?x:1090",
+			testStr: "stratux:1090",
+			wantNil: false,
+			matches: true,
+		},
+		{
+			name:    "Word boundary pattern",
+			pattern: "\\btest\\b",
+			testStr: "test",
+			wantNil: false,
+			matches: true,
+		},
+		{
+			name:    "Character class pattern",
+			pattern: "[a-z]+",
+			testStr: "abc",
+			wantNil: false,
+			matches: true,
+		},
+		{
+			name:    "Anchored pattern",
+			pattern: "^start.*end$",
+			testStr: "start middle end",
+			wantNil: false,
+			matches: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := reCompile(tt.pattern)
+			if (r == nil) != tt.wantNil {
+				t.Errorf("reCompile(%q) nil=%v, want nil=%v", tt.pattern, r == nil, tt.wantNil)
+				return
+			}
+
+			if !tt.wantNil && r != nil {
+				matched := r.MatchString(tt.testStr)
+				if matched != tt.matches {
+					t.Errorf("reCompile(%q).MatchString(%q) = %v, want %v", tt.pattern, tt.testStr, matched, tt.matches)
+				}
+			}
+		})
+	}
+}
+
+// TestReCompileInvalidPatterns tests reCompile with invalid patterns
+func TestReCompileInvalidPatterns(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+	}{
+		{
+			name:    "Unclosed character class",
+			pattern: "[abc",
+		},
+		{
+			name:    "Unclosed group",
+			pattern: "(abc",
+		},
+		{
+			name:    "Invalid escape sequence",
+			pattern: "\\k",
+		},
+		{
+			name:    "Invalid repetition",
+			pattern: "*abc",
+		},
+		{
+			name:    "Unclosed named group",
+			pattern: "(?P<name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := reCompile(tt.pattern)
+			// For invalid patterns, reCompile should return nil
+			if r != nil {
+				t.Errorf("reCompile(%q) should return nil for invalid pattern, got non-nil", tt.pattern)
+			}
+		})
+	}
+}
+
 // Benchmark tests for performance-critical functions
 func BenchmarkGetPPM(b *testing.B) {
 	serials := []string{

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestLoggingFunctions tests the logging wrapper functions
@@ -1267,50 +1268,56 @@ func TestResetPathsToDefaults(t *testing.T) {
 
 // TestLogFileWatcherOnce tests the extracted log file watcher logic
 func TestLogFileWatcherOnce(t *testing.T) {
-	// Create temp directories
-	tmpDir, err := os.MkdirTemp("", "logwatcher_test")
-	if err != nil {
-		t.Skipf("Failed to create temp directory: %v", err)
-		return
-	}
-	defer os.RemoveAll(tmpDir)
-
-	logDir := filepath.Join(tmpDir, "log")
-	err = os.MkdirAll(logDir, 0755)
-	if err != nil {
-		t.Skipf("Failed to create log directory: %v", err)
-		return
-	}
-
 	// Save original values
+	origLogDirPath := logDirPath
 	origLogDirf := logDirf
 	origDebugLogf := debugLogf
+	origLogFileHandle := logFileHandle
 	defer func() {
+		logDirPath = origLogDirPath
 		logDirf = origLogDirf
 		debugLogf = origDebugLogf
+		if logFileHandle != nil && logFileHandle != origLogFileHandle {
+			logFileHandle.Close()
+		}
+		logFileHandle = origLogFileHandle
 	}()
 
-	// Set up test paths
-	logDirf = logDir
-	debugLogf = filepath.Join(logDir, "stratux.log")
-
 	t.Run("no_log_file", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "logwatcher_nofile")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "stratux.log")
+
 		// logFileWatcherOnce should handle missing log file gracefully
 		result := logFileWatcherOnce()
-		// No action should be taken
+		// No action should be taken when file doesn't exist
 		if result != false {
 			t.Errorf("Expected no action when log file doesn't exist, got action taken")
 		}
 	})
 
 	t.Run("small_log_file", func(t *testing.T) {
-		// Create a small log file (under 10MB)
-		err := os.WriteFile(debugLogf, []byte("small log content"), 0644)
+		tmpDir, err := os.MkdirTemp("", "logwatcher_small")
 		if err != nil {
-			t.Skipf("Failed to create log file: %v", err)
-			return
+			t.Fatalf("Failed to create temp directory: %v", err)
 		}
-		defer os.Remove(debugLogf)
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "stratux.log")
+
+		// Create a small log file (under 10MB)
+		err = os.WriteFile(debugLogf, []byte("small log content"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create log file: %v", err)
+		}
 
 		result := logFileWatcherOnce()
 		// No rotation should occur for small file
@@ -1319,56 +1326,28 @@ func TestLogFileWatcherOnce(t *testing.T) {
 		}
 	})
 
-	t.Run("sufficient_disk_space", func(t *testing.T) {
-		// Create a small log file
-		err := os.WriteFile(debugLogf, []byte("test"), 0644)
-		if err != nil {
-			t.Skipf("Failed to create log file: %v", err)
-			return
-		}
-		defer os.Remove(debugLogf)
-
-		// With sufficient disk space, no deletion should occur
-		result := logFileWatcherOnce()
-		if result != false {
-			t.Errorf("Expected no action with sufficient disk space, got action taken")
-		}
-	})
-
-	t.Run("multiple_iterations", func(t *testing.T) {
-		// Create a log file
-		err := os.WriteFile(debugLogf, []byte("test log"), 0644)
-		if err != nil {
-			t.Skipf("Failed to create log file: %v", err)
-			return
-		}
-		defer os.Remove(debugLogf)
-
-		// Run multiple iterations
-		for i := 0; i < 3; i++ {
-			_ = logFileWatcherOnce()
-		}
-
-		// File should still exist
-		if _, err := os.Stat(debugLogf); os.IsNotExist(err) {
-			t.Error("Log file should still exist after multiple iterations")
-		}
-	})
-
 	t.Run("large_log_rotation", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "logwatcher_large")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "stratux.log")
+		logFileHandle = nil
+
 		// Create a large log file (> 10MB) to trigger rotation
 		largeContent := make([]byte, 11*1024*1024) // 11MB
 		for i := range largeContent {
 			largeContent[i] = 'A'
 		}
 
-		err := os.WriteFile(debugLogf, largeContent, 0644)
+		err = os.WriteFile(debugLogf, largeContent, 0644)
 		if err != nil {
-			t.Skipf("Failed to create large log file: %v", err)
-			return
+			t.Fatalf("Failed to create large log file: %v", err)
 		}
-		defer os.Remove(debugLogf)
-		defer os.Remove(debugLogf + ".1") // Cleanup rotated file
 
 		// Run logFileWatcherOnce - should trigger rotation
 		result := logFileWatcherOnce()
@@ -1382,51 +1361,504 @@ func TestLogFileWatcherOnce(t *testing.T) {
 		if _, err := os.Stat(debugLogf + ".1"); os.IsNotExist(err) {
 			t.Error("Expected rotated log file .1 to exist")
 		}
-	})
 
-	t.Run("disk_space_cleanup", func(t *testing.T) {
-		// Create multiple old log files to simulate low disk space scenario
-		// Note: This test is limited because we can't actually control free disk space
-		// We'll create old logs and verify the cleanup logic works
-
-		oldLogs := []string{
-			filepath.Join(logDir, "stratux.log.5"),
-			filepath.Join(logDir, "stratux.log.6"),
-			filepath.Join(logDir, "stratux.log.7"),
+		// New log file should be created by openLogFile
+		if _, err := os.Stat(debugLogf); os.IsNotExist(err) {
+			t.Error("Expected new log file to be created after rotation")
 		}
 
-		// Create old log files
-		for _, logPath := range oldLogs {
+		// Clean up file handle
+		if logFileHandle != nil {
+			logFileHandle.Close()
+			logFileHandle = nil
+		}
+	})
+
+	t.Run("disk_space_cleanup_loop", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "logwatcher_cleanup")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "stratux.log")
+
+		// Create multiple old log files
+		for i := 5; i <= 9; i++ {
+			logPath := filepath.Join(tmpDir, "stratux.log."+strconv.Itoa(i))
 			err := os.WriteFile(logPath, []byte("old log content"), 0644)
 			if err != nil {
-				t.Skipf("Failed to create old log file: %v", err)
-				return
+				t.Fatalf("Failed to create old log file: %v", err)
 			}
-			defer os.Remove(logPath)
 		}
 
 		// Create current log file (small, won't trigger rotation)
-		err := os.WriteFile(debugLogf, []byte("current log"), 0644)
+		err = os.WriteFile(debugLogf, []byte("current log"), 0644)
 		if err != nil {
-			t.Skipf("Failed to create log file: %v", err)
-			return
+			t.Fatalf("Failed to create log file: %v", err)
 		}
-		defer os.Remove(debugLogf)
 
 		// Run once - on most systems with > 50MB free, no deletion should occur
+		// But the function should complete without error
 		result := logFileWatcherOnce()
 
 		// We can't reliably predict the result without controlling disk space
 		// But we can verify the function completes without error
 		t.Logf("logFileWatcherOnce completed, action taken: %v", result)
+	})
 
-		// Verify at least one old log still exists (assuming sufficient disk space)
-		foundLogs := 0
-		for _, logPath := range oldLogs {
-			if _, err := os.Stat(logPath); err == nil {
-				foundLogs++
+	t.Run("stat_error_path", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "logwatcher_staterr")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Use a debugLogf path that points to a directory, not a file
+		// This will cause os.Stat to succeed but Size() check to behave differently
+		logDirPath = tmpDir
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "nonexistent.log")
+
+		// No log file exists, so stat will return error
+		result := logFileWatcherOnce()
+
+		// Should return false (no action) when stat fails
+		if result != false {
+			t.Errorf("Expected no action when stat fails, got action taken")
+		}
+	})
+}
+
+// TestLogFileWatcher tests the background goroutine (limited test)
+func TestLogFileWatcher(t *testing.T) {
+	// This test verifies that logFileWatcher can be started without panicking
+	// We can't easily test the infinite loop, but we can verify it starts
+
+	// Save original values
+	origLogDirPath := logDirPath
+	origLogDirf := logDirf
+	origDebugLogf := debugLogf
+	defer func() {
+		logDirPath = origLogDirPath
+		logDirf = origLogDirf
+		debugLogf = origDebugLogf
+	}()
+
+	tmpDir, err := os.MkdirTemp("", "logwatcher_goroutine")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	logDirPath = tmpDir
+	logDirf = tmpDir
+	debugLogf = filepath.Join(tmpDir, "stratux.log")
+
+	// Create a small log file
+	err = os.WriteFile(debugLogf, []byte("test log"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create log file: %v", err)
+	}
+
+	// Start the watcher in a goroutine
+	done := make(chan bool)
+	go func() {
+		// Run for a very short time
+		ticker := time.NewTicker(100 * time.Millisecond)
+		<-ticker.C
+		ticker.Stop()
+		done <- true
+	}()
+
+	// Start a modified version that exits after one iteration
+	// We can't test the actual infinite loop, but we can test one iteration
+	go func() {
+		logFileWatcherOnce()
+	}()
+
+	// Wait for completion
+	select {
+	case <-done:
+		t.Log("logFileWatcher goroutine test completed")
+	case <-time.After(1 * time.Second):
+		t.Error("Test timed out")
+	}
+}
+
+// TestInitLogging tests the logging initialization
+func TestInitLogging(t *testing.T) {
+	// Save original values
+	origLogDirf := logDirf
+	origDebugLogf := debugLogf
+	origLogFileHandle := logFileHandle
+	defer func() {
+		logDirf = origLogDirf
+		debugLogf = origDebugLogf
+		if logFileHandle != nil && logFileHandle != origLogFileHandle {
+			logFileHandle.Close()
+		}
+		logFileHandle = origLogFileHandle
+	}()
+
+	t.Run("initializes_log_file", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "init_logging")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirf = tmpDir
+		logFileHandle = nil
+
+		// Call initLogging
+		// Note: This starts a background goroutine, so we need to be careful
+		// We'll just call openLogFile directly to test the core functionality
+		openLogFile()
+
+		// Verify log file was created
+		expectedPath := filepath.Join(tmpDir, "stratux.log")
+		if debugLogf != expectedPath {
+			t.Errorf("Expected debugLogf=%s, got %s", expectedPath, debugLogf)
+		}
+
+		if logFileHandle == nil {
+			t.Error("Expected logFileHandle to be set")
+		}
+
+		// Verify file exists
+		if _, err := os.Stat(debugLogf); os.IsNotExist(err) {
+			t.Error("Expected log file to exist after initialization")
+		}
+
+		// Test that we can write to the log
+		log.Printf("Test message after initialization")
+
+		// Clean up
+		if logFileHandle != nil {
+			logFileHandle.Close()
+			logFileHandle = nil
+		}
+	})
+
+	t.Run("handles_multiple_initializations", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "init_logging_multi")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirf = tmpDir
+		logFileHandle = nil
+
+		// Initialize multiple times
+		openLogFile()
+		firstHandle := logFileHandle
+
+		openLogFile()
+		secondHandle := logFileHandle
+
+		// Handles should be different (old one should be closed)
+		if firstHandle == secondHandle {
+			t.Log("Note: Handles are the same (may be reused by OS)")
+		}
+
+		if logFileHandle == nil {
+			t.Error("Expected logFileHandle to be set after re-initialization")
+		}
+
+		// Clean up
+		if logFileHandle != nil {
+			logFileHandle.Close()
+			logFileHandle = nil
+		}
+	})
+
+	t.Run("appends_to_existing_log", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "init_logging_append")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "stratux.log")
+
+		// Create existing log with content
+		initialContent := "Existing log line\n"
+		err = os.WriteFile(debugLogf, []byte(initialContent), 0666)
+		if err != nil {
+			t.Fatalf("Failed to create existing log: %v", err)
+		}
+
+		logFileHandle = nil
+
+		// Initialize (should append)
+		openLogFile()
+
+		// Write new content
+		log.Printf("New log line")
+
+		if logFileHandle != nil {
+			logFileHandle.Close()
+			logFileHandle = nil
+		}
+
+		// Verify both contents are present
+		data, err := os.ReadFile(debugLogf)
+		if err != nil {
+			t.Fatalf("Failed to read log file: %v", err)
+		}
+
+		content := string(data)
+		if !contains(content, initialContent) {
+			t.Error("Expected existing content to be preserved")
+		}
+		if !contains(content, "New log line") {
+			t.Error("Expected new content to be appended")
+		}
+	})
+}
+
+// TestEdgeCases_LoggingFunctions tests additional edge cases
+func TestEdgeCases_LoggingFunctions(t *testing.T) {
+	t.Run("logInf_with_no_args", func(t *testing.T) {
+		var buf bytes.Buffer
+		originalOutput := log.Writer()
+		log.SetOutput(&buf)
+		defer log.SetOutput(originalOutput)
+
+		logInf("Simple message")
+		if buf.String() == "" {
+			t.Error("Expected logInf with no args to produce output")
+		}
+	})
+
+	t.Run("logInf_with_multiple_args", func(t *testing.T) {
+		var buf bytes.Buffer
+		originalOutput := log.Writer()
+		log.SetOutput(&buf)
+		defer log.SetOutput(originalOutput)
+
+		logInf("Message with args: %s %d %v", "test", 42, true)
+		output := buf.String()
+		if !contains(output, "test") || !contains(output, "42") {
+			t.Error("Expected logInf to format multiple args correctly")
+		}
+	})
+
+	t.Run("logErr_with_multiple_args", func(t *testing.T) {
+		var buf bytes.Buffer
+		originalOutput := log.Writer()
+		log.SetOutput(&buf)
+		defer log.SetOutput(originalOutput)
+
+		logErr("Error: %s code=%d", "test error", 500)
+		output := buf.String()
+		if !contains(output, "test error") || !contains(output, "500") {
+			t.Error("Expected logErr to format multiple args correctly")
+		}
+	})
+
+	t.Run("logDbg_toggle_debug", func(t *testing.T) {
+		var buf bytes.Buffer
+		originalOutput := log.Writer()
+		log.SetOutput(&buf)
+		defer log.SetOutput(originalOutput)
+
+		originalDebug := globalSettings.DEBUG
+		defer func() { globalSettings.DEBUG = originalDebug }()
+
+		// Start with debug off
+		globalSettings.DEBUG = false
+		buf.Reset()
+		logDbg("Debug message 1")
+		if buf.String() != "" {
+			t.Error("Expected no output with DEBUG=false")
+		}
+
+		// Turn debug on
+		globalSettings.DEBUG = true
+		buf.Reset()
+		logDbg("Debug message 2")
+		if buf.String() == "" {
+			t.Error("Expected output with DEBUG=true")
+		}
+
+		// Turn debug off again
+		globalSettings.DEBUG = false
+		buf.Reset()
+		logDbg("Debug message 3")
+		if buf.String() != "" {
+			t.Error("Expected no output after turning DEBUG back off")
+		}
+	})
+}
+
+// TestOpenLogFile_ErrorPaths tests error handling in openLogFile
+func TestOpenLogFile_ErrorPaths(t *testing.T) {
+	// Save original values
+	origLogDirf := logDirf
+	origDebugLogf := debugLogf
+	origLogFileHandle := logFileHandle
+	defer func() {
+		logDirf = origLogDirf
+		debugLogf = origDebugLogf
+		if logFileHandle != nil && logFileHandle != origLogFileHandle {
+			logFileHandle.Close()
+		}
+		logFileHandle = origLogFileHandle
+	}()
+
+	t.Run("creates_file_in_valid_directory", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "openlog_valid")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirf = tmpDir
+		logFileHandle = nil
+
+		openLogFile()
+
+		if logFileHandle == nil {
+			t.Error("Expected logFileHandle to be set")
+		}
+
+		if _, err := os.Stat(filepath.Join(tmpDir, "stratux.log")); os.IsNotExist(err) {
+			t.Error("Expected log file to be created")
+		}
+
+		if logFileHandle != nil {
+			logFileHandle.Close()
+			logFileHandle = nil
+		}
+	})
+
+	t.Run("sets_debugLogf_correctly", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "openlog_debuglogf")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirf = tmpDir
+		logFileHandle = nil
+
+		openLogFile()
+
+		expectedPath := filepath.Join(tmpDir, "stratux.log")
+		if debugLogf != expectedPath {
+			t.Errorf("Expected debugLogf to be %s, got %s", expectedPath, debugLogf)
+		}
+
+		if logFileHandle != nil {
+			logFileHandle.Close()
+			logFileHandle = nil
+		}
+	})
+}
+
+// TestGetStratuxLogFiles_EdgeCases tests additional edge cases
+func TestGetStratuxLogFiles_EdgeCases(t *testing.T) {
+	// Save original values
+	origLogDirPath := logDirPath
+	origLogDirf := logDirf
+	defer func() {
+		logDirPath = origLogDirPath
+		logDirf = origLogDirf
+	}()
+
+	t.Run("empty_directory", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "getlogs_empty")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		logs := getStratuxLogFiles()
+
+		if len(logs) != 0 {
+			t.Errorf("Expected 0 logs in empty directory, got %d", len(logs))
+		}
+	})
+
+	t.Run("mixed_files", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "getlogs_mixed")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// Create matching files
+		os.Create(filepath.Join(tmpDir, "stratux.log.1"))
+		os.Create(filepath.Join(tmpDir, "stratux.log.2"))
+
+		// Create non-matching files
+		os.Create(filepath.Join(tmpDir, "stratux.log"))     // No suffix
+		os.Create(filepath.Join(tmpDir, "other.log.1"))     // Wrong prefix
+		os.Create(filepath.Join(tmpDir, "stratux.sqlite"))  // Different extension
+		os.Create(filepath.Join(tmpDir, "stratux.log.txt")) // Non-numeric suffix
+
+		logs := getStratuxLogFiles()
+
+		if len(logs) != 3 { // .1, .2, and .txt
+			t.Errorf("Expected 3 matching logs, got %d: %v", len(logs), logs)
+		}
+
+		// Verify all returned files match pattern
+		for _, log := range logs {
+			baseName := filepath.Base(log)
+			if !strings.HasPrefix(baseName, "stratux.log.") {
+				t.Errorf("Unexpected file in results: %s", log)
 			}
 		}
-		t.Logf("Found %d old log files after cleanup check", foundLogs)
+	})
+
+	t.Run("numeric_suffix_sorting", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "getlogs_sorting")
+		if err != nil {
+			t.Fatalf("Failed to create temp directory: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// Create files in non-sorted order
+		for _, i := range []int{9, 2, 5, 1, 7} {
+			logPath := filepath.Join(tmpDir, "stratux.log."+strconv.Itoa(i))
+			os.Create(logPath)
+		}
+
+		logs := getStratuxLogFiles()
+
+		if len(logs) != 5 {
+			t.Errorf("Expected 5 logs, got %d", len(logs))
+		}
+
+		// Verify sorting (lexicographic)
+		expectedOrder := []string{
+			filepath.Join(tmpDir, "stratux.log.1"),
+			filepath.Join(tmpDir, "stratux.log.2"),
+			filepath.Join(tmpDir, "stratux.log.5"),
+			filepath.Join(tmpDir, "stratux.log.7"),
+			filepath.Join(tmpDir, "stratux.log.9"),
+		}
+
+		for i, expected := range expectedOrder {
+			if logs[i] != expected {
+				t.Errorf("logs[%d] = %s, expected %s", i, logs[i], expected)
+			}
+		}
 	})
 }

@@ -474,10 +474,14 @@ func mavLinkFormat(x []byte) {
 }
 
 func mavLinkParse(mavLinkFrame []byte) bool {
-	if mavLinkFrame[0] != 0xfe || len(mavLinkFrame) > 1024 {
+	// Check length before accessing elements
+	if len(mavLinkFrame) == 0 || len(mavLinkFrame) > 1024 {
 		return true
 	}
-	if len(mavLinkFrame) < 9 || mavLinkFrame[0] != 0xfe || int(mavLinkFrame[1]+8) != len(mavLinkFrame) {
+	if mavLinkFrame[0] != 0xfe {
+		return true
+	}
+	if len(mavLinkFrame) < 9 || int(mavLinkFrame[1]+8) != len(mavLinkFrame) {
 		return false
 	}
 	mavLinkFormat(mavLinkFrame)
