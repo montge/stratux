@@ -23,23 +23,29 @@
 - [x] 4.1 Verify SONAR_TOKEN secret is configured in repository (confirmed)
 - [x] 4.2 `sonar-project.properties` already has correct source paths
 - [x] 4.3 coverage.out is in correct format for SonarCloud
-- [ ] 4.4 Verify SonarCloud scan runs successfully in CI (after push)
+- [x] 4.4 Verify SonarCloud scan runs successfully in CI (confirmed on master)
 
 ## 5. Add Gitflow Support
 
 - [x] 5.1 Update `ci.yml` to trigger on both `master` and `develop` branches
-- [ ] 5.2 Create develop branch from master
-- [ ] 5.3 Push develop branch to origin
+- [x] 5.2 Create develop branch from master
+- [x] 5.3 Push develop branch to origin
+- [x] 5.4 Note: SonarCloud free tier only scans default branch (master). Branch analysis expected 2026.
 
-## 6. Consolidate Workflow Duplication (Future)
+## 6. Fix Go Formatting
 
-- [ ] 6.1 Create reusable composite action for Go build setup
-- [ ] 6.2 Update all workflows to use the composite action
-- [ ] 6.3 Remove duplicated dependency installation steps
+- [x] 6.1 Run gofmt on test files with formatting issues
+- [x] 6.2 Verify formatting check passes in CI
 
-## 7. Verification
+## 7. Consolidate Workflow Duplication (Future)
 
-- [x] 7.1 Run all Go tests locally (all pass with Go 1.24.1)
-- [x] 7.2 Run web UI tests locally (77 tests pass)
-- [ ] 7.3 Verify all workflows pass in CI after changes
-- [ ] 7.4 Verify SonarCloud receives coverage data
+- [ ] 7.1 Create reusable composite action for Go build setup
+- [ ] 7.2 Update all workflows to use the composite action
+- [ ] 7.3 Remove duplicated dependency installation steps
+
+## 8. Verification
+
+- [x] 8.1 Run all Go tests locally (all pass with Go 1.24.1)
+- [x] 8.2 Run web UI tests locally (77 tests pass)
+- [x] 8.3 Verify all workflows pass in CI after changes (master CI passed)
+- [x] 8.4 Verify SonarCloud receives coverage data (scan completed successfully)
