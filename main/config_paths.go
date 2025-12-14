@@ -27,6 +27,22 @@ var (
 	// varLogDirPath is the directory for log files used by managementinterface
 	// Default: /var/log
 	varLogDirPath = "/var/log"
+
+	// dhcpLeaseDirPath is the directory for DHCP lease files
+	// Default: /var/lib/misc
+	dhcpLeaseDirPath = "/var/lib/misc"
+
+	// dhcpLeaseFilePath is the path to the DHCP lease file
+	// Default: /var/lib/misc/dnsmasq.leases
+	dhcpLeaseFilePath = "/var/lib/misc/dnsmasq.leases"
+
+	// arpFilePath is the path to the ARP table file
+	// Default: /proc/net/arp
+	arpFilePath = "/proc/net/arp"
+
+	// extraHostsFilePath is the path to static hosts file
+	// Default: /etc/stratux-static-hosts.conf
+	extraHostsFilePath = "/etc/stratux-static-hosts.conf"
 )
 
 // resetPathsToDefaults restores all path variables to their default values
@@ -35,6 +51,10 @@ func resetPathsToDefaults() {
 	stratuxHome = "/opt/stratux"
 	logDirPath = "/var/log/"
 	varLogDirPath = "/var/log"
+	dhcpLeaseDirPath = "/var/lib/misc"
+	dhcpLeaseFilePath = "/var/lib/misc/dnsmasq.leases"
+	arpFilePath = "/proc/net/arp"
+	extraHostsFilePath = "/etc/stratux-static-hosts.conf"
 }
 
 // getMapdataPath returns the path to the mapdata directory

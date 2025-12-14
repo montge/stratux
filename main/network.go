@@ -40,10 +40,11 @@ const (
 	NETWORK_AHRS_GDL90     = 4
 	NETWORK_FLARM_NMEA     = 8
 	NETWORK_POSITION_FFSIM = 16
-	dhcp_lease_file        = "/var/lib/misc/dnsmasq.leases"
-	dhcp_lease_dir         = "/var/lib/misc/"
-	extra_hosts_file       = "/etc/stratux-static-hosts.conf"
 )
+
+// Note: dhcp_lease_file, dhcp_lease_dir, and extra_hosts_file are now
+// configurable via dhcpLeaseFilePath, dhcpLeaseDirPath, and extraHostsFilePath
+// in config_paths.go for testability
 
 var dhcpLeaseDirectoryLastTest time.Time // Last time fsWriteTest() was run on the DHCP lease directory.
 
@@ -52,13 +53,13 @@ func getDHCPLeases() (map[string]string, error) {
 	// Do a write test. Even if we are able to read the file, it may be out of date because there's a fs write issue.
 	// Only perform the test once every 5 minutes to minimize writes.
 	if stratuxClock.Since(dhcpLeaseDirectoryLastTest) >= 5*time.Minute {
-		err := fsWriteTest(dhcp_lease_dir)
+		err := fsWriteTest(dhcpLeaseDirPath)
 		if err != nil {
-			addSingleSystemErrorf("fs-write", "Write error on '%s', your EFB may have issues receiving weather and traffic.", dhcp_lease_dir)
+			addSingleSystemErrorf("fs-write", "Write error on '%s', your EFB may have issues receiving weather and traffic.", dhcpLeaseDirPath)
 		}
 		dhcpLeaseDirectoryLastTest = stratuxClock.Time
 	}
-	dat, err := os.ReadFile(dhcp_lease_file)
+	dat, err := os.ReadFile(dhcpLeaseFilePath)
 	ret := make(map[string]string)
 
 	if err == nil {
@@ -84,7 +85,7 @@ func getDHCPLeases() (map[string]string, error) {
 	}
 
 	// Check kernel ARP table - useful when in client mode. We skip reverse hostname lookup since it can be very slow..
-	dat2, err := os.ReadFile("/proc/net/arp")
+	dat2, err := os.ReadFile(arpFilePath)
 	if err != nil {
 		return ret, nil
 	}
@@ -101,7 +102,7 @@ func getDHCPLeases() (map[string]string, error) {
 
 	// Added the ability to have static IP hosts stored in /etc/stratux-static-hosts.conf
 
-	dat3, err := os.ReadFile(extra_hosts_file)
+	dat3, err := os.ReadFile(extraHostsFilePath)
 	if err != nil {
 		return ret, nil
 	}

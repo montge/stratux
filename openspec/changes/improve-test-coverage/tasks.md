@@ -183,12 +183,30 @@
 - [ ] Test speed at limits (0, Mach 3)
 - [ ] Test timestamp edge cases
 
+## 8. Phase 8: Code Deduplication (Future)
+
+### 8.1 Identify Duplicate Test Patterns
+- [ ] Survey test files for repeated setup/teardown patterns
+- [ ] Find duplicate mock implementations across test files
+- [ ] Identify common test helper functions that could be consolidated
+
+### 8.2 Create Shared Test Utilities
+- [ ] Create test_helpers.go with common setup functions
+- [ ] Consolidate mock implementations into test_mocks.go
+- [ ] Create reusable test fixtures
+
+### 8.3 Refactor Existing Tests
+- [ ] Update tests to use shared utilities
+- [ ] Remove duplicate code
+- [ ] Ensure all tests still pass after refactoring
+
 ## Success Criteria
 - [ ] Coverage reaches 90%+
 - [x] All tests pass in CI
 - [ ] No flaky tests (TestMonotonicTimeAdvancement needs fixing)
 - [ ] Test execution time < 120 seconds
 - [ ] No hardware dependencies in unit tests
+- [ ] Minimal code duplication in test files
 
 ## Estimated Coverage by Phase
 
@@ -197,9 +215,10 @@
 | Phase 1 | 60% | 56.5% (Complete) | +6,000 |
 | Phase 2 | 60% | 57.0% (Complete) | +500 |
 | Phase 3 | 70% | 57.3% (Complete) | +300 |
-| Phase 4 | 75% | 58.5% (In Progress) | +500 |
-| Phase 5 | 65% | 58.5% (In Progress) | +100 |
-| Phase 6 | 75% | ~75% | +2,000 |
+| Phase 4 | 75% | 58.5% (Complete) | +500 |
+| Phase 5 | 65% | 58.5% (Complete) | +100 |
+| Phase 6 | 75% | 59.1% (In Progress) | +500 |
 | Phase 7 | 90%+ | ~90%+ | +3,000 |
+| Phase 8 | N/A | Deduplication | -500 |
 
 Total estimated new test code: ~7,200 lines
