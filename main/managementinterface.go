@@ -1161,7 +1161,7 @@ func readMbTilesMetadata(fname string, db *sql.DB) map[string]string {
 	// check if it is vectortiles and we have a style, then add the URL to metadata...
 	if format, ok := meta["format"]; ok && format == "pbf" {
 		_, file := filepath.Split(fname)
-		if _, err := os.Stat(STRATUX_HOME + "/mapdata/styles/" + file + "/style.json"); err == nil {
+		if _, err := os.Stat(getMapdataStylesPath() + file + "/style.json"); err == nil {
 			// We found a style!
 			meta["stratux_style_url"] = "/mapdata/styles/" + file + "/style.json"
 		}
@@ -1172,7 +1172,7 @@ func readMbTilesMetadata(fname string, db *sql.DB) map[string]string {
 
 // Scans mapdata dir for all .db and .mbtiles files and returns json representation of all metadata values
 func handleTilesets(w http.ResponseWriter, r *http.Request) {
-	files, err := os.ReadDir(STRATUX_HOME + "/mapdata/")
+	files, err := os.ReadDir(getMapdataPath())
 	if err != nil {
 		log.Printf("handleTilesets() error: %s\n", err.Error())
 		http.Error(w, err.Error(), 500)
@@ -1183,7 +1183,7 @@ func handleTilesets(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if strings.HasSuffix(f.Name(), ".mbtiles") || strings.HasSuffix(f.Name(), ".db") {
-			_, meta, err := connectMbTilesArchive(STRATUX_HOME + "/mapdata/" + f.Name())
+			_, meta, err := connectMbTilesArchive(getMapdataPath() + f.Name())
 			if err != nil {
 				log.Printf("SQLite open "+f.Name()+" failed: %s", err.Error())
 				continue
@@ -1196,7 +1196,7 @@ func handleTilesets(w http.ResponseWriter, r *http.Request) {
 }
 
 func loadTile(fname string, z, x, y int) ([]byte, error) {
-	db, meta, err := connectMbTilesArchive(STRATUX_HOME + "/mapdata/" + fname)
+	db, meta, err := connectMbTilesArchive(getMapdataPath() + fname)
 	if err != nil {
 		return nil, err
 	}
@@ -1263,7 +1263,7 @@ func managementInterface() {
 
 	http.HandleFunc("/", defaultServer)
 	//http.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log"))))
-	http.Handle("/mapdata/styles/", http.StripPrefix("/mapdata/styles/", http.FileServer(http.Dir(STRATUX_HOME+"/mapdata/styles"))))
+	http.Handle("/mapdata/styles/", http.StripPrefix("/mapdata/styles/", http.FileServer(http.Dir(getMapdataStylesPath()))))
 	http.HandleFunc("/logs/", viewLogs)
 
 	http.HandleFunc("/gdl90",

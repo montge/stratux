@@ -2,20 +2,14 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 )
 
-// TestMain sets up test environment - attempts to create OGN directory for file I/O tests
+// TestMain sets up test environment
 func TestMain(m *testing.M) {
-	// Try to create /opt/stratux/ogn directory for file I/O tests
-	// This will succeed if running with sudo or appropriate permissions
-	// If it fails, file I/O tests will be skipped
-	ognDir := STRATUX_HOME + "/ogn"
-	_ = os.MkdirAll(ognDir, 0755)
-	// Don't fail if mkdir fails - just let individual tests skip
-
 	// Run tests
 	exitCode := m.Run()
 
@@ -23,20 +17,47 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+// setupOgnTestDir creates a temporary directory structure for OGN tests
+// and configures stratuxHome to point to it. Returns the ogn dir path
+// and a cleanup function that must be called when the test completes.
+func setupOgnTestDir(t *testing.T) (string, func()) {
+	t.Helper()
+
+	tmpDir, err := os.MkdirTemp("", "stratux_ogn_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	// Create ogn subdirectory
+	ognDir := filepath.Join(tmpDir, "ogn")
+	if err := os.MkdirAll(ognDir, 0755); err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Failed to create ogn dir: %v", err)
+	}
+
+	// Save old value and set configurable path to our temp directory
+	oldStratuxHome := stratuxHome
+	stratuxHome = tmpDir
+
+	// Clear the OGN tail number cache so tests get fresh state
+	ognTailNumberCache = make(map[string]string)
+
+	// Return cleanup function
+	cleanup := func() {
+		stratuxHome = oldStratuxHome
+		os.RemoveAll(tmpDir)
+		// Clear cache after test
+		ognTailNumberCache = make(map[string]string)
+	}
+
+	return ognDir, cleanup
+}
+
 // OGN Lookup Tests Coverage Notes:
 // ===================================
-// lookupOgnTailNumber has dependencies on file I/O at STRATUX_HOME (/opt/stratux).
-// Without write access to /opt/stratux/ogn/, several tests will be skipped.
-//
-// Current achievable coverage WITHOUT file I/O: 42.9%
-//   - Cache hit path (line 371-372)
-//   - Cache miss path (line 374)
-//   - File read error path (line 352-354)
-//
-// To achieve maximum coverage (near 100%), run tests with:
-//   sudo mkdir -p /opt/stratux/ogn && sudo chmod 777 /opt/stratux/ogn
-//   go test -run TestLookupOgnTailNumber -v -coverprofile=coverage.out
-//   go tool cover -func=coverage.out | grep lookupOgnTailNumber
+// lookupOgnTailNumber tests now use configurable paths via setupOgnTestDir
+// which creates a temporary directory and sets stratuxHome to it.
+// This allows full test coverage without needing write access to /opt/stratux.
 //
 // With file I/O access enabled, the following additional paths are tested:
 //   - Successful file parsing and cache population (lines 356-369)
@@ -569,28 +590,10 @@ func TestImportOgnStatusMessage_TxEnabled(t *testing.T) {
 }
 
 // TestLookupOgnTailNumber_FileLoad tests lookupOgnTailNumber with actual file loading
-// NOTE: This test requires write access to STRATUX_HOME (/opt/stratux).
-// Run with appropriate permissions or on a Stratux device for full coverage.
-// To enable: sudo mkdir -p /opt/stratux/ogn && sudo chmod 777 /opt/stratux/ogn
+// Uses configurable paths via setupOgnTestDir to avoid needing write access to /opt/stratux
 func TestLookupOgnTailNumber_FileLoad(t *testing.T) {
-	// Save original cache
-	origCache := ognTailNumberCache
-	defer func() {
-		ognTailNumberCache = origCache
-	}()
-
-	// Try to create ogn subdirectory in STRATUX_HOME
-	ognDir := STRATUX_HOME + "/ogn"
-	err := os.MkdirAll(ognDir, 0755)
-	if err != nil {
-		t.Skipf("Cannot create test directory in STRATUX_HOME (%s): %v\nTo enable these tests, run: sudo mkdir -p %s && sudo chmod 777 %s",
-			STRATUX_HOME, err, ognDir, ognDir)
-	}
-
-	// Clean up test files after all subtests
-	defer func() {
-		os.Remove(ognDir + "/ddb.json")
-	}()
+	ognDir, cleanup := setupOgnTestDir(t)
+	defer cleanup()
 
 	t.Run("successful_file_parse", func(t *testing.T) {
 		// Clear cache to force file load
@@ -780,23 +783,8 @@ func TestLookupOgnTailNumber_EdgeCases(t *testing.T) {
 
 // TestLookupOgnTailNumber_MultipleLookups tests multiple lookups after cache is loaded
 func TestLookupOgnTailNumber_MultipleLookups(t *testing.T) {
-	// Save original cache
-	origCache := ognTailNumberCache
-	defer func() {
-		ognTailNumberCache = origCache
-	}()
-
-	// Try to create ogn subdirectory in STRATUX_HOME
-	ognDir := STRATUX_HOME + "/ogn"
-	err := os.MkdirAll(ognDir, 0755)
-	if err != nil {
-		t.Skipf("Cannot create test directory in STRATUX_HOME: %v", err)
-	}
-
-	// Clean up test files after test
-	defer func() {
-		os.Remove(ognDir + "/ddb.json")
-	}()
+	ognDir, cleanup := setupOgnTestDir(t)
+	defer cleanup()
 
 	t.Run("multiple_successful_lookups", func(t *testing.T) {
 		// Clear cache to force file load
@@ -922,18 +910,8 @@ func TestLookupOgnTailNumber_MultipleLookups(t *testing.T) {
 
 // TestLookupOgnTailNumber_MalformedJSON tests handling of malformed device database
 func TestLookupOgnTailNumber_MalformedJSON(t *testing.T) {
-	// Save original cache
-	origCache := ognTailNumberCache
-	defer func() {
-		ognTailNumberCache = origCache
-	}()
-
-	// Try to create ogn subdirectory in STRATUX_HOME
-	ognDir := STRATUX_HOME + "/ogn"
-	err := os.MkdirAll(ognDir, 0755)
-	if err != nil {
-		t.Skipf("Cannot create test directory in STRATUX_HOME: %v", err)
-	}
+	ognDir, cleanup := setupOgnTestDir(t)
+	defer cleanup()
 
 	t.Run("missing_devices_field", func(t *testing.T) {
 		// Clear cache
@@ -1045,18 +1023,8 @@ func TestLookupOgnTailNumber_MalformedJSON(t *testing.T) {
 
 // TestLookupOgnTailNumber_EmptyDatabase tests handling of empty database
 func TestLookupOgnTailNumber_EmptyDatabase(t *testing.T) {
-	// Save original cache
-	origCache := ognTailNumberCache
-	defer func() {
-		ognTailNumberCache = origCache
-	}()
-
-	// Try to create ogn subdirectory in STRATUX_HOME
-	ognDir := STRATUX_HOME + "/ogn"
-	err := os.MkdirAll(ognDir, 0755)
-	if err != nil {
-		t.Skipf("Cannot create test directory in STRATUX_HOME: %v", err)
-	}
+	ognDir, cleanup := setupOgnTestDir(t)
+	defer cleanup()
 
 	t.Run("empty_devices_array", func(t *testing.T) {
 		// Clear cache
@@ -1088,18 +1056,8 @@ func TestLookupOgnTailNumber_EmptyDatabase(t *testing.T) {
 
 // TestLookupOgnTailNumber_LargeDatabase tests handling of large database
 func TestLookupOgnTailNumber_LargeDatabase(t *testing.T) {
-	// Save original cache
-	origCache := ognTailNumberCache
-	defer func() {
-		ognTailNumberCache = origCache
-	}()
-
-	// Try to create ogn subdirectory in STRATUX_HOME
-	ognDir := STRATUX_HOME + "/ogn"
-	err := os.MkdirAll(ognDir, 0755)
-	if err != nil {
-		t.Skipf("Cannot create test directory in STRATUX_HOME: %v", err)
-	}
+	ognDir, cleanup := setupOgnTestDir(t)
+	defer cleanup()
 
 	t.Run("large_database_performance", func(t *testing.T) {
 		// Clear cache

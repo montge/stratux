@@ -36,3 +36,21 @@ func resetPathsToDefaults() {
 	logDirPath = "/var/log/"
 	varLogDirPath = "/var/log"
 }
+
+// getMapdataPath returns the path to the mapdata directory
+// Uses the configurable stratuxHome variable
+func getMapdataPath() string {
+	return stratuxHome + "/mapdata/"
+}
+
+// getMapdataStylesPath returns the path to the mapdata styles directory
+// Uses the configurable stratuxHome variable
+func getMapdataStylesPath() string {
+	return stratuxHome + "/mapdata/styles/"
+}
+
+// getOgnPath returns the path to the OGN data directory
+// Uses the configurable stratuxHome variable
+func getOgnPath() string {
+	return stratuxHome + "/ogn/"
+}
