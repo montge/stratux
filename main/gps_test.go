@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -6457,4 +6458,195 @@ func TestMakeAHRSGDL90Report(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mockSerialReader implements io.Reader for testing processSerialInput
+type mockSerialReader struct {
+	data   []byte
+	offset int
+}
+
+func newMockSerialReader(lines ...string) *mockSerialReader {
+	var data []byte
+	for _, line := range lines {
+		data = append(data, []byte(line+"\n")...)
+	}
+	return &mockSerialReader{data: data}
+}
+
+func (m *mockSerialReader) Read(p []byte) (n int, err error) {
+	if m.offset >= len(m.data) {
+		return 0, io.EOF
+	}
+	n = copy(p, m.data[m.offset:])
+	m.offset += n
+	return n, nil
+}
+
+// TestProcessSerialInput tests the processSerialInput function
+// which reads NMEA sentences from a reader and processes them
+func TestProcessSerialInput(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Initialize mySituation mutexes
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+
+	// Initialize network infrastructure for processNMEALine
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+
+	// Save original values
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origSituation := mySituation
+	defer func() {
+		globalSettings = origSettings
+		globalStatus = origStatus
+		mySituation = origSituation
+	}()
+
+	t.Run("processes_valid_NMEA_sentences", func(t *testing.T) {
+		// Enable GPS processing
+		globalSettings.GPS_Enabled = true
+		globalStatus.GPS_connected = true
+
+		// Create mock reader with valid NMEA sentences
+		reader := newMockSerialReader(
+			"$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,47.0,M,,*47",
+			"$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A",
+		)
+
+		// Process the input
+		linesProcessed, err := processSerialInput(reader)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if linesProcessed != 2 {
+			t.Errorf("Expected 2 lines processed, got %d", linesProcessed)
+		}
+	})
+
+	t.Run("handles_empty_reader", func(t *testing.T) {
+		globalSettings.GPS_Enabled = true
+		globalStatus.GPS_connected = true
+
+		reader := newMockSerialReader() // Empty reader
+
+		linesProcessed, err := processSerialInput(reader)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if linesProcessed != 0 {
+			t.Errorf("Expected 0 lines processed, got %d", linesProcessed)
+		}
+	})
+
+	t.Run("stops_when_GPS_disabled", func(t *testing.T) {
+		// Start with GPS enabled
+		globalSettings.GPS_Enabled = true
+		globalStatus.GPS_connected = true
+
+		// Create reader with multiple lines
+		reader := newMockSerialReader(
+			"$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,47.0,M,,*47",
+			"$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A",
+			"$GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*39",
+		)
+
+		// Disable GPS after first read by using a special reader
+		// that disables GPS after reading first line
+		globalSettings.GPS_Enabled = false // Disable before processing
+
+		linesProcessed, err := processSerialInput(reader)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		// Should process 0 lines since GPS is disabled from start
+		if linesProcessed != 0 {
+			t.Errorf("Expected 0 lines processed when GPS disabled, got %d", linesProcessed)
+		}
+	})
+
+	t.Run("handles_multiple_NMEA_on_single_line", func(t *testing.T) {
+		globalSettings.GPS_Enabled = true
+		globalStatus.GPS_connected = true
+
+		// Some GPS devices send multiple NMEA sentences on one line
+		reader := newMockSerialReader(
+			"$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,47.0,M,,*47$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A",
+		)
+
+		linesProcessed, err := processSerialInput(reader)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if linesProcessed != 1 {
+			t.Errorf("Expected 1 line processed, got %d", linesProcessed)
+		}
+		// The function internally splits by $ so both messages should be processed
+	})
+
+	t.Run("handles_lines_without_dollar", func(t *testing.T) {
+		globalSettings.GPS_Enabled = true
+		globalStatus.GPS_connected = true
+
+		// Some noise/garbage data without $ prefix
+		reader := newMockSerialReader(
+			"GARBAGE DATA WITHOUT DOLLAR SIGN",
+			"$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,47.0,M,,*47",
+		)
+
+		linesProcessed, err := processSerialInput(reader)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if linesProcessed != 2 {
+			t.Errorf("Expected 2 lines processed, got %d", linesProcessed)
+		}
+	})
+
+	t.Run("stops_when_GPS_disconnected", func(t *testing.T) {
+		globalSettings.GPS_Enabled = true
+		globalStatus.GPS_connected = false // Disconnected
+
+		reader := newMockSerialReader(
+			"$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,47.0,M,,*47",
+		)
+
+		linesProcessed, err := processSerialInput(reader)
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if linesProcessed != 0 {
+			t.Errorf("Expected 0 lines when GPS disconnected, got %d", linesProcessed)
+		}
+	})
 }

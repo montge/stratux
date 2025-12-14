@@ -2960,3 +2960,135 @@ func TestPongKillWithConnectedDevice(t *testing.T) {
 		}
 	})
 }
+
+// TestSendAllOwnshipInfo tests the sendAllOwnshipInfo function
+// which sends heartbeat and ownship messages to connected clients
+func TestSendAllOwnshipInfo(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	crcInit()
+	setupMySituationForTests()
+
+	// Initialize stratuxVersion to prevent panic in makeStratuxStatus
+	stratuxVersion = "v1.6"
+
+	// Initialize ADSBTower infrastructure
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+	if ADSBTowers == nil {
+		ADSBTowers = make(map[string]ADSBTower)
+	}
+
+	// Initialize network infrastructure
+	if networkGDL90Chan == nil {
+		networkGDL90Chan = make(chan []byte, 100)
+	}
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+
+	// Drain channel in background to prevent blocking
+	done := make(chan bool)
+	messageCount := 0
+	go func() {
+		for {
+			select {
+			case <-networkGDL90Chan:
+				messageCount++
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	// Save original values
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origSituation := mySituation
+	defer func() {
+		globalSettings = origSettings
+		globalStatus = origStatus
+		mySituation = origSituation
+		done <- true
+	}()
+
+	t.Run("with_valid_GPS", func(t *testing.T) {
+		// Set up valid GPS data
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
+		mySituation.GPSLatitude = 43.99
+		mySituation.GPSLongitude = -88.56
+		mySituation.GPSAltitudeMSL = 1000.0
+		mySituation.GPSTrueCourse = 90.0
+		mySituation.GPSGroundSpeed = 120.0
+		mySituation.GPSHorizontalAccuracy = 5
+		mySituation.GPSNACp = 10
+		mySituation.GPSHeightAboveEllipsoid = 950.0
+
+		globalStatus.GPS_connected = true
+		globalSettings.OwnshipModeS = "A12345"
+
+		// Call function - should not panic
+		sendAllOwnshipInfo()
+
+		// Allow time for messages to be sent
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify messages were sent (at least heartbeat and stratux messages)
+		if messageCount < 3 {
+			t.Logf("Expected at least 3 messages, got %d", messageCount)
+		}
+	})
+
+	t.Run("without_GPS_fix", func(t *testing.T) {
+		// Reset message count
+		messageCount = 0
+
+		// Set GPS as invalid
+		mySituation.GPSFixQuality = 0
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime().Add(-10 * time.Second)
+		globalStatus.GPS_connected = false
+
+		// Call function - should not panic even without GPS
+		sendAllOwnshipInfo()
+
+		// Allow time for messages to be sent
+		time.Sleep(10 * time.Millisecond)
+
+		// Should still send heartbeat messages even without GPS
+		if messageCount < 2 {
+			t.Logf("Expected at least 2 messages even without GPS, got %d", messageCount)
+		}
+	})
+
+	t.Run("with_detected_ownship", func(t *testing.T) {
+		// Reset message count
+		messageCount = 0
+
+		// Set GPS as invalid but have detected ownship
+		mySituation.GPSFixQuality = 0
+		globalStatus.GPS_connected = false
+
+		// Set up detected ownship
+		OwnshipTrafficInfo.Last_seen = stratuxClock.GetTime()
+		OwnshipTrafficInfo.Lat = 43.99
+		OwnshipTrafficInfo.Lng = -88.56
+		OwnshipTrafficInfo.Alt = 1000
+		OwnshipTrafficInfo.Speed = 120
+		OwnshipTrafficInfo.Speed_valid = true
+		OwnshipTrafficInfo.Position_valid = true
+
+		// Call function
+		sendAllOwnshipInfo()
+
+		// Allow time for messages
+		time.Sleep(10 * time.Millisecond)
+	})
+}

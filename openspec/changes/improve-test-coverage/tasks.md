@@ -24,7 +24,7 @@
 - [x] Test connectMbTilesArchive (92.9% coverage)
 - [x] Test readMbTilesMetadata (89.3% coverage)
 
-## 2. Phase 2: Configurable Paths (Complete: 57.0%)
+## 2. Phase 2: Configurable Paths (Complete: 57.1%)
 
 ### 2.1 Created config_paths.go
 - [x] Added stratuxHome variable
@@ -42,30 +42,38 @@
 - [x] viewLogs: 77.5% → 85.0%
 - [x] handleDeleteAHRSLogFiles: 100%
 
-## 3. Phase 3: Hardware Interface Mocking (Target: 70%)
+### 2.4 GDL90 Heartbeat Functions (December 2025)
+- [x] Test sendAllOwnshipInfo: 0% → 100%
+  - Tests heartbeat message sending with valid GPS
+  - Tests message sending without GPS fix
+  - Tests detected ownship scenario
 
-### 3.1 Define GPS Interface
-- [ ] Create `SerialPortInterface` in gps.go
-- [ ] Define methods: Open, Read, Write, Close, SetReadDeadline
-- [ ] Create mock implementation for tests
-- [ ] Refactor gpsSerialReader to use interface
+## 3. Phase 3: Hardware Interface Mocking (In Progress: 57.3%)
 
-### 3.2 Define SDR Interface
+### 3.1 GPS Serial Input Interface (Complete)
+- [x] Created `SerialReaderInterface` in gps.go
+- [x] Extracted `processSerialInput(reader io.Reader)` from gpsSerialReader
+- [x] Created `mockSerialReader` for tests in gps_test.go
+- [x] Added `TestProcessSerialInput` with 6 test cases
+- [x] processSerialInput: 0% → 87.5%
+
+### 3.2 SDR Interface (Deferred)
 - [ ] Create `SDRDeviceInterface` in sdr.go
 - [ ] Define methods: Start, Stop, Kill, Status
 - [ ] Create mock implementation for tests
-- [ ] Refactor sdrWatcher to use interface
+- **Note**: SDR code heavily depends on RTL-SDR hardware (`rtl.GetDeviceCount()`) and external processes. Requires significant refactoring to make testable.
 
-### 3.3 Define Network Interface
-- [ ] Create `UDPWriterInterface` in network.go
-- [ ] Define methods: Write, Close, SetWriteDeadline
-- [ ] Create mock implementation for tests
-- [ ] Refactor network output functions to use interface
+### 3.3 Network Interface (Partially Complete)
+- [x] Core network functions already at 100% (`sendMsg`, `sendGDL90`, `connectionWriter`)
+- [ ] `getDHCPLeases` - needs path configuration
+- [ ] `refreshConnectedClients` - needs refactoring
+- **Note**: Loop-based watchers (`monitorDHCPLeases`, `getNetworkStats`) require extraction like GPS.
 
-### 3.4 Expected Coverage Gains
-- [ ] gpsSerialReader: 0% → 80%+ (large function, ~200 lines)
-- [ ] sdrWatcher: 0% → 80%
-- [ ] networkOutWatcher: 0% → 80%
+### 3.4 Coverage Summary
+- processSerialInput: 0% → 87.5%
+- gpsSerialReader: 0% (wrapper only, logic now in processSerialInput)
+- Network core functions: 100%
+- SDR: Requires hardware, deferred to future work
 
 ## 4. Phase 4: Configurable Constants (Target: 75%)
 

@@ -12,21 +12,20 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"bufio"
-
 	"github.com/tarm/serial"
-
-	"os"
-	"os/exec"
 
 	"github.com/stratux/stratux/common"
 )
@@ -1979,16 +1978,23 @@ func baroAltGuesser() {
 	}
 }
 
-func gpsSerialReader() {
-	defer serialPort.Close()
-	readyToInitGPS = false //TODO: replace with channel control to terminate goroutine when complete
+// SerialReaderInterface defines the interface for reading from serial-like sources.
+// This enables testing with mock readers.
+type SerialReaderInterface interface {
+	io.Reader
+	io.Closer
+}
 
-	i := 0 //debug monitor
-	scanner := bufio.NewScanner(serialPort)
+// processSerialInput reads NMEA sentences from the given reader and processes them.
+// This function is extracted from gpsSerialReader to enable testing with mock readers.
+// Returns the number of lines processed and any scanner error encountered.
+func processSerialInput(reader io.Reader) (int, error) {
+	i := 0
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() && globalStatus.GPS_connected && globalSettings.GPS_Enabled {
 		i++
 		if globalSettings.DEBUG && i%100 == 0 {
-			log.Printf("gpsSerialReader() scanner loop iteration i=%d\n", i) // debug monitor
+			log.Printf("processSerialInput() scanner loop iteration i=%d\n", i)
 		}
 
 		s := scanner.Text()
@@ -2008,12 +2014,20 @@ func gpsSerialReader() {
 			}
 		}
 	}
-	if err := scanner.Err(); err != nil {
+	return i, scanner.Err()
+}
+
+func gpsSerialReader() {
+	defer serialPort.Close()
+	readyToInitGPS = false //TODO: replace with channel control to terminate goroutine when complete
+
+	linesProcessed, err := processSerialInput(serialPort)
+	if err != nil {
 		log.Printf("reading standard input: %s\n", err.Error())
 	}
 
 	if globalSettings.DEBUG {
-		log.Printf("Exiting gpsSerialReader() after i=%d loops\n", i) // debug monitor
+		log.Printf("Exiting gpsSerialReader() after i=%d loops\n", linesProcessed)
 	}
 	globalStatus.GPS_connected = false
 	readyToInitGPS = true //TODO: replace with channel control to terminate goroutine when complete
