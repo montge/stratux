@@ -115,23 +115,36 @@ func clearDebugLogFile() {
 	}
 }
 
+// logFileWatcherOnce performs a single iteration of log file watching.
+// It checks if the current log file exceeds 10MB and rotates if needed,
+// then ensures at least 50MB free disk space by deleting old logs.
+// Returns true if any action was taken (rotation or deletion).
+func logFileWatcherOnce() bool {
+	actionTaken := false
+
+	logSize, err := os.Stat(debugLogf)
+	if err == nil && logSize.Size() > 10*1024*1024 { // 10mb limit
+		rotateLogs()
+		actionTaken = true
+	}
+
+	usage := du.NewDiskUsage(logDirf)
+	freeBytes := int64(usage.Free())
+	for freeBytes < 50*1024*1024 { // leave 50mb free
+		deleted := deleteOldestLog()
+		if deleted == 0 {
+			break
+		}
+		freeBytes += deleted
+		actionTaken = true
+	}
+
+	return actionTaken
+}
+
 func logFileWatcher() {
 	for {
-		logSize, err := os.Stat(debugLogf)
-		if err == nil && logSize.Size() > 10*1024*1024 { // 10mb limit
-			rotateLogs()
-		}
-
-		usage := du.NewDiskUsage(logDirf)
-		freeBytes := int64(usage.Free())
-		for freeBytes < 50*1024*1024 { // leave 50mb free
-			deleted := deleteOldestLog()
-			if deleted == 0 {
-				break
-			}
-			freeBytes += deleted
-		}
-
+		logFileWatcherOnce()
 		time.Sleep(30 * time.Second)
 	}
 }

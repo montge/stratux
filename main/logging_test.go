@@ -1264,3 +1264,94 @@ func TestResetPathsToDefaults(t *testing.T) {
 	logDirPath = origLogDirPath
 	varLogDirPath = origVarLogDirPath
 }
+
+// TestLogFileWatcherOnce tests the extracted log file watcher logic
+func TestLogFileWatcherOnce(t *testing.T) {
+	// Create temp directories
+	tmpDir, err := os.MkdirTemp("", "logwatcher_test")
+	if err != nil {
+		t.Skipf("Failed to create temp directory: %v", err)
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+
+	logDir := filepath.Join(tmpDir, "log")
+	err = os.MkdirAll(logDir, 0755)
+	if err != nil {
+		t.Skipf("Failed to create log directory: %v", err)
+		return
+	}
+
+	// Save original values
+	origLogDirf := logDirf
+	origDebugLogf := debugLogf
+	defer func() {
+		logDirf = origLogDirf
+		debugLogf = origDebugLogf
+	}()
+
+	// Set up test paths
+	logDirf = logDir
+	debugLogf = filepath.Join(logDir, "stratux.log")
+
+	t.Run("no_log_file", func(t *testing.T) {
+		// logFileWatcherOnce should handle missing log file gracefully
+		result := logFileWatcherOnce()
+		// No action should be taken
+		if result != false {
+			t.Errorf("Expected no action when log file doesn't exist, got action taken")
+		}
+	})
+
+	t.Run("small_log_file", func(t *testing.T) {
+		// Create a small log file (under 10MB)
+		err := os.WriteFile(debugLogf, []byte("small log content"), 0644)
+		if err != nil {
+			t.Skipf("Failed to create log file: %v", err)
+			return
+		}
+		defer os.Remove(debugLogf)
+
+		result := logFileWatcherOnce()
+		// No rotation should occur for small file
+		if result != false {
+			t.Errorf("Expected no action for small log file, got action taken")
+		}
+	})
+
+	t.Run("sufficient_disk_space", func(t *testing.T) {
+		// Create a small log file
+		err := os.WriteFile(debugLogf, []byte("test"), 0644)
+		if err != nil {
+			t.Skipf("Failed to create log file: %v", err)
+			return
+		}
+		defer os.Remove(debugLogf)
+
+		// With sufficient disk space, no deletion should occur
+		result := logFileWatcherOnce()
+		if result != false {
+			t.Errorf("Expected no action with sufficient disk space, got action taken")
+		}
+	})
+
+	t.Run("multiple_iterations", func(t *testing.T) {
+		// Create a log file
+		err := os.WriteFile(debugLogf, []byte("test log"), 0644)
+		if err != nil {
+			t.Skipf("Failed to create log file: %v", err)
+			return
+		}
+		defer os.Remove(debugLogf)
+
+		// Run multiple iterations
+		for i := 0; i < 3; i++ {
+			_ = logFileWatcherOnce()
+		}
+
+		// File should still exist
+		if _, err := os.Stat(debugLogf); os.IsNotExist(err) {
+			t.Error("Log file should still exist after multiple iterations")
+		}
+	})
+}
