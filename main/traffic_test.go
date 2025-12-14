@@ -4158,11 +4158,11 @@ func TestSendTrafficUpdates_TrafficAgeUpdate(t *testing.T) {
 	now := stratuxClock.GetTime()
 
 	traffic[0x111111] = TrafficInfo{
-		Icao_addr:   0x111111,
-		Last_source: TRAFFIC_SOURCE_1090ES,
-		Last_seen:   now.Add(-5 * time.Second),
-		Last_alt:    now.Add(-3 * time.Second),
-		Last_extrapolation: now.Add(-1 * time.Second),
+		Icao_addr:            0x111111,
+		Last_source:          TRAFFIC_SOURCE_1090ES,
+		Last_seen:            now.Add(-5 * time.Second),
+		Last_alt:             now.Add(-3 * time.Second),
+		Last_extrapolation:   now.Add(-1 * time.Second),
 		ExtrapolatedPosition: true,
 		Position_valid:       false,
 	}
@@ -4230,8 +4230,8 @@ func TestSendTrafficUpdates_RadarUpdate(t *testing.T) {
 	globalStatus.GPS_connected = true
 
 	// Set radar limits
-	globalSettings.RadarLimits = 2000  // +/- 2000ft altitude
-	globalSettings.RadarRange = 5      // 5 nautical miles
+	globalSettings.RadarLimits = 2000 // +/- 2000ft altitude
+	globalSettings.RadarRange = 5     // 5 nautical miles
 
 	// Traffic within radar range and altitude limits (should appear on radar)
 	traffic[0x111111] = TrafficInfo{
