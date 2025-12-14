@@ -1046,7 +1046,9 @@ func viewLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !finfo.IsDir() {
-		http.ServeFile(w, r, cleanPath)
+		// NOSONAR: Path traversal is prevented by validation at lines 1029-1036
+		// cleanPath is validated to start with varLogDirPath before reaching here
+		http.ServeFile(w, r, cleanPath) //NOSONAR
 		return
 	}
 

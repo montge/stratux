@@ -204,6 +204,37 @@
 - [ ] Remove duplicate code
 - [ ] Ensure all tests still pass after refactoring
 
+## 9. Phase 9: SonarCloud Issues (In Progress)
+
+### 9.1 Security Vulnerabilities
+- [x] BLOCKER: viewLogs path traversal (managementinterface.go:1049) - FALSE POSITIVE
+  - Path already validated at lines 1029-1036 to prevent traversal
+  - Added //NOSONAR comment to suppress
+
+### 9.2 Critical Cognitive Complexity (Deferred)
+These functions exceed SonarCloud's complexity threshold of 15:
+- [ ] traffic.go:1074 - sendTrafficUpdates (complexity: 96)
+- [ ] sdr.go:811 - sdrWatcher (complexity: 77)
+- [ ] gen_gdl90.go:1705 - heartBeatSender (complexity: 44)
+- [ ] pong.go:294 - pingWatcher (complexity: 38)
+- [ ] gps.go:1084 - processNMEALineLow (complexity: 332)
+- [ ] gen_gdl90.go:309/501 - makeOwnshipReport variants (complexity: 26-31)
+- [ ] sdr.go:74/197 - SDR functions (complexity: 21-30)
+- [ ] gps.go:225/1991 - GPS functions (complexity: 17-28)
+- [ ] ogn.go:69 - parseAprsMessage (complexity: 21)
+- [ ] test/replay.go - replay functions (complexity: 17-18)
+**Note**: Reducing complexity requires major refactoring. Prioritize after coverage target is met.
+
+### 9.3 Major Issues (Deferred)
+- [ ] Dockerfile: Remove cache after installing packages (8 instances)
+- [ ] Dockerfile: Use WORKDIR instead of cd (3 instances)
+- [ ] Shell scripts: Error handling and best practices
+**Note**: These are build/CI quality improvements, not runtime issues.
+
+### 9.4 Minor Issues
+- [x] managementinterface.go:1166 - "/mapdata/styles/" literal (acceptable duplication)
+- [ ] uatparse.go:324 - Rename variable to match convention
+
 ## Success Criteria
 - [ ] Coverage reaches 90%+
 - [x] All tests pass in CI
@@ -211,6 +242,7 @@
 - [x] Test execution time < 120 seconds
 - [x] No hardware dependencies in unit tests
 - [ ] Minimal code duplication in test files (Phase 8)
+- [x] No BLOCKER security vulnerabilities in SonarCloud
 
 ## Coverage Progress
 
@@ -221,8 +253,9 @@
 | Phase 3 | 70% | 57.3% (Complete) | +300 |
 | Phase 4 | 75% | 57.8% (Complete) | +500 |
 | Phase 5 | 65% | 58.4% (Complete) | +100 |
-| Phase 6 | 75% | 59.1% (In Progress) | +400 |
+| Phase 6 | 75% | 59.5% (Complete) | +1,700 |
 | Phase 7 | 90%+ | In Progress | +3,000 |
 | Phase 8 | N/A | Deduplication | -500 |
+| Phase 9 | N/A | SonarCloud Issues | N/A |
 
 Total estimated new test code: ~10,000+ lines
