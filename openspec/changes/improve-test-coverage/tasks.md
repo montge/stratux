@@ -89,7 +89,7 @@
 ### 4.2 Test Tile Handlers
 - [x] Created setupTileTestDir() helper for temp directories
 - [x] Updated all tile tests to use temp directories
-- [x] handleTilesets: 50% (unchanged - needs more work)
+- [x] handleTilesets: 50% → 87.5% (added 6 test cases)
 - [x] loadTile: 9.5% → 85.7%
 
 ### 4.3 Test OGN Functions
@@ -197,8 +197,8 @@
 | Phase 1 | 60% | 56.5% (Complete) | +6,000 |
 | Phase 2 | 60% | 57.0% (Complete) | +500 |
 | Phase 3 | 70% | 57.3% (Complete) | +300 |
-| Phase 4 | 75% | 57.8% (Complete) | +200 |
-| Phase 5 | 65% | ~65% | +1,200 |
+| Phase 4 | 75% | 58.5% (In Progress) | +500 |
+| Phase 5 | 65% | 58.5% (In Progress) | +100 |
 | Phase 6 | 75% | ~75% | +2,000 |
 | Phase 7 | 90%+ | ~90%+ | +3,000 |
 
