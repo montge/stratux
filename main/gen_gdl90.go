@@ -817,6 +817,57 @@ func sendAllOwnshipInfo() {
 	makeOwnshipGeometricAltitudeReport()
 }
 
+// heartBeatOnce performs a single heartbeat iteration.
+// It handles LED status, sends ownship info, FLARM messages, traffic updates, and status.
+// Returns true if LED blinking was started (to track state across iterations).
+func heartBeatOnce(ledBlinking bool) bool {
+	// Green LED - always on during normal operation.
+	//  Blinking when there is a critical system error (and Stratux is still running).
+
+	if len(globalStatus.Errors) == 0 { // Any system errors?
+		if !globalStatus.NightMode { // LED is off by default (/boot/config.txt.)
+			// Turn on green ACT LED on the Pi.
+			setActLed(true)
+		}
+	} else if !ledBlinking {
+		// This assumes that system errors do not disappear until restart.
+		go blinkStatusLED()
+		ledBlinking = true
+	}
+
+	sendAllOwnshipInfo()
+
+	sendNetFLARM(makeGPRMCString(), time.Second, -1)
+	sendNetFLARM(makeGPGGAString(), time.Second, 0)
+	if isTempPressValid() && mySituation.BaroSourceType != BARO_TYPE_NONE && mySituation.BaroSourceType != BARO_TYPE_ADSBESTIMATE {
+		sendNetFLARM(makePGRMZString(), time.Second, 0)
+	}
+	sendNetFLARM("$GPGSA,A,3,,,,,,,,,,,,,1.0,1.0,1.0*33\r\n", time.Second, 1)
+
+	// --- debug code: traffic demo ---
+	// Uncomment and compile to display large number of artificial traffic targets
+	/*
+		numTargets := uint32(36)
+		hexCode := uint32(0xFF0000)
+
+		for i := uint32(0); i < numTargets; i++ {
+			tail := fmt.Sprintf("DEMO%d", i)
+			alt := float32((i*117%2000)*25 + 2000)
+			hdg := int32((i * 149) % 360)
+			spd := float64(50 + ((i*23)%13)*37)
+
+			updateDemoTraffic(i|hexCode, tail, alt, spd, hdg)
+
+		}
+	*/
+
+	// ---end traffic demo code ---
+	sendTrafficUpdates()
+	updateStatus()
+
+	return ledBlinking
+}
+
 func heartBeatSender() {
 	timer := time.NewTicker(1 * time.Second)
 	timerMessageStats := time.NewTicker(2 * time.Second)
@@ -824,49 +875,7 @@ func heartBeatSender() {
 	for {
 		select {
 		case <-timer.C:
-			// Green LED - always on during normal operation.
-			//  Blinking when there is a critical system error (and Stratux is still running).
-
-			if len(globalStatus.Errors) == 0 { // Any system errors?
-				if !globalStatus.NightMode { // LED is off by default (/boot/config.txt.)
-					// Turn on green ACT LED on the Pi.
-					setActLed(true)
-				}
-			} else if !ledBlinking {
-				// This assumes that system errors do not disappear until restart.
-				go blinkStatusLED()
-				ledBlinking = true
-			}
-
-			sendAllOwnshipInfo()
-
-			sendNetFLARM(makeGPRMCString(), time.Second, -1)
-			sendNetFLARM(makeGPGGAString(), time.Second, 0)
-			if isTempPressValid() && mySituation.BaroSourceType != BARO_TYPE_NONE && mySituation.BaroSourceType != BARO_TYPE_ADSBESTIMATE {
-				sendNetFLARM(makePGRMZString(), time.Second, 0)
-			}
-			sendNetFLARM("$GPGSA,A,3,,,,,,,,,,,,,1.0,1.0,1.0*33\r\n", time.Second, 1)
-
-			// --- debug code: traffic demo ---
-			// Uncomment and compile to display large number of artificial traffic targets
-			/*
-				numTargets := uint32(36)
-				hexCode := uint32(0xFF0000)
-
-				for i := uint32(0); i < numTargets; i++ {
-					tail := fmt.Sprintf("DEMO%d", i)
-					alt := float32((i*117%2000)*25 + 2000)
-					hdg := int32((i * 149) % 360)
-					spd := float64(50 + ((i*23)%13)*37)
-
-					updateDemoTraffic(i|hexCode, tail, alt, spd, hdg)
-
-				}
-			*/
-
-			// ---end traffic demo code ---
-			sendTrafficUpdates()
-			updateStatus()
+			ledBlinking = heartBeatOnce(ledBlinking)
 		case <-timerMessageStats.C:
 			// Save a bit of CPU by not pruning the message log every 1 second.
 			updateMessageStats()

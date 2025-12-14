@@ -3092,3 +3092,177 @@ func TestSendAllOwnshipInfo(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	})
 }
+
+// TestHeartBeatOnce tests the extracted heartbeat logic
+func TestHeartBeatOnce(t *testing.T) {
+	// Initialize required globals
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	crcInit()
+	setupMySituationForTests()
+
+	// Initialize stratuxVersion to prevent panic in makeStratuxStatus
+	stratuxVersion = "v1.6"
+
+	// Initialize ADSBTower infrastructure
+	if ADSBTowerMutex == nil {
+		ADSBTowerMutex = &sync.Mutex{}
+	}
+	if ADSBTowers == nil {
+		ADSBTowers = make(map[string]ADSBTower)
+	}
+
+	// Initialize traffic infrastructure
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+	if traffic == nil {
+		traffic = make(map[uint32]TrafficInfo)
+	}
+
+	// Initialize network infrastructure
+	if networkGDL90Chan == nil {
+		networkGDL90Chan = make(chan []byte, 100)
+	}
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+
+	// Drain channel in background to prevent blocking
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-networkGDL90Chan:
+				// Drain messages
+			case <-done:
+				return
+			}
+		}
+	}()
+	defer func() { done <- true }()
+
+	// Save original values
+	origSettings := globalSettings
+	origStatus := globalStatus
+	origSituation := mySituation
+	defer func() {
+		globalSettings = origSettings
+		globalStatus = origStatus
+		mySituation = origSituation
+	}()
+
+	t.Run("no_errors_day_mode", func(t *testing.T) {
+		// Clear errors and set day mode
+		globalStatus.Errors = []string{}
+		globalStatus.NightMode = false
+
+		// Set up valid GPS data
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
+
+		// Call heartBeatOnce with ledBlinking=false
+		result := heartBeatOnce(false)
+
+		// Should return false since no errors
+		if result != false {
+			t.Errorf("Expected ledBlinking=false when no errors, got %v", result)
+		}
+	})
+
+	t.Run("no_errors_night_mode", func(t *testing.T) {
+		// Clear errors and set night mode
+		globalStatus.Errors = []string{}
+		globalStatus.NightMode = true
+
+		// Call heartBeatOnce
+		result := heartBeatOnce(false)
+
+		// Should return false since no errors
+		if result != false {
+			t.Errorf("Expected ledBlinking=false when no errors in night mode, got %v", result)
+		}
+	})
+
+	t.Run("with_errors_starts_blinking", func(t *testing.T) {
+		// Add an error
+		globalStatus.Errors = []string{"Test error"}
+
+		// Call heartBeatOnce with ledBlinking=false
+		result := heartBeatOnce(false)
+
+		// Should return true since blinking should start
+		if result != true {
+			t.Errorf("Expected ledBlinking=true when errors present, got %v", result)
+		}
+
+		// Clear errors for next test
+		globalStatus.Errors = []string{}
+	})
+
+	t.Run("with_errors_already_blinking", func(t *testing.T) {
+		// Add an error
+		globalStatus.Errors = []string{"Test error"}
+
+		// Call heartBeatOnce with ledBlinking=true (already blinking)
+		result := heartBeatOnce(true)
+
+		// Should still return true
+		if result != true {
+			t.Errorf("Expected ledBlinking=true when already blinking, got %v", result)
+		}
+
+		// Clear errors
+		globalStatus.Errors = []string{}
+	})
+
+	t.Run("with_valid_baro", func(t *testing.T) {
+		// Set up valid baro data
+		mySituation.BaroSourceType = BARO_TYPE_BMP280
+		mySituation.BaroTemperature = 25.0
+		mySituation.BaroLastMeasurementTime = stratuxClock.GetTime()
+		globalStatus.Errors = []string{}
+
+		// Call heartBeatOnce - should send PGRMZ
+		result := heartBeatOnce(false)
+
+		if result != false {
+			t.Errorf("Expected ledBlinking=false, got %v", result)
+		}
+	})
+
+	t.Run("without_valid_baro", func(t *testing.T) {
+		// Set up invalid baro data
+		mySituation.BaroSourceType = BARO_TYPE_NONE
+		globalStatus.Errors = []string{}
+
+		// Call heartBeatOnce - should not send PGRMZ
+		result := heartBeatOnce(false)
+
+		if result != false {
+			t.Errorf("Expected ledBlinking=false, got %v", result)
+		}
+	})
+
+	t.Run("multiple_iterations", func(t *testing.T) {
+		// Simulate multiple heartbeat iterations
+		globalStatus.Errors = []string{}
+		mySituation.GPSFixQuality = 2
+		mySituation.GPSLastFixLocalTime = stratuxClock.GetTime()
+
+		ledBlinking := false
+		for i := 0; i < 5; i++ {
+			ledBlinking = heartBeatOnce(ledBlinking)
+		}
+
+		// Should still be false after multiple iterations without errors
+		if ledBlinking != false {
+			t.Errorf("Expected ledBlinking=false after multiple iterations without errors, got %v", ledBlinking)
+		}
+	})
+}
