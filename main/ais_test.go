@@ -2381,3 +2381,568 @@ func TestImportAISTrafficMessage_DirectCall_AllBranches(t *testing.T) {
 		})
 	}
 }
+
+// TestParseAisMessage_EmptyString tests handling of empty string input
+func TestParseAisMessage_EmptyString(t *testing.T) {
+	resetAISState()
+
+	parseAisMessage("")
+
+	// Should still increment counter and log message
+	if globalStatus.AIS_messages_total != 1 {
+		t.Errorf("Expected AIS_messages_total=1, got %d", globalStatus.AIS_messages_total)
+	}
+
+	if len(msgLog) != 1 {
+		t.Fatalf("Expected 1 message in log, got %d", len(msgLog))
+	}
+}
+
+// TestParseAisMessage_MalformedChecksum tests handling of bad checksum
+func TestParseAisMessage_MalformedChecksum(t *testing.T) {
+	resetAISState()
+
+	// Invalid checksum - should log error but not crash
+	badMsg := "!AIVDM,1,1,,B,13u@ND0P00PkCj0L1uUoEf600000,0*FF"
+
+	parseAisMessage(badMsg)
+
+	// Should increment counter even for invalid messages
+	if globalStatus.AIS_messages_total != 1 {
+		t.Errorf("Expected AIS_messages_total=1, got %d", globalStatus.AIS_messages_total)
+	}
+}
+
+// TestParseAisMessage_NoExclamation tests handling of message without leading !
+func TestParseAisMessage_NoExclamation(t *testing.T) {
+	resetAISState()
+
+	// Missing leading ! or $
+	badMsg := "AIVDM,1,1,,B,13u@ND0P00PkCj0L1uUoEf600000,0*68"
+
+	parseAisMessage(badMsg)
+
+	// Should still log the message
+	if globalStatus.AIS_messages_total != 1 {
+		t.Errorf("Expected AIS_messages_total=1, got %d", globalStatus.AIS_messages_total)
+	}
+}
+
+// TestParseAisMessage_NullMessage tests handling of nil packet in parser
+func TestParseAisMessage_NullMessage(t *testing.T) {
+	resetAISState()
+
+	// This is a first part of multipart message - parser returns nil without error
+	multipartMsg := "!AIVDM,2,1,1,A,55?MbV02>H97ac<H4hl@4U0E:H8r2222220S0l4N76T@p000000000,0*3F"
+
+	parseAisMessage(multipartMsg)
+
+	// Should increment counter
+	if globalStatus.AIS_messages_total != 1 {
+		t.Errorf("Expected AIS_messages_total=1, got %d", globalStatus.AIS_messages_total)
+	}
+
+	// Should NOT create traffic (multiline sentence incomplete)
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	if count != 0 {
+		t.Errorf("Expected 0 traffic from incomplete multipart message, got %d", count)
+	}
+}
+
+// TestImportAISTrafficMessage_ExtremeCoordinates tests various invalid coordinate ranges
+func TestImportAISTrafficMessage_ExtremeCoordinates(t *testing.T) {
+	resetAISState()
+
+	testCases := []struct {
+		name string
+		lat  float64
+		lng  float64
+	}{
+		{"Lat > 360", 400.0, -122.5},
+		{"Lat < -360", -400.0, -122.5},
+		{"Lng > 360", 37.5, 400.0},
+		{"Lng < -360", 37.5, -400.0},
+		{"Both > 360", 400.0, 400.0},
+		{"Both < -360", -400.0, -400.0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetAISState()
+
+			vdmPacket := &aisnmea.VdmPacket{
+				Packet: ais.PositionReport{
+					Header:    ais.Header{MessageID: 1, UserID: 111111},
+					Latitude:  ais.FieldLatLonFine(tc.lat),
+					Longitude: ais.FieldLatLonFine(tc.lng),
+					Sog:       10.0,
+					Cog:       90,
+				},
+			}
+
+			importAISTrafficMessage(vdmPacket)
+
+			trafficMutex.Lock()
+			count := len(traffic)
+			trafficMutex.Unlock()
+
+			// Should be filtered out due to invalid coordinates
+			if count != 0 {
+				t.Errorf("Expected 0 traffic for %s (lat=%f, lng=%f), got %d",
+					tc.name, tc.lat, tc.lng, count)
+			}
+		})
+	}
+}
+
+// TestImportAISTrafficMessage_EdgeSpeed tests speed boundary conditions
+func TestImportAISTrafficMessage_EdgeSpeed(t *testing.T) {
+	resetAISState()
+
+	testCases := []struct {
+		name          string
+		sog           float64
+		expectValid   bool
+		expectSpeed   bool
+		expectedSpeed uint16
+	}{
+		{"Speed 0", 0.0, true, true, 0},
+		{"Speed 0.1", 0.1, true, true, 0},
+		{"Speed 102.2", 102.2, true, true, 102},
+		{"Speed 102.3 (boundary)", 102.3, false, false, 0},
+		{"Speed 150", 150.0, false, false, 0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetAISState()
+
+			vdmPacket := &aisnmea.VdmPacket{
+				Packet: ais.PositionReport{
+					Header:    ais.Header{MessageID: 1, UserID: 222222},
+					Latitude:  37.5,
+					Longitude: -122.5,
+					Sog:       ais.Field10(tc.sog),
+					Cog:       90,
+				},
+			}
+
+			importAISTrafficMessage(vdmPacket)
+
+			trafficMutex.Lock()
+			var ti TrafficInfo
+			found := false
+			for _, v := range traffic {
+				ti = v
+				found = true
+				break
+			}
+			trafficMutex.Unlock()
+
+			if !found && tc.expectValid {
+				t.Fatalf("Expected traffic to be created for %s", tc.name)
+			}
+
+			if found {
+				if ti.Speed_valid != tc.expectSpeed {
+					t.Errorf("Expected Speed_valid=%v for %s, got %v",
+						tc.expectSpeed, tc.name, ti.Speed_valid)
+				}
+			}
+		})
+	}
+}
+
+// TestImportAISTrafficMessage_Type27SpeedBoundary tests Type 27 speed filtering
+func TestImportAISTrafficMessage_Type27SpeedBoundary(t *testing.T) {
+	resetAISState()
+
+	testCases := []struct {
+		name          string
+		sog           uint8
+		expectValid   bool
+		expectedSpeed uint16
+	}{
+		{"Speed 0", 0, true, 0},
+		{"Speed 62", 62, true, 62},
+		{"Speed 63 (boundary)", 63, false, 0},
+		{"Speed 100", 100, false, 0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetAISState()
+
+			vdmPacket := &aisnmea.VdmPacket{
+				Packet: ais.LongRangeAisBroadcastMessage{
+					Header:    ais.Header{MessageID: 27, UserID: 333333},
+					Latitude:  37.5,
+					Longitude: -122.5,
+					Sog:       tc.sog,
+					Cog:       90,
+				},
+			}
+
+			importAISTrafficMessage(vdmPacket)
+
+			trafficMutex.Lock()
+			var ti TrafficInfo
+			found := false
+			for _, v := range traffic {
+				ti = v
+				found = true
+				break
+			}
+			trafficMutex.Unlock()
+
+			if !found {
+				t.Fatalf("Expected traffic to be created for %s", tc.name)
+			}
+
+			if ti.Speed_valid != tc.expectValid {
+				t.Errorf("Expected Speed_valid=%v for %s (sog=%d), got %v",
+					tc.expectValid, tc.name, tc.sog, ti.Speed_valid)
+			}
+		})
+	}
+}
+
+// TestImportAISTrafficMessage_Type5OnlyUpdatesNameCallsign tests Type 5 behavior
+func TestImportAISTrafficMessage_Type5OnlyUpdatesNameCallsign(t *testing.T) {
+	resetAISState()
+
+	// First, create a target with Type 1 position report
+	vdmPacket1 := &aisnmea.VdmPacket{
+		Packet: ais.PositionReport{
+			Header:    ais.Header{MessageID: 1, UserID: 444444},
+			Latitude:  37.5,
+			Longitude: -122.5,
+			Sog:       10.0,
+			Cog:       90,
+		},
+	}
+
+	importAISTrafficMessage(vdmPacket1)
+
+	trafficMutex.Lock()
+	var ti1 TrafficInfo
+	for _, v := range traffic {
+		ti1 = v
+		break
+	}
+	originalLat := ti1.Lat
+	originalLng := ti1.Lng
+	trafficMutex.Unlock()
+
+	// Now send Type 5 (ship static data) - should only update name/callsign
+	vdmPacket5 := &aisnmea.VdmPacket{
+		Packet: ais.ShipStaticData{
+			Header:   ais.Header{MessageID: 5, UserID: 444444},
+			Name:     "SHIP NAME     ",
+			CallSign: "CALL123",
+			Type:     70, // Cargo ship
+		},
+	}
+
+	importAISTrafficMessage(vdmPacket5)
+
+	trafficMutex.Lock()
+	var ti2 TrafficInfo
+	for _, v := range traffic {
+		ti2 = v
+		break
+	}
+	trafficMutex.Unlock()
+
+	// Position should remain unchanged
+	if ti2.Lat != originalLat {
+		t.Errorf("Type 5 should not change Lat, was %f, now %f", originalLat, ti2.Lat)
+	}
+	if ti2.Lng != originalLng {
+		t.Errorf("Type 5 should not change Lng, was %f, now %f", originalLng, ti2.Lng)
+	}
+
+	// Name and callsign should be updated
+	if ti2.Tail != "SHIP NAME" {
+		t.Errorf("Expected Tail='SHIP NAME', got '%s'", ti2.Tail)
+	}
+	if ti2.Reg != "CALL123" {
+		t.Errorf("Expected Reg='CALL123', got '%s'", ti2.Reg)
+	}
+	if ti2.SurfaceVehicleType != 70 {
+		t.Errorf("Expected SurfaceVehicleType=70, got %d", ti2.SurfaceVehicleType)
+	}
+}
+
+// TestImportAISTrafficMessage_RateOfTurnFormula tests ROT calculation accuracy
+func TestImportAISTrafficMessage_RateOfTurnFormula(t *testing.T) {
+	resetAISState()
+
+	testCases := []struct {
+		name        string
+		rot         int16
+		expectedROT float32
+	}{
+		{"ROT 0", 0, 0.0},
+		{"ROT 10", 10, (10.0 / 4.733) * (10.0 / 4.733)},
+		{"ROT -10", -10, (-10.0 / 4.733) * (-10.0 / 4.733)},
+		{"ROT 127", 127, (127.0 / 4.733) * (127.0 / 4.733)},
+		{"ROT -128 (invalid)", -128, 0.0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetAISState()
+
+			vdmPacket := &aisnmea.VdmPacket{
+				Packet: ais.PositionReport{
+					Header:      ais.Header{MessageID: 1, UserID: 555555},
+					Latitude:    37.5,
+					Longitude:   -122.5,
+					Sog:         10.0,
+					Cog:         90,
+					RateOfTurn:  tc.rot,
+					TrueHeading: 90,
+				},
+			}
+
+			importAISTrafficMessage(vdmPacket)
+
+			trafficMutex.Lock()
+			var ti TrafficInfo
+			for _, v := range traffic {
+				ti = v
+				break
+			}
+			trafficMutex.Unlock()
+
+			// Allow small floating point error
+			diff := ti.TurnRate - tc.expectedROT
+			if diff < 0 {
+				diff = -diff
+			}
+
+			if diff > 0.1 {
+				t.Errorf("Expected TurnRate=%f for ROT=%d, got %f",
+					tc.expectedROT, tc.rot, ti.TurnRate)
+			}
+
+			t.Logf("ROT %d -> TurnRate %f", tc.rot, ti.TurnRate)
+		})
+	}
+}
+
+// TestImportAISTrafficMessage_CourseVsHeading tests course over ground vs heading logic
+func TestImportAISTrafficMessage_CourseVsHeading(t *testing.T) {
+	resetAISState()
+
+	testCases := []struct {
+		name          string
+		sog           float64
+		cog           uint16
+		heading       uint16
+		expectedTrack float32
+	}{
+		{"Moving with COG", 10.0, 90, 270, 90.0},   // Use COG when moving
+		{"Moving COG 360", 10.0, 360, 270, 0.0},    // COG 360 means 0
+		{"Stationary", 0.0, 90, 270, 270.0},        // Use heading when stopped
+		{"Slow heading 511", 0.5, 90, 511, 90.0},   // heading 511 is invalid, use COG
+		{"Fast with heading", 50.0, 180, 270, 180}, // Use COG when moving
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetAISState()
+
+			vdmPacket := &aisnmea.VdmPacket{
+				Packet: ais.PositionReport{
+					Header:      ais.Header{MessageID: 1, UserID: 666666},
+					Latitude:    37.5,
+					Longitude:   -122.5,
+					Sog:         ais.Field10(tc.sog),
+					Cog:         ais.Field10(float64(tc.cog)),
+					TrueHeading: tc.heading,
+				},
+			}
+
+			importAISTrafficMessage(vdmPacket)
+
+			trafficMutex.Lock()
+			var ti TrafficInfo
+			for _, v := range traffic {
+				ti = v
+				break
+			}
+			trafficMutex.Unlock()
+
+			if ti.Track != tc.expectedTrack {
+				t.Errorf("Expected Track=%f for %s (sog=%f, cog=%d, heading=%d), got %f",
+					tc.expectedTrack, tc.name, tc.sog, tc.cog, tc.heading, ti.Track)
+			}
+
+			t.Logf("%s: Track=%f (SOG=%f, COG=%d, Heading=%d)",
+				tc.name, ti.Track, tc.sog, tc.cog, tc.heading)
+		})
+	}
+}
+
+// TestParseAisMessage_MessageCounterIncremental tests message counter across multiple messages
+func TestParseAisMessage_MessageCounterIncremental(t *testing.T) {
+	resetAISState()
+
+	messages := []string{
+		"!AIVDM,1,1,,A,13u@ND0P00PkCj0L1uUoEf600000,0*68",
+		"!AIVDM,1,1,,B,13u@ND0P00PkCj0L1uUoEf600000,0*68",
+		"",
+		"invalid",
+		"!AIVDM,1,1,,A,13u@ND0P00PkCj0L1uUoEf600000,0*68",
+	}
+
+	for i, msg := range messages {
+		parseAisMessage(msg)
+		expected := uint64(i + 1)
+		if globalStatus.AIS_messages_total != expected {
+			t.Errorf("After message %d, expected AIS_messages_total=%d, got %d",
+				i+1, expected, globalStatus.AIS_messages_total)
+		}
+	}
+
+	t.Logf("Processed %d messages, counter=%d",
+		len(messages), globalStatus.AIS_messages_total)
+}
+
+// TestImportAISTrafficMessage_PostProcessAndRegister tests traffic registration
+func TestImportAISTrafficMessage_PostProcessAndRegister(t *testing.T) {
+	resetAISState()
+
+	vdmPacket := &aisnmea.VdmPacket{
+		Packet: ais.PositionReport{
+			Header:    ais.Header{MessageID: 1, UserID: 777777},
+			Latitude:  37.5,
+			Longitude: -122.5,
+			Sog:       10.0,
+			Cog:       90,
+		},
+	}
+
+	importAISTrafficMessage(vdmPacket)
+
+	// Check that traffic was added to traffic map
+	trafficMutex.Lock()
+	_, existsInTraffic := traffic[777777]
+	trafficMutex.Unlock()
+
+	if !existsInTraffic {
+		t.Error("Expected traffic to be registered in traffic map")
+	}
+
+	// Check that seenTraffic was updated
+	if !seenTraffic[777777] {
+		t.Error("Expected traffic to be marked in seenTraffic map")
+	}
+
+	t.Log("Traffic successfully registered and marked as seen")
+}
+
+// TestImportAISTrafficMessage_Type27CogCalculation tests COG value handling for Type 27
+func TestImportAISTrafficMessage_Type27CogCalculation(t *testing.T) {
+	resetAISState()
+
+	testCases := []struct {
+		name          string
+		cog           uint16
+		expectedTrack float32
+	}{
+		{"COG 0", 0, 0.0},
+		{"COG 90", 90, 90.0},
+		{"COG 180", 180, 180.0},
+		{"COG 270", 270, 270.0},
+		{"COG 359", 359, 359.0},
+		{"COG 511 (invalid)", 511, 0.0}, // Invalid should not update
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetAISState()
+
+			vdmPacket := &aisnmea.VdmPacket{
+				Packet: ais.LongRangeAisBroadcastMessage{
+					Header:    ais.Header{MessageID: 27, UserID: 888888},
+					Latitude:  37.5,
+					Longitude: -122.5,
+					Sog:       10,
+					Cog:       tc.cog,
+				},
+			}
+
+			importAISTrafficMessage(vdmPacket)
+
+			trafficMutex.Lock()
+			var ti TrafficInfo
+			for _, v := range traffic {
+				ti = v
+				break
+			}
+			trafficMutex.Unlock()
+
+			if tc.cog != 511 && ti.Track != tc.expectedTrack {
+				t.Errorf("Expected Track=%f for COG=%d, got %f",
+					tc.expectedTrack, tc.cog, ti.Track)
+			}
+
+			t.Logf("COG %d -> Track %f", tc.cog, ti.Track)
+		})
+	}
+}
+
+// TestImportAISTrafficMessage_TargetTypeAndEmitterCategory tests AIS-specific fields
+func TestImportAISTrafficMessage_TargetTypeAndEmitterCategory(t *testing.T) {
+	resetAISState()
+
+	vdmPacket := &aisnmea.VdmPacket{
+		Packet: ais.PositionReport{
+			Header:    ais.Header{MessageID: 1, UserID: 999999},
+			Latitude:  37.5,
+			Longitude: -122.5,
+			Sog:       10.0,
+			Cog:       90,
+		},
+	}
+
+	importAISTrafficMessage(vdmPacket)
+
+	trafficMutex.Lock()
+	var ti TrafficInfo
+	for _, v := range traffic {
+		ti = v
+		break
+	}
+	trafficMutex.Unlock()
+
+	// Verify AIS-specific fields
+	if ti.TargetType != TARGET_TYPE_AIS {
+		t.Errorf("Expected TargetType=%d (AIS), got %d", TARGET_TYPE_AIS, ti.TargetType)
+	}
+
+	if ti.Emitter_category != 18 {
+		t.Errorf("Expected Emitter_category=18 (Ground Vehicle), got %d", ti.Emitter_category)
+	}
+
+	if ti.Last_source != TRAFFIC_SOURCE_AIS {
+		t.Errorf("Expected Last_source=%d (AIS), got %d", TRAFFIC_SOURCE_AIS, ti.Last_source)
+	}
+
+	if ti.Addr_type != 1 {
+		t.Errorf("Expected Addr_type=1 (Non-ICAO), got %d", ti.Addr_type)
+	}
+
+	if !ti.OnGround {
+		t.Error("Expected OnGround=true for AIS targets")
+	}
+
+	t.Logf("AIS target fields verified: TargetType=%d, Emitter=%d, Source=%d",
+		ti.TargetType, ti.Emitter_category, ti.Last_source)
+}
