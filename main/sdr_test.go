@@ -11,7 +11,10 @@ package main
 
 import (
 	"regexp"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // TestGetPPM tests the PPM extraction from serial strings
@@ -1015,5 +1018,338 @@ func BenchmarkReCompile(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		pattern := patterns[i%len(patterns)]
 		reCompile(pattern)
+	}
+}
+
+// initHandleUatMessageTest initializes globals and returns a cleanup function
+func initHandleUatMessageTest() func() {
+	// Save original state
+	originalClock := stratuxClock
+	originalMaxSignalStrength := maxSignalStrength
+	originalGlobalStatus := globalStatus
+	originalGlobalSettings := globalSettings
+	originalNetworkGDL90Chan := networkGDL90Chan
+	originalNetMutex := netMutex
+	originalClientConnections := clientConnections
+	originalTrafficMutex := trafficMutex
+	originalTraffic := traffic
+	originalSeenTraffic := seenTraffic
+
+	// Initialize required globals
+	stratuxClock = NewMonotonic()
+	time.Sleep(10 * time.Millisecond)         // Let the clock start
+	networkGDL90Chan = make(chan []byte, 100) // Buffered channel to prevent blocking
+	netMutex = &sync.Mutex{}
+	clientConnections = make(map[string]connection)
+	trafficMutex = &sync.Mutex{}
+	traffic = make(map[uint32]TrafficInfo)
+	seenTraffic = make(map[uint32]bool)
+
+	// Return cleanup function
+	return func() {
+		stratuxClock = originalClock
+		maxSignalStrength = originalMaxSignalStrength
+		globalStatus = originalGlobalStatus
+		globalSettings = originalGlobalSettings
+		networkGDL90Chan = originalNetworkGDL90Chan
+		netMutex = originalNetMutex
+		clientConnections = originalClientConnections
+		trafficMutex = originalTrafficMutex
+		traffic = originalTraffic
+		seenTraffic = originalSeenTraffic
+	}
+}
+
+// TestHandleUatMessage tests the handleUatMessage function
+func TestHandleUatMessage(t *testing.T) {
+	defer initHandleUatMessageTest()()
+
+	tests := []struct {
+		name        string
+		input       string
+		description string
+	}{
+		{
+			name:        "Valid UAT uplink message",
+			input:       "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;ss=1000",
+			description: "Valid uplink message with signal strength",
+		},
+		{
+			name:        "Valid UAT basic downlink message",
+			input:       "-" + strings.Repeat("AA", 18) + ";rs=3;ss=500",
+			description: "Valid basic downlink (18 bytes) with signal strength",
+		},
+		{
+			name:        "Valid UAT long downlink message (34 bytes)",
+			input:       "-" + strings.Repeat("BB", 34) + ";rs=4;ss=750",
+			description: "Valid long downlink (34 bytes) with signal strength",
+		},
+		{
+			name:        "Valid UAT long downlink message (48 bytes)",
+			input:       "-" + strings.Repeat("CC", 48) + ";rs=6;ss=900",
+			description: "Valid long downlink (48 bytes with Reed Solomon) with signal strength",
+		},
+		{
+			name:        "Empty message",
+			input:       "",
+			description: "Empty string should be handled gracefully",
+		},
+		{
+			name:        "Message without signal strength",
+			input:       "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5",
+			description: "Uplink message without ss= field",
+		},
+		{
+			name:        "Downlink without signal strength",
+			input:       "-" + strings.Repeat("DD", 18) + ";rs=2",
+			description: "Downlink message without ss= field",
+		},
+		{
+			name:        "Uplink with invalid signal strength",
+			input:       "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;ss=invalid",
+			description: "Uplink with non-numeric signal strength",
+		},
+		{
+			name:        "Downlink with high signal strength",
+			input:       "-" + strings.Repeat("FF", 18) + ";rs=7;ss=9999",
+			description: "Downlink with very high signal strength",
+		},
+		{
+			name:        "Uplink with zero signal strength",
+			input:       "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=1;ss=0",
+			description: "Uplink with zero signal strength",
+		},
+		{
+			name:        "Short uplink (should be padded)",
+			input:       "+" + strings.Repeat("11", 100) + ";rs=4;ss=800",
+			description: "Short uplink message that gets padded",
+		},
+		{
+			name:        "Message with only prefix",
+			input:       "+",
+			description: "Message with only prefix character",
+		},
+		{
+			name:        "Message with semicolon but no data",
+			input:       ";",
+			description: "Message starting with semicolon",
+		},
+		{
+			name:        "Downlink message with no semicolon",
+			input:       "-" + strings.Repeat("22", 18),
+			description: "Downlink without semicolon separator",
+		},
+		{
+			name:        "Uplink message with multiple semicolons",
+			input:       "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;ss=1000;extra=data",
+			description: "Uplink with extra fields after semicolons",
+		},
+		{
+			name:        "Message without ss prefix in third field",
+			input:       "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;rs=1000",
+			description: "Uplink without proper ss= prefix in signal field",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset state before each test
+			globalStatus.UAT_messages_total = 0
+			maxSignalStrength = 0
+
+			// Call handleUatMessage - should not panic
+			handleUatMessage(tt.input)
+
+			// Verify UAT_messages_total was incremented (except for empty message)
+			if tt.input != "" && tt.input != ";" {
+				if globalStatus.UAT_messages_total == 0 {
+					t.Errorf("Expected UAT_messages_total to be incremented for non-empty message")
+				}
+			}
+		})
+	}
+}
+
+// TestHandleUatMessageWithValidMessages tests handleUatMessage with messages that should be relayed
+func TestHandleUatMessageWithValidMessages(t *testing.T) {
+	defer initHandleUatMessageTest()()
+
+	tests := []struct {
+		name           string
+		input          string
+		expectedRelay  bool
+		expectedSignal int
+	}{
+		{
+			name:           "Valid uplink with signal",
+			input:          "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;ss=5000",
+			expectedRelay:  true,
+			expectedSignal: 5000,
+		},
+		{
+			name:           "Valid basic report",
+			input:          "-" + strings.Repeat("AA", 18) + ";rs=3;ss=2000",
+			expectedRelay:  true,
+			expectedSignal: 2000,
+		},
+		{
+			name:          "Empty input",
+			input:         "",
+			expectedRelay: false,
+		},
+		{
+			name:          "Invalid format",
+			input:         "invalid",
+			expectedRelay: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset state
+			globalStatus.UAT_messages_total = 0
+			maxSignalStrength = 0
+
+			// Call the function
+			handleUatMessage(tt.input)
+
+			// For valid messages, check that maxSignalStrength was updated
+			if tt.expectedRelay && tt.input[0] == '+' && tt.expectedSignal > 0 {
+				if maxSignalStrength != tt.expectedSignal {
+					t.Errorf("Expected maxSignalStrength=%d, got %d", tt.expectedSignal, maxSignalStrength)
+				}
+			}
+		})
+	}
+}
+
+// TestHandleUatMessageErrorPaths tests error handling in handleUatMessage
+func TestHandleUatMessageErrorPaths(t *testing.T) {
+	defer initHandleUatMessageTest()()
+
+	errorCases := []struct {
+		name        string
+		input       string
+		description string
+	}{
+		{
+			name:        "Empty string",
+			input:       "",
+			description: "Empty string returns nil from parseInput",
+		},
+		{
+			name:        "Just semicolon",
+			input:       ";",
+			description: "Just semicolon should be handled",
+		},
+		{
+			name:        "Invalid format",
+			input:       "invalid",
+			description: "Invalid format should be handled gracefully",
+		},
+	}
+
+	for _, tc := range errorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset state
+			globalStatus.UAT_messages_total = 0
+
+			// Should not panic
+			handleUatMessage(tc.input)
+
+			// Empty string won't increment counter
+			if tc.input == "" || tc.input == ";" {
+				if globalStatus.UAT_messages_total != 0 {
+					t.Errorf("Empty/semicolon message should not increment UAT_messages_total")
+				}
+			}
+		})
+	}
+}
+
+// TestHandleUatMessageSignalStrengthTracking tests signal strength handling
+func TestHandleUatMessageSignalStrengthTracking(t *testing.T) {
+	defer initHandleUatMessageTest()()
+
+	// Reset max signal strength
+	maxSignalStrength = 0
+
+	// Test increasing signal strength
+	handleUatMessage("+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;ss=1000")
+	if maxSignalStrength != 1000 {
+		t.Errorf("Expected maxSignalStrength=1000, got %d", maxSignalStrength)
+	}
+
+	// Test higher signal strength (should update)
+	handleUatMessage("+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;ss=2000")
+	if maxSignalStrength != 2000 {
+		t.Errorf("Expected maxSignalStrength=2000, got %d", maxSignalStrength)
+	}
+
+	// Test lower signal strength (should NOT update)
+	handleUatMessage("+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;ss=1500")
+	if maxSignalStrength != 2000 {
+		t.Errorf("Expected maxSignalStrength to remain 2000, got %d", maxSignalStrength)
+	}
+
+	// Test downlink message (should NOT update maxSignalStrength)
+	handleUatMessage("-" + strings.Repeat("AA", 18) + ";rs=3;ss=5000")
+	if maxSignalStrength != 2000 {
+		t.Errorf("Downlink should not update maxSignalStrength, expected 2000, got %d", maxSignalStrength)
+	}
+
+	// Test zero signal strength
+	prevMax := maxSignalStrength
+	handleUatMessage("+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES) + ";rs=5;ss=0")
+	if maxSignalStrength != prevMax {
+		t.Errorf("Zero signal strength should not update max, expected %d, got %d", prevMax, maxSignalStrength)
+	}
+}
+
+// TestHandleUatMessageMessageTypes tests different UAT message types
+func TestHandleUatMessageMessageTypes(t *testing.T) {
+	defer initHandleUatMessageTest()()
+
+	messageTypes := []struct {
+		name     string
+		input    string
+		msgBytes int
+	}{
+		{
+			name:     "MSGTYPE_UPLINK (432 bytes)",
+			input:    "+" + strings.Repeat("00", UPLINK_FRAME_DATA_BYTES),
+			msgBytes: UPLINK_FRAME_DATA_BYTES,
+		},
+		{
+			name:     "MSGTYPE_BASIC_REPORT (18 bytes)",
+			input:    "-" + strings.Repeat("AA", 18),
+			msgBytes: 18,
+		},
+		{
+			name:     "MSGTYPE_LONG_REPORT (34 bytes)",
+			input:    "-" + strings.Repeat("BB", 34),
+			msgBytes: 34,
+		},
+		{
+			name:     "MSGTYPE_LONG_REPORT (48 bytes)",
+			input:    "-" + strings.Repeat("CC", 48),
+			msgBytes: 48,
+		},
+	}
+
+	for _, mt := range messageTypes {
+		t.Run(mt.name, func(t *testing.T) {
+			globalStatus.UAT_messages_total = 0
+
+			// Add signal strength field
+			fullInput := mt.input + ";rs=5;ss=1000"
+
+			// Should not panic and should process the message
+			handleUatMessage(fullInput)
+
+			if globalStatus.UAT_messages_total == 0 {
+				t.Errorf("Expected UAT_messages_total to be incremented")
+			}
+		})
 	}
 }

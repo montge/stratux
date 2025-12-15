@@ -2573,12 +2573,24 @@ func TestLogTimestampResolution(t *testing.T) {
 
 // TestDataLogWatchdogOnce tests the dataLogWatchdogOnce function
 func TestDataLogWatchdogOnce(t *testing.T) {
+	// Initialize stratuxClock
+	stratuxClock = NewMonotonic()
+
 	// Save original state
 	origDataLogStarted := dataLogStarted
+	origDataLogReadyToWrite := dataLogReadyToWrite
 	origReplayLog := globalSettings.ReplayLog
+	origDataLogFilef := dataLogFilef
+	origInsertString := insertString
+	origInsertBatchIfs := insertBatchIfs
+
 	defer func() {
 		dataLogStarted = origDataLogStarted
+		dataLogReadyToWrite = origDataLogReadyToWrite
 		globalSettings.ReplayLog = origReplayLog
+		dataLogFilef = origDataLogFilef
+		insertString = origInsertString
+		insertBatchIfs = origInsertBatchIfs
 	}()
 
 	t.Run("no_action_when_not_started_and_not_wanted", func(t *testing.T) {
@@ -2590,6 +2602,9 @@ func TestDataLogWatchdogOnce(t *testing.T) {
 
 		if action != "none" {
 			t.Errorf("Expected action='none', got %q", action)
+		}
+		if dataLogStarted {
+			t.Error("dataLogStarted should still be false")
 		}
 		t.Logf("Correctly returns 'none' when logging not started and not wanted")
 	})
@@ -2604,13 +2619,136 @@ func TestDataLogWatchdogOnce(t *testing.T) {
 		if action != "none" {
 			t.Errorf("Expected action='none', got %q", action)
 		}
+		// dataLogStarted should remain true
+		if !dataLogStarted {
+			t.Error("dataLogStarted should still be true")
+		}
 		t.Logf("Correctly returns 'none' when logging is running as expected")
 	})
 
-	// Note: Testing "start" and "stop" actions requires complex initialization
-	// including maps, channels, and database setup that leads to test instability.
-	// These paths are verified by integration tests. The decision logic (lines 616-624)
-	// is correctly exercised by the "none" test cases above.
+	t.Run("starts_logging_when_not_started_but_wanted", func(t *testing.T) {
+		// Set up temporary database location
+		tmpDir := t.TempDir()
+		dataLogFilef = tmpDir + "/test_watchdog_start.db"
+
+		// Initialize maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		// State: not logging, but we want to start
+		dataLogStarted = false
+		dataLogReadyToWrite = false
+		globalSettings.ReplayLog = true
+
+		action := dataLogWatchdogOnce()
+
+		if action != "start" {
+			t.Errorf("Expected action='start', got %q", action)
+		}
+
+		// Wait for dataLog to initialize
+		timeout := time.After(5 * time.Second)
+		for !dataLogReadyToWrite {
+			select {
+			case <-timeout:
+				t.Fatal("Timeout waiting for dataLog to initialize after watchdog start")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+
+		// Verify it started
+		if !dataLogStarted {
+			t.Error("dataLogStarted should be true after watchdog triggered start")
+		}
+		if !dataLogReadyToWrite {
+			t.Error("dataLogReadyToWrite should be true after dataLog started")
+		}
+
+		t.Logf("Successfully started logging via watchdog")
+
+		// Clean up - stop the dataLog we started
+		go func() {
+			closeDataLog()
+		}()
+
+		shutdownTimeout := time.After(10 * time.Second)
+		for dataLogStarted {
+			select {
+			case <-shutdownTimeout:
+				t.Fatal("Timeout waiting for dataLog shutdown in cleanup")
+			default:
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+
+		shutdownDataLogWriter = nil
+		time.Sleep(200 * time.Millisecond)
+	})
+
+	t.Run("stops_logging_when_started_but_not_wanted", func(t *testing.T) {
+		// Set up temporary database location
+		tmpDir := t.TempDir()
+		dataLogFilef = tmpDir + "/test_watchdog_stop.db"
+
+		// Initialize maps
+		insertString = make(map[string]string)
+		insertBatchIfs = make(map[string][][]interface{})
+
+		// First, start the dataLog
+		dataLogStarted = false
+		dataLogReadyToWrite = false
+		go dataLog()
+
+		// Wait for initialization
+		timeout := time.After(5 * time.Second)
+		for !dataLogReadyToWrite {
+			select {
+			case <-timeout:
+				t.Fatal("Timeout waiting for dataLog to initialize before watchdog stop test")
+			default:
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+
+		// Verify it's running
+		if !dataLogStarted {
+			t.Fatal("dataLog should be started before testing stop")
+		}
+
+		// Now set state: logging is running, but we want to stop
+		globalSettings.ReplayLog = false
+
+		action := dataLogWatchdogOnce()
+
+		if action != "stop" {
+			t.Errorf("Expected action='stop', got %q", action)
+		}
+
+		// Wait for shutdown to complete
+		shutdownTimeout := time.After(10 * time.Second)
+		for dataLogStarted {
+			select {
+			case <-shutdownTimeout:
+				t.Fatal("Timeout waiting for dataLog shutdown after watchdog stop")
+			default:
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+
+		// Verify it stopped
+		if dataLogStarted {
+			t.Error("dataLogStarted should be false after watchdog triggered stop")
+		}
+		if dataLogReadyToWrite {
+			t.Error("dataLogReadyToWrite should be false after dataLog stopped")
+		}
+
+		t.Logf("Successfully stopped logging via watchdog")
+
+		shutdownDataLogWriter = nil
+		time.Sleep(200 * time.Millisecond)
+	})
 }
 
 // TestDataLogWriter tests the dataLogWriter goroutine behavior
