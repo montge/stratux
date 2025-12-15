@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stratux/stratux/common"
 )
@@ -3524,6 +3525,8 @@ func TestUpdateStatus_Uptime(t *testing.T) {
 	if stratuxClock == nil {
 		stratuxClock = NewMonotonic()
 	}
+	// Wait a bit to ensure clock has advanced
+	time.Sleep(10 * time.Millisecond)
 
 	// Initialize mutex if needed
 	if mySituation.muSatellite == nil {

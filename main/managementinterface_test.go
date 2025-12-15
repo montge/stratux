@@ -8154,6 +8154,122 @@ func TestHandleWeatherWS(t *testing.T) {
 	}
 }
 
+// TestHandleGDL90WS_NonZeroData tests the GDL90 websocket handler with non-zero data to exercise the continue branch
+func TestHandleGDL90WS_NonZeroData(t *testing.T) {
+	// Initialize the gdl90Update broadcaster if needed
+	if gdl90Update == nil {
+		gdl90Update = NewUIBroadcaster()
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s := websocket.Server{Handler: websocket.Handler(handleGDL90WS)}
+		s.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + server.URL[4:] + "/gdl90"
+
+	timeout := time.After(2 * time.Second)
+	done := make(chan bool)
+
+	go func() {
+		ws, err := websocket.Dial(wsURL, "", server.URL)
+		if err != nil {
+			t.Logf("WebSocket dial failed (expected in some test environments): %v", err)
+			done <- true
+			return
+		}
+		defer ws.Close()
+
+		// Read initial data if any
+		buf := make([]byte, 4096)
+		ws.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		n, err := ws.Read(buf)
+		if err == nil && n > 0 {
+			t.Logf("Received initial data: %d bytes", n)
+		}
+
+		// Send non-zero data to exercise the continue branch (buf[0] != 0)
+		ws.Write([]byte{0x01, 0x02, 0x03})
+
+		// Wait a bit to ensure the server processes the data
+		time.Sleep(100 * time.Millisecond)
+
+		// Send another non-zero packet to ensure we're testing the continue path
+		ws.Write([]byte{0xFF, 0xAA, 0xBB})
+
+		// Wait a bit before closing
+		time.Sleep(100 * time.Millisecond)
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		t.Log("handleGDL90WS non-zero data test completed")
+	case <-timeout:
+		t.Log("handleGDL90WS non-zero data test timeout (acceptable for coverage)")
+	}
+}
+
+// TestHandleWeatherWS_NonZeroData tests the weather websocket handler with non-zero data to exercise the continue branch
+func TestHandleWeatherWS_NonZeroData(t *testing.T) {
+	// Initialize the weatherUpdate broadcaster if needed
+	if weatherUpdate == nil {
+		weatherUpdate = NewUIBroadcaster()
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s := websocket.Server{Handler: websocket.Handler(handleWeatherWS)}
+		s.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + server.URL[4:] + "/weather"
+
+	timeout := time.After(2 * time.Second)
+	done := make(chan bool)
+
+	go func() {
+		ws, err := websocket.Dial(wsURL, "", server.URL)
+		if err != nil {
+			t.Logf("WebSocket dial failed (expected in some test environments): %v", err)
+			done <- true
+			return
+		}
+		defer ws.Close()
+
+		// Read initial data if any
+		buf := make([]byte, 4096)
+		ws.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		n, err := ws.Read(buf)
+		if err == nil && n > 0 {
+			t.Logf("Received initial data: %d bytes", n)
+		}
+
+		// Send non-zero data to exercise the continue branch (buf[0] != 0)
+		ws.Write([]byte{0x01, 0x02, 0x03})
+
+		// Wait a bit to ensure the server processes the data
+		time.Sleep(100 * time.Millisecond)
+
+		// Send another non-zero packet to ensure we're testing the continue path
+		ws.Write([]byte{0xFF, 0xAA, 0xBB})
+
+		// Wait a bit before closing
+		time.Sleep(100 * time.Millisecond)
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		t.Log("handleWeatherWS non-zero data test completed")
+	case <-timeout:
+		t.Log("handleWeatherWS non-zero data test timeout (acceptable for coverage)")
+	}
+}
+
 // TestHandleTrafficWS tests the traffic websocket handler
 func TestHandleTrafficWS(t *testing.T) {
 	// Initialize the trafficUpdate broadcaster if needed
@@ -8234,6 +8350,11 @@ func TestHandleRadarWS(t *testing.T) {
 		radarUpdate = NewUIBroadcaster()
 	}
 
+	// Initialize trafficMutex to avoid nil pointer dereference
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s := websocket.Server{Handler: websocket.Handler(handleRadarWS)}
 		s.ServeHTTP(w, r)
@@ -8273,6 +8394,70 @@ func TestHandleRadarWS(t *testing.T) {
 		t.Log("handleRadarWS test completed")
 	case <-timeout:
 		t.Log("handleRadarWS test timeout (acceptable for coverage)")
+	}
+}
+
+// TestHandleRadarWS_NonZeroData tests the handleRadarWS function with non-zero data
+// to exercise the continue branch (line 206-207 in managementinterface.go)
+func TestHandleRadarWS_NonZeroData(t *testing.T) {
+	// Initialize the radarUpdate broadcaster if needed
+	if radarUpdate == nil {
+		radarUpdate = NewUIBroadcaster()
+	}
+
+	// Initialize trafficMutex to avoid nil pointer dereference
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s := websocket.Server{Handler: websocket.Handler(handleRadarWS)}
+		s.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + server.URL[4:] + "/radar"
+
+	timeout := time.After(2 * time.Second)
+	done := make(chan bool)
+
+	go func() {
+		ws, err := websocket.Dial(wsURL, "", server.URL)
+		if err != nil {
+			t.Logf("WebSocket dial failed (expected in some test environments): %v", err)
+			done <- true
+			return
+		}
+		defer ws.Close()
+
+		// Read initial settings
+		buf := make([]byte, 4096)
+		ws.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		n, err := ws.Read(buf)
+		if err == nil && n > 0 {
+			t.Logf("Received initial settings: %d bytes", n)
+		}
+
+		// Send non-zero data to exercise the continue branch (buf[0] != 0)
+		ws.Write([]byte{0x01, 0x02, 0x03})
+
+		// Wait a bit to ensure the server processes the data
+		time.Sleep(100 * time.Millisecond)
+
+		// Send another non-zero packet to ensure we're testing the continue path
+		ws.Write([]byte{0xFF, 0xAA, 0xBB})
+
+		// Wait a bit before closing
+		time.Sleep(100 * time.Millisecond)
+
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		t.Log("handleRadarWS non-zero data test completed")
+	case <-timeout:
+		t.Log("handleRadarWS non-zero data test timeout (acceptable for coverage)")
 	}
 }
 

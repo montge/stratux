@@ -173,15 +173,29 @@
 - [ ] Test max traffic targets limit
 - [ ] Test message queue overflow
 - [ ] Test log rotation under pressure
-- [ ] Test database write failures
+- [x] Test dataLogWriter shutdown channel propagation (datalog_test.go)
 
-### 7.4 Concurrent Access
+### 7.4 GDL90 Protocol Functions (December 2025)
+- [x] gracefulShutdown: 85.7% → 100% (gen_gdl90_test.go)
+  - Added test for dataLogStarted=true branch
+  - Tests shutdown channel close and logging cleanup
+- [x] setActLed: 0% → 100% (gen_gdl90_test.go)
+  - Tests LED state setting via sysfs mock
+  - Tests fallback path handling
+  - Tests "green" suffix LED path variant
+
+### 7.5 Data Logging Functions (December 2025)
+- [x] dataLogWriter DEBUG logging paths (datalog_test.go)
+  - Tests DEBUG logging level output
+  - Note: Slow write warning (>10s) is untestable in unit tests
+
+### 7.6 Concurrent Access
 - [x] Test concurrent traffic map updates (traffic_test.go)
 - [x] Test concurrent settings changes (managementinterface_test.go)
 - [ ] Test concurrent client connections
 - [x] Test mutex deadlock prevention (various test files)
 
-### 7.5 Boundary Conditions
+### 7.7 Boundary Conditions
 - [x] Test latitude/longitude at limits (traffic_test.go)
 - [x] Test altitude at extremes (gen_gdl90_test.go)
 - [x] Test speed at limits (traffic_test.go)
@@ -282,9 +296,9 @@ These functions exceed SonarCloud's complexity threshold of 15:
 | Phase 4 | 75% | 57.8% (Complete) | +500 |
 | Phase 5 | 65% | 58.4% (Complete) | +100 |
 | Phase 6 | 75% | 59.5% (Complete) | +1,700 |
-| Phase 7 | 90%+ | 63.3% (In Progress) | +4,000 |
+| Phase 7 | 90%+ | 63.7% (In Progress) | +4,500 |
 | Phase 8 | N/A | Deduplication | -500 |
 | Phase 9 | N/A | SonarCloud Issues | N/A |
 
-**Current Coverage**: 63.3% (as of December 2025)
-Total estimated new test code: ~12,000+ lines
+**Current Coverage**: 63.7% (as of December 2025)
+Total estimated new test code: ~12,500+ lines

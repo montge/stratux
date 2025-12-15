@@ -871,6 +871,83 @@ func TestSDrKillBasic(t *testing.T) {
 	}
 }
 
+// TestSdrKill_AllDevicesNil tests sdrKill when all devices are nil
+func TestSdrKill_AllDevicesNil(t *testing.T) {
+	// Save and restore
+	oldShutdown := sdrShutdown
+	oldUAT := UATDev
+	oldES := ESDev
+	oldOGN := OGNDev
+	oldAIS := AISDev
+	defer func() {
+		sdrShutdown = oldShutdown
+		UATDev = oldUAT
+		ESDev = oldES
+		OGNDev = oldOGN
+		AISDev = oldAIS
+	}()
+
+	// All devices nil - should return immediately without looping
+	UATDev = nil
+	ESDev = nil
+	OGNDev = nil
+	AISDev = nil
+	sdrShutdown = false
+
+	sdrKill()
+
+	if !sdrShutdown {
+		t.Error("sdrShutdown should be true")
+	}
+}
+
+// TestSdrKill_WaitsForDevices tests sdrKill waiting for devices to be nil
+func TestSdrKill_WaitsForDevices(t *testing.T) {
+	// Save and restore
+	oldShutdown := sdrShutdown
+	oldUAT := UATDev
+	oldES := ESDev
+	oldOGN := OGNDev
+	oldAIS := AISDev
+	defer func() {
+		sdrShutdown = oldShutdown
+		UATDev = oldUAT
+		ESDev = oldES
+		OGNDev = oldOGN
+		AISDev = oldAIS
+	}()
+
+	// Create a mock SDR object (use empty struct pointer)
+	// Ensure other devices are nil
+	UATDev = &UAT{}
+	ESDev = nil
+	OGNDev = nil
+	AISDev = nil
+	sdrShutdown = false
+
+	// Start sdrKill in goroutine
+	done := make(chan bool)
+	go func() {
+		sdrKill()
+		done <- true
+	}()
+
+	// Wait a bit then nil out the device
+	time.Sleep(100 * time.Millisecond)
+	UATDev = nil
+
+	// Should complete within reasonable time
+	select {
+	case <-done:
+		// Success
+		if !sdrShutdown {
+			t.Error("sdrShutdown should be true after sdrKill completes")
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("sdrKill didn't complete in time")
+	}
+}
+
 // TestReCompileValidPatterns tests reCompile with various valid patterns
 func TestReCompileValidPatterns(t *testing.T) {
 	tests := []struct {

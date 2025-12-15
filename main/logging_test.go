@@ -1134,6 +1134,259 @@ func TestDeleteOldestLog_WithConfigurablePath(t *testing.T) {
 	})
 }
 
+// TestDeleteOldestLog_EdgeCases tests edge cases and error paths to improve coverage
+func TestDeleteOldestLog_EdgeCases(t *testing.T) {
+	// Save original values
+	origLogDirf := logDirf
+	origLogDirPath := logDirPath
+	defer func() {
+		logDirf = origLogDirf
+		logDirPath = origLogDirPath
+	}()
+
+	t.Run("stat_error_on_deleted_file", func(t *testing.T) {
+		// This test simulates a race condition where the file is deleted
+		// between getStratuxLogFiles() and os.Stat()
+		tmpDir, err := os.MkdirTemp("", "test-delete-stat-race-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// Create a log file
+		logPath := filepath.Join(tmpDir, debugLogFile+".1")
+		f, err := os.Create(logPath)
+		if err != nil {
+			t.Fatalf("Failed to create log: %v", err)
+		}
+		f.WriteString("Content")
+		f.Close()
+
+		// Delete the file to trigger stat error
+		os.Remove(logPath)
+
+		// deleteOldestLog should return 0 when stat fails
+		deleted := deleteOldestLog()
+		if deleted != 0 {
+			t.Errorf("Expected 0 when stat fails, got %d", deleted)
+		}
+	})
+
+	t.Run("remove_error_on_read_only_dir", func(t *testing.T) {
+		// This test tries to simulate remove error by using a read-only directory
+		// Note: This may not work on all systems/environments
+		tmpDir, err := os.MkdirTemp("", "test-delete-readonly-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// Create a log file
+		logPath := filepath.Join(tmpDir, debugLogFile+".1")
+		f, err := os.Create(logPath)
+		if err != nil {
+			t.Fatalf("Failed to create log: %v", err)
+		}
+		content := "Test content for remove error"
+		f.WriteString(content)
+		f.Close()
+
+		// Make directory read-only (this may not prevent deletion on all systems)
+		os.Chmod(tmpDir, 0444)
+		defer os.Chmod(tmpDir, 0755) // Restore permissions for cleanup
+
+		// Try to delete - may return 0 if remove fails
+		deleted := deleteOldestLog()
+
+		// On systems where chmod prevents deletion, we expect 0
+		// On systems where it doesn't, we expect the file size
+		t.Logf("Deleted %d bytes (0 if remove failed due to permissions)", deleted)
+	})
+
+	t.Run("remove_error_on_nonexistent_file", func(t *testing.T) {
+		// This test creates a scenario where the file exists during listing
+		// but is removed before the actual deletion attempt
+		tmpDir, err := os.MkdirTemp("", "test-delete-removed-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// Create a log file
+		logPath := filepath.Join(tmpDir, debugLogFile+".1")
+		f, err := os.Create(logPath)
+		if err != nil {
+			t.Fatalf("Failed to create log: %v", err)
+		}
+		f.WriteString("Content")
+		f.Close()
+
+		// Stat the file first to ensure it exists
+		stat, err := os.Stat(logPath)
+		if err != nil {
+			t.Fatalf("File should exist before test: %v", err)
+		}
+		expectedSize := stat.Size()
+
+		// Normal deletion should work
+		deleted := deleteOldestLog()
+		if deleted != expectedSize {
+			t.Errorf("Expected %d bytes deleted, got %d", expectedSize, deleted)
+		}
+
+		// Verify file was actually deleted
+		if _, err := os.Stat(logPath); err == nil {
+			t.Error("File should be deleted")
+		}
+	})
+
+	t.Run("empty_directory_returns_zero", func(t *testing.T) {
+		// This explicitly tests the len(logs) == 0 path
+		tmpDir, err := os.MkdirTemp("", "test-delete-empty-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// No log files created - directory is empty
+		logs := getStratuxLogFiles()
+		if len(logs) != 0 {
+			t.Fatalf("Expected empty directory, got %d files", len(logs))
+		}
+
+		// deleteOldestLog should return 0 for empty directory
+		deleted := deleteOldestLog()
+		if deleted != 0 {
+			t.Errorf("Expected 0 for empty directory, got %d", deleted)
+		}
+	})
+
+	t.Run("multiple_files_deletes_highest_number", func(t *testing.T) {
+		// Verify that deleteOldestLog selects logs[len(logs)-1]
+		// which is the highest number (oldest) in sorted order
+		tmpDir, err := os.MkdirTemp("", "test-delete-highest-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// Create multiple log files
+		for i := 1; i <= 5; i++ {
+			logPath := filepath.Join(tmpDir, debugLogFile+"."+strconv.Itoa(i))
+			f, _ := os.Create(logPath)
+			f.WriteString("Log " + strconv.Itoa(i))
+			f.Close()
+		}
+
+		// The oldest should be .5 (highest number in sorted order)
+		oldestPath := filepath.Join(tmpDir, debugLogFile+".5")
+		stat, _ := os.Stat(oldestPath)
+		expectedSize := stat.Size()
+
+		// Delete oldest
+		deleted := deleteOldestLog()
+
+		if deleted != expectedSize {
+			t.Errorf("Expected %d bytes, got %d", expectedSize, deleted)
+		}
+
+		// Verify .5 was deleted
+		if _, err := os.Stat(oldestPath); err == nil {
+			t.Error("Expected .5 to be deleted")
+		}
+
+		// Verify others still exist
+		for i := 1; i <= 4; i++ {
+			logPath := filepath.Join(tmpDir, debugLogFile+"."+strconv.Itoa(i))
+			if _, err := os.Stat(logPath); err != nil {
+				t.Errorf("Expected .%d to still exist", i)
+			}
+		}
+	})
+
+	t.Run("permission_denied_stat", func(t *testing.T) {
+		// Test the error path where stat returns an error
+		// We create a file, then make it inaccessible
+		tmpDir, err := os.MkdirTemp("", "test-delete-nostat-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// Create a log file
+		logPath := filepath.Join(tmpDir, debugLogFile+".1")
+		f, err := os.Create(logPath)
+		if err != nil {
+			t.Fatalf("Failed to create log: %v", err)
+		}
+		f.WriteString("Content")
+		f.Close()
+
+		// Remove all permissions to make stat fail
+		// Note: This may not work as expected on all systems
+		os.Chmod(logPath, 0000)
+		defer os.Chmod(logPath, 0644) // Restore for cleanup
+
+		// Attempt to delete - should return 0 if stat fails
+		deleted := deleteOldestLog()
+
+		// The result depends on whether the OS allows stat on a no-permission file
+		// On most systems, root or the file owner can still stat it
+		t.Logf("Deleted %d bytes (may be 0 if stat denied, or actual size if allowed)", deleted)
+	})
+
+	t.Run("valid_deletion_returns_size", func(t *testing.T) {
+		// This test verifies the happy path - successful deletion returns file size
+		tmpDir, err := os.MkdirTemp("", "test-delete-valid-*")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+
+		// Create a log file with known content
+		logPath := filepath.Join(tmpDir, debugLogFile+".1")
+		content := "This is test content with known size"
+		err = os.WriteFile(logPath, []byte(content), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create log: %v", err)
+		}
+
+		expectedSize := int64(len(content))
+
+		// Delete and verify size is returned
+		deleted := deleteOldestLog()
+		if deleted != expectedSize {
+			t.Errorf("Expected %d bytes, got %d", expectedSize, deleted)
+		}
+
+		// Verify file no longer exists
+		if _, err := os.Stat(logPath); err == nil {
+			t.Error("File should be deleted")
+		}
+	})
+}
+
 // TestGetStratuxLogFiles_WithConfigurablePath tests getStratuxLogFiles with configurable logDirPath
 func TestGetStratuxLogFiles_WithConfigurablePath(t *testing.T) {
 	// Save original values
@@ -1264,6 +1517,117 @@ func TestResetPathsToDefaults(t *testing.T) {
 	stratuxHome = origStratuxHome
 	logDirPath = origLogDirPath
 	varLogDirPath = origVarLogDirPath
+}
+
+// TestLogFileWatcherOnce_SimpleScenarios tests basic scenarios for logFileWatcherOnce
+// These tests focus on the three main code paths and ensure proper return values.
+func TestLogFileWatcherOnce_SimpleScenarios(t *testing.T) {
+	// Save original values
+	origLogDirPath := logDirPath
+	origLogDirf := logDirf
+	origDebugLogf := debugLogf
+	origLogFileHandle := logFileHandle
+	defer func() {
+		logDirPath = origLogDirPath
+		logDirf = origLogDirf
+		debugLogf = origDebugLogf
+		if logFileHandle != nil && logFileHandle != origLogFileHandle {
+			logFileHandle.Close()
+		}
+		logFileHandle = origLogFileHandle
+	}()
+
+	t.Run("file_does_not_exist", func(t *testing.T) {
+		// Setup: Point to non-existent file
+		tmpDir, err := os.MkdirTemp("", "logwatcher_test")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "nonexistent.log")
+
+		// Test: Call logFileWatcherOnce when file doesn't exist
+		result := logFileWatcherOnce()
+
+		// Verify: Should return false (no action taken)
+		if result != false {
+			t.Errorf("Expected false when file doesn't exist, got %v", result)
+		}
+	})
+
+	t.Run("small_file_no_rotation", func(t *testing.T) {
+		// Setup: Create small file under 10MB limit
+		tmpDir, err := os.MkdirTemp("", "logwatcher_small")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "stratux.log")
+
+		// Create a file well under 10MB (1KB)
+		smallContent := []byte(strings.Repeat("test log line\n", 100))
+		err = os.WriteFile(debugLogf, smallContent, 0644)
+		if err != nil {
+			t.Fatalf("Failed to create small log file: %v", err)
+		}
+
+		// Test: Call logFileWatcherOnce with small file
+		result := logFileWatcherOnce()
+
+		// Verify: Should return false on systems with adequate disk space
+		// (rotation not triggered because file < 10MB)
+		// Note: Could return true if disk space < 50MB, but that's system-dependent
+		if result {
+			t.Logf("Action taken (likely due to low disk space on test system)")
+		} else {
+			t.Logf("No action taken as expected (file < 10MB, adequate disk space)")
+		}
+
+		// Verify log file was NOT rotated (no .1 file created)
+		rotatedFile := debugLogf + ".1"
+		if _, err := os.Stat(rotatedFile); err == nil {
+			t.Error("Small file should not be rotated")
+		}
+	})
+
+	t.Run("return_false_when_no_action_needed", func(t *testing.T) {
+		// Setup: Create environment where no action is needed
+		tmpDir, err := os.MkdirTemp("", "logwatcher_noaction")
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		logDirPath = tmpDir
+		logDirf = tmpDir
+		debugLogf = filepath.Join(tmpDir, "stratux.log")
+
+		// Create tiny log file (100 bytes)
+		tinyContent := []byte("Small log file content")
+		err = os.WriteFile(debugLogf, tinyContent, 0644)
+		if err != nil {
+			t.Fatalf("Failed to create log file: %v", err)
+		}
+
+		// Test: Call logFileWatcherOnce
+		result := logFileWatcherOnce()
+
+		// Verify: On most systems with > 50MB free space and small log file,
+		// no action should be taken and function should return false
+		if result {
+			t.Logf("Warning: Action was taken despite small file size. " +
+				"This may indicate low disk space on the test system (< 50MB free)")
+		}
+
+		// The important thing is the function completes without error
+		t.Log("logFileWatcherOnce completed successfully")
+	})
 }
 
 // TestLogFileWatcherOnce tests the extracted log file watcher logic

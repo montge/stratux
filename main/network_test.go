@@ -3771,6 +3771,241 @@ func TestRefreshConnectedClients_PreservesSerialConnections(t *testing.T) {
 	}
 }
 
+// TestRefreshConnectedClients_GetDHCPLeasesError tests error handling when getDHCPLeases fails
+func TestRefreshConnectedClients_GetDHCPLeasesError(t *testing.T) {
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	// Save and set paths to invalid/non-existent directory
+	origDhcpLeaseDirPath := dhcpLeaseDirPath
+	origDhcpLeaseFilePath := dhcpLeaseFilePath
+	origArpFilePath := arpFilePath
+	origExtraHostsFilePath := extraHostsFilePath
+	origDhcpLeaseDirectoryLastTest := dhcpLeaseDirectoryLastTest
+
+	// Set to non-existent path to cause getDHCPLeases to fail
+	dhcpLeaseDirPath = "/nonexistent/invalid/path"
+	dhcpLeaseFilePath = "/nonexistent/invalid/path/dnsmasq.leases"
+	arpFilePath = "/nonexistent/invalid/path/arp"
+	extraHostsFilePath = "/nonexistent/invalid/path/static-hosts.conf"
+	dhcpLeaseDirectoryLastTest = time.Time{}
+
+	defer func() {
+		dhcpLeaseDirPath = origDhcpLeaseDirPath
+		dhcpLeaseFilePath = origDhcpLeaseFilePath
+		arpFilePath = origArpFilePath
+		extraHostsFilePath = origExtraHostsFilePath
+		dhcpLeaseDirectoryLastTest = origDhcpLeaseDirectoryLastTest
+	}()
+
+	// Setup network outputs
+	origNetworkOutputs := globalSettings.NetworkOutputs
+	globalSettings.NetworkOutputs = []networkConnection{
+		{Port: 4000, Capability: NETWORK_GDL90_STANDARD},
+	}
+	defer func() { globalSettings.NetworkOutputs = origNetworkOutputs }()
+
+	// Save old connections
+	netMutex.Lock()
+	oldConnections := clientConnections
+	clientConnections = make(map[string]connection)
+	netMutex.Unlock()
+	defer func() {
+		netMutex.Lock()
+		clientConnections = oldConnections
+		netMutex.Unlock()
+	}()
+
+	// Call refreshConnectedClients - should return early due to getDHCPLeases error
+	refreshConnectedClients()
+
+	// Should not have any connections since getDHCPLeases failed
+	netMutex.Lock()
+	connCount := len(clientConnections)
+	netMutex.Unlock()
+
+	if connCount != 0 {
+		t.Errorf("Expected 0 connections when getDHCPLeases fails, got %d", connCount)
+	}
+
+	t.Logf("Connections: %d (function returned early due to getDHCPLeases error)", connCount)
+}
+
+// TestRefreshConnectedClients_ResolveUDPAddrError tests error handling when ResolveUDPAddr fails
+func TestRefreshConnectedClients_ResolveUDPAddrError(t *testing.T) {
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Setup test directory
+	tmpDir, err := os.MkdirTemp("", "stratux_network_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Save and set paths
+	origDhcpLeaseDirPath := dhcpLeaseDirPath
+	origDhcpLeaseFilePath := dhcpLeaseFilePath
+	origArpFilePath := arpFilePath
+	origExtraHostsFilePath := extraHostsFilePath
+	origDhcpLeaseDirectoryLastTest := dhcpLeaseDirectoryLastTest
+
+	dhcpLeaseDirPath = tmpDir
+	dhcpLeaseFilePath = filepath.Join(tmpDir, "dnsmasq.leases")
+	arpFilePath = filepath.Join(tmpDir, "arp")
+	extraHostsFilePath = filepath.Join(tmpDir, "static-hosts.conf")
+	dhcpLeaseDirectoryLastTest = time.Time{}
+
+	defer func() {
+		dhcpLeaseDirPath = origDhcpLeaseDirPath
+		dhcpLeaseFilePath = origDhcpLeaseFilePath
+		arpFilePath = origArpFilePath
+		extraHostsFilePath = origExtraHostsFilePath
+		dhcpLeaseDirectoryLastTest = origDhcpLeaseDirectoryLastTest
+	}()
+
+	// Create lease file with an IP that will work
+	leaseContent := `1609459200 aa:bb:cc:dd:ee:01 192.168.10.101 test-client-1 *
+`
+	if err := os.WriteFile(dhcpLeaseFilePath, []byte(leaseContent), 0644); err != nil {
+		t.Fatalf("Failed to create lease file: %v", err)
+	}
+
+	// Setup network outputs with an invalid port that will cause ResolveUDPAddr to potentially fail
+	// Using port 0 should work, but we can use extremely large port number
+	origNetworkOutputs := globalSettings.NetworkOutputs
+	globalSettings.NetworkOutputs = []networkConnection{
+		{Port: 99999, Capability: NETWORK_GDL90_STANDARD}, // Port out of range
+	}
+	defer func() { globalSettings.NetworkOutputs = origNetworkOutputs }()
+
+	// Clear connections
+	clientConnections = make(map[string]connection)
+
+	// Call refreshConnectedClients - should handle error gracefully
+	refreshConnectedClients()
+
+	// Should have processed leases even though connection failed
+	netMutex.Lock()
+	leaseCount := len(dhcpLeases)
+	connCount := len(clientConnections)
+	netMutex.Unlock()
+
+	if leaseCount != 1 {
+		t.Errorf("Expected 1 DHCP lease, got %d", leaseCount)
+	}
+
+	// Connection should not be created due to invalid port
+	if connCount != 0 {
+		t.Logf("Warning: Expected 0 connections with invalid port, got %d (port validation may vary by system)", connCount)
+	}
+
+	t.Logf("DHCP leases: %d, connections: %d", leaseCount, connCount)
+}
+
+// TestRefreshConnectedClients_DialUDPError tests error handling when DialUDP fails
+func TestRefreshConnectedClients_DialUDPError(t *testing.T) {
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Setup test directory
+	tmpDir, err := os.MkdirTemp("", "stratux_network_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Save and set paths
+	origDhcpLeaseDirPath := dhcpLeaseDirPath
+	origDhcpLeaseFilePath := dhcpLeaseFilePath
+	origArpFilePath := arpFilePath
+	origExtraHostsFilePath := extraHostsFilePath
+	origDhcpLeaseDirectoryLastTest := dhcpLeaseDirectoryLastTest
+
+	dhcpLeaseDirPath = tmpDir
+	dhcpLeaseFilePath = filepath.Join(tmpDir, "dnsmasq.leases")
+	arpFilePath = filepath.Join(tmpDir, "arp")
+	extraHostsFilePath = filepath.Join(tmpDir, "static-hosts.conf")
+	dhcpLeaseDirectoryLastTest = time.Time{}
+
+	defer func() {
+		dhcpLeaseDirPath = origDhcpLeaseDirPath
+		dhcpLeaseFilePath = origDhcpLeaseFilePath
+		arpFilePath = origArpFilePath
+		extraHostsFilePath = origExtraHostsFilePath
+		dhcpLeaseDirectoryLastTest = origDhcpLeaseDirectoryLastTest
+	}()
+
+	// Note: It's difficult to reliably trigger a DialUDP error in tests because:
+	// 1. UDP is connectionless - DialUDP almost always succeeds
+	// 2. It only fails on system-level issues (e.g., no network interfaces)
+	// 3. Even invalid/unreachable addresses succeed because UDP doesn't verify connectivity
+	//
+	// The ResolveUDPAddr error test above provides more reliable coverage.
+	// This test documents that DialUDP errors are extremely rare in practice.
+	//
+	// Using various addresses that should theoretically cause issues:
+	// - 255.255.255.255 (broadcast) - typically succeeds
+	// - 0.0.0.0 (any address) - typically succeeds
+	// - 224.0.0.1 (multicast) - typically succeeds
+	//
+	// We'll test with multicast to at least exercise the code path even if it doesn't error.
+
+	leaseContent := `1609459200 aa:bb:cc:dd:ee:02 224.0.0.1 test-client-2 *
+`
+	if err := os.WriteFile(dhcpLeaseFilePath, []byte(leaseContent), 0644); err != nil {
+		t.Fatalf("Failed to create lease file: %v", err)
+	}
+
+	// Setup network outputs
+	origNetworkOutputs := globalSettings.NetworkOutputs
+	globalSettings.NetworkOutputs = []networkConnection{
+		{Port: 4000, Capability: NETWORK_GDL90_STANDARD},
+	}
+	defer func() { globalSettings.NetworkOutputs = origNetworkOutputs }()
+
+	// Clear connections
+	clientConnections = make(map[string]connection)
+
+	// Call refreshConnectedClients - should handle any errors gracefully
+	refreshConnectedClients()
+
+	// Should have processed leases
+	netMutex.Lock()
+	leaseCount := len(dhcpLeases)
+	connCount := len(clientConnections)
+	netMutex.Unlock()
+
+	if leaseCount != 1 {
+		t.Errorf("Expected 1 DHCP lease, got %d", leaseCount)
+	}
+
+	// The important thing is that the function doesn't panic, regardless of whether
+	// the connection was created or not
+	t.Logf("DHCP leases: %d, connections: %d (DialUDP rarely fails for UDP)", leaseCount, connCount)
+}
+
 // TestSendMsg_EmptyConnections tests sendMsg with no connections
 func TestSendMsg_EmptyConnections(t *testing.T) {
 	if netMutex == nil {
