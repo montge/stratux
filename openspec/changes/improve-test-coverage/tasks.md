@@ -35,10 +35,12 @@
 ### 2.2 Logging Function Improvements
 - [x] getStratuxLogFiles: 77.8% → 100%
 - [x] rotateLogs: 33.3% → 100%
-- [x] deleteOldestLog: 27.3% → 81.8%
+- [x] deleteOldestLog: 27.3% → 81.8% → 90.9%
 
 ### 2.3 Management Interface Improvements
-- [x] handleDownloadAHRSLogsRequest: 36.1% → 72.2%
+- [x] handleDownloadAHRSLogsRequest: 36.1% → 72.2% → 83.3%
+- [x] handleDownloadLogRequest: → 100%
+- [x] handleDownloadDBRequest: → 100%
 - [x] viewLogs: 77.5% → 85.0%
 - [x] handleDeleteAHRSLogFiles: 100%
 
@@ -65,15 +67,16 @@
 
 ### 3.3 Network Interface (Partially Complete)
 - [x] Core network functions already at 100% (`sendMsg`, `sendGDL90`, `connectionWriter`)
-- [ ] `getDHCPLeases` - needs path configuration
-- [ ] `refreshConnectedClients` - needs refactoring
+- [x] `getDHCPLeases`: 0% → 97.6%
+- [x] `refreshConnectedClients`: 80.6% → 87.1%
 - **Note**: Loop-based watchers (`monitorDHCPLeases`, `getNetworkStats`) require extraction like GPS.
 
 ### 3.4 Coverage Summary
 - processSerialInput: 0% → 87.5%
 - gpsSerialReader: 0% (wrapper only, logic now in processSerialInput)
 - Network core functions: 100%
-- SDR: Requires hardware, deferred to future work
+- sdrKill: 66.7% → 100%
+- SDR watcher: Requires hardware, deferred to future work
 
 ## 4. Phase 4: Configurable Constants (Complete: 57.8%)
 
@@ -189,13 +192,36 @@
   - Tests DEBUG logging level output
   - Note: Slow write warning (>10s) is untestable in unit tests
 
-### 7.6 Concurrent Access
+### 7.6 WebSocket Handlers (December 2025)
+- [x] handleRadarWS: 91.7% → 100%
+  - Added non-zero data branch test (buf[0] != 0)
+- [x] handleGDL90WS: 88.9% → 100%
+  - Added non-zero data branch test
+- [x] handleWeatherWS: 88.9% → 100%
+  - Added non-zero data branch test
+
+### 7.7 SDR Functions (December 2025)
+- [x] sdrKill: 66.7% → 100%
+  - Tests device wait loop with mock device
+  - Tests all-devices-nil fast path
+
+### 7.8 GPS Status Functions (December 2025)
+- [x] updateStatus: Added GPS fix quality tests
+  - Tests Dead Reckoning (GPSFixQuality == 6)
+  - Tests Unknown quality handling
+  - Tests Disconnected GPS state and satellite reset
+- [x] logFileWatcherOnce: Added simple scenario tests
+  - Tests file-not-exist path
+  - Tests small file no-rotation path
+  - Note: Disk cleanup loop requires <50MB free space
+
+### 7.9 Concurrent Access
 - [x] Test concurrent traffic map updates (traffic_test.go)
 - [x] Test concurrent settings changes (managementinterface_test.go)
 - [ ] Test concurrent client connections
 - [x] Test mutex deadlock prevention (various test files)
 
-### 7.7 Boundary Conditions
+### 7.10 Boundary Conditions
 - [x] Test latitude/longitude at limits (traffic_test.go)
 - [x] Test altitude at extremes (gen_gdl90_test.go)
 - [x] Test speed at limits (traffic_test.go)
@@ -296,9 +322,9 @@ These functions exceed SonarCloud's complexity threshold of 15:
 | Phase 4 | 75% | 57.8% (Complete) | +500 |
 | Phase 5 | 65% | 58.4% (Complete) | +100 |
 | Phase 6 | 75% | 59.5% (Complete) | +1,700 |
-| Phase 7 | 90%+ | 63.7% (In Progress) | +4,500 |
+| Phase 7 | 90%+ | 63.9% (In Progress) | +6,000 |
 | Phase 8 | N/A | Deduplication | -500 |
 | Phase 9 | N/A | SonarCloud Issues | N/A |
 
-**Current Coverage**: 63.7% (as of December 2025)
+**Current Coverage**: 63.9% (as of December 2025)
 Total estimated new test code: ~12,500+ lines
