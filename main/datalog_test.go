@@ -4104,3 +4104,227 @@ func TestDataLogIntegration(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	})
 }
+
+// TestDataLogWriter_DebugLogging tests the DEBUG logging paths in dataLogWriter
+func TestDataLogWriter_DebugLogging(t *testing.T) {
+	// Save original DEBUG setting
+	origDebug := globalSettings.DEBUG
+	defer func() {
+		globalSettings.DEBUG = origDebug
+	}()
+
+	// Enable DEBUG mode
+	globalSettings.DEBUG = true
+
+	// Initialize stratuxClock
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Create temporary database
+	tmpFile := t.TempDir() + "/test_debug_logging.db"
+	db, err := sql.Open("sqlite3", tmpFile)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	defer db.Close()
+
+	// Initialize database schema
+	makeTable(StratuxTimestamp{}, "timestamp", db)
+	makeTable(StratuxStartup{}, "startup", db)
+	makeTable(mySituation, "mySituation", db)
+
+	// Initialize global state
+	oldInsertString := insertString
+	oldInsertBatchIfs := insertBatchIfs
+	insertString = make(map[string]string)
+	insertBatchIfs = make(map[string][][]interface{})
+	defer func() {
+		insertString = oldInsertString
+		insertBatchIfs = oldInsertBatchIfs
+	}()
+
+	// Initialize timestamp data
+	dataLogTimestamps = make([]StratuxTimestamp, 1)
+	dataLogTimestamps[0] = StratuxTimestamp{
+		id:                   1,
+		Time_type_preference: 0,
+		StratuxClock_value:   stratuxClock.Time,
+		GPSClock_value:       time.Time{},
+		PreferredTime_value:  stratuxClock.Time,
+		StartupID:            1,
+	}
+	dataLogCurTimestamp = 0
+
+	// Create startup entry
+	stratuxStartupID = insertData(StratuxStartup{}, "startup", db, 0)
+
+	// Start the actual dataLogWriter goroutine
+	go dataLogWriter(db)
+
+	// Give it time to initialize
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify channels are initialized
+	if dataLogWriteChan == nil {
+		t.Fatal("dataLogWriteChan not initialized")
+	}
+	if shutdownDataLogWriter == nil {
+		t.Fatal("shutdownDataLogWriter not initialized")
+	}
+
+	// Send test data to trigger write
+	for i := 0; i < 5; i++ {
+		select {
+		case dataLogWriteChan <- DataLogRow{
+			tbl:    "mySituation",
+			data:   mySituation,
+			ts_num: 0,
+		}:
+		case <-time.After(1 * time.Second):
+			t.Fatal("Timeout sending to dataLogWriteChan")
+		}
+	}
+
+	t.Log("Sent 5 test rows, waiting for write ticker (10 seconds)")
+
+	// Wait for the 10-second ticker to fire and process the rows
+	// This should trigger the DEBUG logging paths at lines 380-382 and 404-407
+	time.Sleep(11 * time.Second)
+
+	// Verify data was written
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM mySituation").Scan(&count)
+	if err != nil {
+		t.Errorf("Failed to query database: %v", err)
+	}
+	if count != 5 {
+		t.Errorf("Expected 5 rows in database, got %d", count)
+	} else {
+		t.Logf("Successfully wrote %d rows with DEBUG logging enabled", count)
+	}
+
+	// Clean shutdown
+	select {
+	case shutdownDataLogWriter <- true:
+		t.Log("Sent shutdown signal")
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout sending shutdown signal")
+	}
+
+	// Wait a bit for shutdown to complete
+	time.Sleep(200 * time.Millisecond)
+}
+
+// NOTE: The slow write warning path (lines 408-412) is difficult to test in a unit test
+// environment because it requires an actual slow database write (>10 seconds). Creating
+// artificial delays doesn't help coverage since we need to use the actual dataLogWriter
+// function, and we can't easily make a real SQLite database slow in a controlled way.
+// This path is best tested through:
+// 1. Integration tests with a heavily loaded database
+// 2. Manual testing with large data volumes
+// 3. Production monitoring
+//
+// The slow write warning code at lines 408-412:
+//   if timeElapsed.Seconds() > 10.0 {
+//       log.Printf("WARNING! SQLite logging is behind. Last write took %.1f seconds.\n", ...)
+//       addSystemError(...)
+//   }
+
+// TestDataLogWriter_ShutdownChannel tests the shutdown channel handling
+func TestDataLogWriter_ShutdownChannel(t *testing.T) {
+	// Initialize stratuxClock
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Create temporary database
+	tmpFile := t.TempDir() + "/test_shutdown.db"
+	db, err := sql.Open("sqlite3", tmpFile)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	defer db.Close()
+
+	// Initialize database schema
+	makeTable(StratuxTimestamp{}, "timestamp", db)
+	makeTable(StratuxStartup{}, "startup", db)
+	makeTable(mySituation, "mySituation", db)
+
+	// Initialize global state
+	oldInsertString := insertString
+	oldInsertBatchIfs := insertBatchIfs
+	insertString = make(map[string]string)
+	insertBatchIfs = make(map[string][][]interface{})
+	defer func() {
+		insertString = oldInsertString
+		insertBatchIfs = oldInsertBatchIfs
+	}()
+
+	// Initialize timestamp data
+	dataLogTimestamps = make([]StratuxTimestamp, 1)
+	dataLogTimestamps[0] = StratuxTimestamp{
+		id:                   1,
+		Time_type_preference: 0,
+		StratuxClock_value:   stratuxClock.Time,
+		GPSClock_value:       time.Time{},
+		PreferredTime_value:  stratuxClock.Time,
+		StartupID:            1,
+	}
+	dataLogCurTimestamp = 0
+
+	// Create startup entry
+	stratuxStartupID = insertData(StratuxStartup{}, "startup", db, 0)
+
+	// Initialize shutdownDataLog channel to capture shutdown signal
+	shutdownDataLog = make(chan bool, 1)
+	defer close(shutdownDataLog)
+
+	// Start the actual dataLogWriter goroutine
+	go dataLogWriter(db)
+
+	// Give it time to initialize
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify channels are initialized
+	if dataLogWriteChan == nil {
+		t.Fatal("dataLogWriteChan not initialized")
+	}
+	if shutdownDataLogWriter == nil {
+		t.Fatal("shutdownDataLogWriter not initialized")
+	}
+
+	// Send some data to the queue before shutdown
+	select {
+	case dataLogWriteChan <- DataLogRow{
+		tbl:    "mySituation",
+		data:   mySituation,
+		ts_num: 0,
+	}:
+		t.Log("Sent test row before shutdown")
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout sending to dataLogWriteChan")
+	}
+
+	// Send shutdown signal - this should trigger the shutdown path at lines 413-416
+	select {
+	case shutdownDataLogWriter <- true:
+		t.Log("Sent shutdown signal to dataLogWriter")
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout sending shutdown signal")
+	}
+
+	// Verify that dataLogWriter sends shutdown signal to dataLog
+	select {
+	case <-shutdownDataLog:
+		t.Log("Successfully received shutdown signal from dataLogWriter to dataLog")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout waiting for shutdown signal to dataLog")
+	}
+
+	// Give goroutine time to exit
+	time.Sleep(200 * time.Millisecond)
+	t.Log("Shutdown channel handling tested successfully")
+}

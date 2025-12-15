@@ -2698,18 +2698,86 @@ func TestFsWriteTest(t *testing.T) {
 // TestSetActLed tests LED control function
 // Verifies: Status LED control
 func TestSetActLed(t *testing.T) {
-	// This function writes to system files and may fail in test environment
-	// We just verify it doesn't panic
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("setActLed panicked: %v", r)
+	t.Run("set_led_on", func(t *testing.T) {
+		// This function writes to system files and may fail in test environment
+		// We just verify it doesn't panic when setting LED on (state=true)
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("setActLed(true) panicked: %v", r)
+			}
+		}()
+
+		setActLed(true)
+		t.Log("setActLed(true) called successfully")
+	})
+
+	t.Run("set_led_off", func(t *testing.T) {
+		// Test setting LED off (state=false)
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("setActLed(false) panicked: %v", r)
+			}
+		}()
+
+		setActLed(false)
+		t.Log("setActLed(false) called successfully")
+	})
+
+	t.Run("multiple_state_changes", func(t *testing.T) {
+		// Test multiple calls with different states to ensure the function
+		// handles state transitions correctly
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("setActLed panicked during multiple calls: %v", r)
+			}
+		}()
+
+		// Test sequence: on -> off -> on -> on -> off
+		states := []bool{true, false, true, true, false}
+		for i, state := range states {
+			setActLed(state)
+			t.Logf("Call %d: setActLed(%v) succeeded", i+1, state)
 		}
-	}()
 
-	setActLed(true)
-	setActLed(false)
+		t.Log("Multiple setActLed calls completed successfully")
+	})
 
-	t.Log("setActLed called successfully (may have failed to write, but didn't panic)")
+	t.Run("led_path_fallback_logic", func(t *testing.T) {
+		// The function checks two LED paths:
+		// 1. /sys/class/leds/led0/brightness (older kernels)
+		// 2. /sys/class/leds/ACT/brightness (kernel 6.1.21-v8+)
+		// This test verifies the function handles both paths without error
+
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("setActLed panicked during path fallback test: %v", r)
+			}
+		}()
+
+		// Check if either LED path exists
+		led0Exists := false
+		actExists := false
+
+		if _, err := os.Stat("/sys/class/leds/led0/brightness"); err == nil {
+			led0Exists = true
+			t.Log("Found LED path: /sys/class/leds/led0/brightness")
+		}
+
+		if _, err := os.Stat("/sys/class/leds/ACT/brightness"); err == nil {
+			actExists = true
+			t.Log("Found LED path: /sys/class/leds/ACT/brightness")
+		}
+
+		if !led0Exists && !actExists {
+			t.Log("Neither LED path exists (expected on non-Pi systems)")
+		}
+
+		// Call setActLed regardless - it should handle missing paths gracefully
+		setActLed(true)
+		setActLed(false)
+
+		t.Log("LED path fallback logic handled correctly")
+	})
 }
 
 // TestSaveSettings_Basic tests settings save functionality
@@ -2787,19 +2855,117 @@ func TestSaveSettings_ReadOnly(t *testing.T) {
 // TestGracefulShutdown tests shutdown sequence
 // Verifies: Clean shutdown procedure
 func TestGracefulShutdown(t *testing.T) {
-	// This function calls several subsystem shutdown functions
-	// We verify it doesn't panic
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("gracefulShutdown panicked: %v", r)
-		}
-	}()
+	t.Run("basic_shutdown", func(t *testing.T) {
+		// This function calls several subsystem shutdown functions
+		// We verify it doesn't panic
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("gracefulShutdown panicked: %v", r)
+			}
+		}()
 
-	// Note: Most subsystems won't be initialized in test
-	// so the shutdown calls will be no-ops
-	gracefulShutdown()
+		// Save original values
+		origDataLogStarted := dataLogStarted
+		origSdrShutdown := sdrShutdown
+		origShutdownPing := shutdownPing
+		origShutdownPong := shutdownPong
+		origUATDev := UATDev
+		origESDev := ESDev
+		origOGNDev := OGNDev
+		origAISDev := AISDev
+		origPingConnected := globalStatus.Ping_connected
+		origPongConnected := globalStatus.Pong_connected
 
-	t.Log("gracefulShutdown completed without panic")
+		defer func() {
+			dataLogStarted = origDataLogStarted
+			sdrShutdown = origSdrShutdown
+			shutdownPing = origShutdownPing
+			shutdownPong = origShutdownPong
+			UATDev = origUATDev
+			ESDev = origESDev
+			OGNDev = origOGNDev
+			AISDev = origAISDev
+			globalStatus.Ping_connected = origPingConnected
+			globalStatus.Pong_connected = origPongConnected
+		}()
+
+		// Set up for fast shutdown (no devices)
+		dataLogStarted = false
+		UATDev = nil
+		ESDev = nil
+		OGNDev = nil
+		AISDev = nil
+		globalStatus.Ping_connected = false
+		globalStatus.Pong_connected = false
+
+		// Note: Most subsystems won't be initialized in test
+		// so the shutdown calls will be no-ops
+		gracefulShutdown()
+
+		t.Log("gracefulShutdown completed without panic")
+	})
+
+	t.Run("with_data_log_started", func(t *testing.T) {
+		// This test case covers the dataLogStarted branch (line 1666 in gen_gdl90.go)
+		// that was previously uncovered, bringing coverage from 85.7% to higher
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("gracefulShutdown panicked with dataLogStarted=true: %v", r)
+			}
+		}()
+
+		// Save original values
+		origDataLogStarted := dataLogStarted
+		origSdrShutdown := sdrShutdown
+		origShutdownPing := shutdownPing
+		origShutdownPong := shutdownPong
+		origUATDev := UATDev
+		origESDev := ESDev
+		origOGNDev := OGNDev
+		origAISDev := AISDev
+		origPingConnected := globalStatus.Ping_connected
+		origPongConnected := globalStatus.Pong_connected
+		origShutdownDataLogWriter := shutdownDataLogWriter
+
+		defer func() {
+			dataLogStarted = origDataLogStarted
+			sdrShutdown = origSdrShutdown
+			shutdownPing = origShutdownPing
+			shutdownPong = origShutdownPong
+			UATDev = origUATDev
+			ESDev = origESDev
+			OGNDev = origOGNDev
+			AISDev = origAISDev
+			globalStatus.Ping_connected = origPingConnected
+			globalStatus.Pong_connected = origPongConnected
+			shutdownDataLogWriter = origShutdownDataLogWriter
+		}()
+
+		// Set up for fast shutdown with data log started
+		dataLogStarted = true // This triggers the if dataLogStarted branch
+		UATDev = nil
+		ESDev = nil
+		OGNDev = nil
+		AISDev = nil
+		globalStatus.Ping_connected = false
+		globalStatus.Pong_connected = false
+
+		// Create a new shutdown channel for this test
+		shutdownDataLogWriter = make(chan bool, 1)
+
+		// Start a minimal goroutine that simulates dataLog() responding to shutdown
+		// This prevents closeDataLog() from hanging
+		go func() {
+			<-shutdownDataLogWriter // Wait for shutdown signal
+			dataLogStarted = false  // Set flag to false so closeDataLog() can complete
+		}()
+
+		// Call gracefulShutdown - it should enter the if dataLogStarted branch
+		// and call closeDataLog(), which will signal the goroutine above
+		gracefulShutdown()
+
+		t.Log("gracefulShutdown completed with dataLogStarted=true")
+	})
 }
 
 // TestSdrKillWithConnectedDevice tests the sdrKill function when devices are connected
