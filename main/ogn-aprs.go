@@ -220,7 +220,8 @@ func parseAprsMessage(data string, fakeCurrentTime bool) {
 
 		details, err := hex.DecodeString(res[14][:2])
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error decoding APRS details: %s\n", err.Error())
+			return
 		}
 		detail_byte := details[0]
 		addr_type := detail_byte & 0b00000011
