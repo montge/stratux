@@ -1012,8 +1012,7 @@ func updateStatus() {
 	globalStatus.Uptime = int64(stratuxClock.GetMilliseconds())
 	globalStatus.UptimeClock = stratuxClock.GetTime()
 
-	usage := du.NewDiskUsage("/")
-	globalStatus.DiskBytesFree = usage.Free()
+	globalStatus.DiskBytesFree = getDiskFreeBytes("/")
 	globalStatus.Logfile_Size = logFileSize()
 
 	var ahrsLogSize int64

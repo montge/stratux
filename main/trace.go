@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ricochet2200/go-disk-usage/du"
 	"golang.org/x/exp/slices"
 )
 
@@ -193,8 +192,7 @@ func traceLoggerWatchdog() {
 		}
 
 		if TraceLog.IsActive() {
-			usage := du.NewDiskUsage("/")
-			if usage.Free() < 1024*1024*50 {
+			if getDiskFreeBytes("/") < 1024*1024*50 {
 				// less than 50mb free? deactivate
 				log.Printf("Space running out - disable trace logging for this run")
 				TraceLog.Stop()
