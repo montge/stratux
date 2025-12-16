@@ -348,25 +348,51 @@ Current web interface uses **AngularJS 1.3.0-rc.3** (2014) which is:
 - Also references AngularJS 1.8.3 in some files
 - mobile-angular-ui framework
 
-### 11.2 Upgrade Options
+### 11.2 Decision: Option B - Migrate to Modern Framework ✓
 
-**Option A: Upgrade to AngularJS 1.8.3** (Minimal effort)
-- [ ] Update CDN references to 1.8.3
-- [ ] Test all pages for compatibility
-- [ ] Fix any breaking changes
-- **Note**: Still EOL, but better than 1.3.0-rc.3
+**Rationale**:
+- AngularJS 1.x is end-of-life with no security updates
+- Modern frameworks offer better performance, tooling, and maintainability
+- Investment in migration pays off long-term vs. staying on dead framework
+- Opportunity to improve mobile responsiveness and offline capabilities
 
-**Option B: Migrate to Modern Framework** (Recommended, High effort)
-- [ ] Evaluate Vue.js, React, or Angular (modern)
-- [ ] Plan incremental migration strategy
-- [ ] Rewrite web interface components
-- [ ] Maintain backward compatibility during migration
+### 11.3 Framework Evaluation
+- [ ] Evaluate Vue.js 3 (lightweight, easy migration from AngularJS)
+- [ ] Evaluate React 18+ (large ecosystem, component reuse)
+- [ ] Evaluate Svelte (minimal bundle size, good for embedded devices)
+- [ ] **Decision**: Select framework based on bundle size (Pi has limited resources)
 
-### 11.3 Immediate Actions
+### 11.4 Migration Strategy
+- [ ] Phase 1: Inventory current functionality
+  - [ ] Document all pages and their features
+  - [ ] List all AngularJS directives in use
+  - [ ] Map mobile-angular-ui components to modern equivalents
+  - [ ] Document WebSocket connections and data flows
+
+- [ ] Phase 2: Set up new build system
+  - [ ] Configure Vite or similar modern bundler
+  - [ ] Set up development server with hot reload
+  - [ ] Configure production builds with minification
+  - [ ] Ensure builds work on Raspberry Pi
+
+- [ ] Phase 3: Incremental migration
+  - [ ] Start with static pages (about, settings display)
+  - [ ] Migrate real-time pages (status, traffic, GPS)
+  - [ ] Migrate configuration pages (settings, WiFi)
+  - [ ] Migrate complex pages (logs, developer tools)
+
+- [ ] Phase 4: Testing and validation
+  - [ ] Test on all supported browsers
+  - [ ] Test on mobile devices (tablets in cockpit)
+  - [ ] Performance testing on Raspberry Pi
+  - [ ] Ensure WebSocket reconnection works reliably
+
+### 11.5 Immediate Actions
 - [ ] Audit all HTML files for AngularJS version references
 - [ ] Document all AngularJS directives and services in use
 - [ ] Identify mobile-angular-ui dependencies
 - [ ] Create migration plan document
+- [ ] Prototype one page in candidate framework(s)
 
 ## Success Criteria
 - [ ] Coverage reaches 90%+
