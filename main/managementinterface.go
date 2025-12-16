@@ -257,24 +257,21 @@ func handleSituationWS(conn *websocket.Conn) {
 // AJAX call - /getStatus. Responds with current global status
 // a webservice call for the same data available on the websocket but when only a single update is needed
 func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	statusJSON, _ := json.Marshal(&globalStatus)
 	fmt.Fprintf(w, "%s\n", statusJSON)
 }
 
 // AJAX call - /getSituation. Responds with current situation (lat/lon/gdspeed/track/pitch/roll/heading/etc.)
 func handleSituationRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	situationJSON, _ := json.Marshal(&mySituation)
 	fmt.Fprintf(w, "%s\n", situationJSON)
 }
 
 // AJAX call - /getTowers. Responds with all ADS-B ground towers that have sent messages that we were able to parse, along with its stats.
 func handleTowersRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 
 	ADSBTowerMutex.Lock()
 	towersJSON, err := json.Marshal(&ADSBTowers)
@@ -289,8 +286,7 @@ func handleTowersRequest(w http.ResponseWriter, r *http.Request) {
 
 // AJAX call - /getSatellites. Responds with all GNSS satellites that are being tracked, along with status information.
 func handleSatellitesRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	mySituation.muSatellite.Lock()
 	satellitesJSON, err := json.Marshal(&Satellites)
 	if err != nil {
@@ -302,8 +298,7 @@ func handleSatellitesRequest(w http.ResponseWriter, r *http.Request) {
 
 // AJAX call - /getSettings. Responds with all stratux.conf data.
 func handleSettingsGetRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	settingsJSON, err := json.Marshal(&globalSettings)
 	if err != nil {
 		log.Printf("%s", err)
@@ -312,8 +307,7 @@ func handleSettingsGetRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRegionGet(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	switch globalSettings.RegionSelected {
 	case 1:
 		RegionSettings.IsSet = true
@@ -335,8 +329,7 @@ func handleRegionGet(w http.ResponseWriter, r *http.Request) {
 // AJAX call - /setRegion. receives via POST command, any/all stratux.conf data.
 func handleRegionSet(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 	if r.Method == "POST" {
@@ -381,8 +374,7 @@ func handleRegionSet(w http.ResponseWriter, r *http.Request) {
 // AJAX call - /setSettings. receives via POST command, any/all stratux.conf data.
 func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 
@@ -656,8 +648,7 @@ func handleRestartRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRebootRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 	go delayReboot()
@@ -763,8 +754,7 @@ func doRestartApp() {
 
 // AJAX call - /getClients. Responds with all connected clients.
 func handleClientsGetRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	netMutex.Lock()
 	clientsJSON, _ := json.Marshal(&clientConnections)
 	netMutex.Unlock()
@@ -845,8 +835,7 @@ func handleDownloadDBRequest(w http.ResponseWriter, r *http.Request) {
 
 // Upload an update file.
 func handleUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	overlayctl("unlock")
 	reader, err := r.MultipartReader()
 	if err != nil {
@@ -907,8 +896,7 @@ func handleUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
 
 // Upload an update file for Pong
 func handlePongUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
-	setNoCache(w)
-	setJSONHeaders(w)
+	setJSONHeadersWithNoCache(w)
 	log.Printf("request: %s\n", sanitizeLogString(r.URL.RequestURI()))
 	err := r.ParseMultipartForm(8 << 20)
 	if err != nil {
@@ -946,6 +934,13 @@ func setNoCache(w http.ResponseWriter) {
 func setJSONHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
+}
+
+// setJSONHeadersWithNoCache combines setNoCache and setJSONHeaders for JSON API endpoints.
+// This is the common pattern for most API handlers.
+func setJSONHeadersWithNoCache(w http.ResponseWriter) {
+	setNoCache(w)
+	setJSONHeaders(w)
 }
 
 // sanitizeLogString removes or replaces characters that could be used for log injection attacks.
