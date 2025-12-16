@@ -222,16 +222,16 @@ func parseAprsMessage(data string, fakeCurrentTime bool) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		detail_byte := details[0]
-		addr_type := detail_byte & 0b00000011
-		acft_type := (detail_byte & 0b00111100) >> 2
+		detailByte := details[0]
+		addrType := detailByte & 0b00000011
+		acftType := (detailByte & 0b00111100) >> 2
 
 		msg := OgnMessage{
 			Sys:       res[1],
 			Time:      float64(ts.Unix()),
 			Addr:      res[2],
-			Addr_type: int32(addr_type),
-			Acft_type: fmt.Sprintf("%d", acft_type),
+			Addr_type: int32(addrType),
+			Acft_type: fmt.Sprintf("%d", acftType),
 			Lat_deg:   float32(lat + lat_m/60 + lat_m3d/60000),
 			Lon_deg:   float32(lon + lon_m/60 + lon_m3d/60000),
 			Alt_msl_m: float32(alt * 0.3048),

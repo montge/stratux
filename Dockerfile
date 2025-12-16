@@ -4,31 +4,34 @@ FROM debian:bookworm
 
 # file and nano are nice to have
 RUN apt-get update \
-  && apt-get -y install file \
-  && apt-get -y install nano \
-  && apt-get -y install make \
-  && apt-get -y install git \
-  && apt-get -y install gcc \
-  && apt-get -y install ncurses-dev \
-  && apt-get -y install wget \
-  && apt-get -y install libusb-1.0-0-dev
+  && apt-get -y install --no-install-recommends \
+      file \
+      nano \
+      make \
+      git \
+      gcc \
+      ncurses-dev \
+      wget \
+      ca-certificates \
+      libusb-1.0-0-dev \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install Go 1.24.1 (Debian Bookworm only has Go 1.20 which doesn't support toolchain directive)
 # Note: golang.org/x/net v0.47.0 requires Go 1.24+
-RUN cd /tmp \
-    && wget https://go.dev/dl/go1.24.1.linux-arm64.tar.gz \
+WORKDIR /tmp
+RUN wget https://go.dev/dl/go1.24.1.linux-arm64.tar.gz \
     && tar -C /usr/local -xzf go1.24.1.linux-arm64.tar.gz \
     && rm go1.24.1.linux-arm64.tar.gz
 
 ENV PATH="/usr/local/go/bin:${PATH}"
 
-RUN cd /tmp \
-    && wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb \
-    && dpkg -i librtlsdr0_2.0.2-2_arm64.deb
+RUN wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb \
+    && dpkg -i librtlsdr0_2.0.2-2_arm64.deb \
+    && rm librtlsdr0_2.0.2-2_arm64.deb
 
-RUN cd /tmp \
-    && wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb \
-    && dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb
+RUN wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb \
+    && dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb \
+    && rm librtlsdr-dev_2.0.2-2_arm64.deb
 
 # specific to debian, ubuntu images come with user 'ubuntu' that is uid 1000
 ENV USERNAME="stratux"

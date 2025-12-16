@@ -336,8 +336,7 @@ func handleRegionSet(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	setJSONHeaders(w)
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 	if r.Method == "POST" {
 		// raw, _ := httputil.DumpRequest(r, true)
 		// log.Printf("handleRegionSet:raw: %s\n", raw)
@@ -382,8 +381,7 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	setJSONHeaders(w)
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// for an OPTION method request, we return header without processing.
 	// this insures we are recognized as supporting cross-domain AJAX REST calls
@@ -657,8 +655,7 @@ func handleRestartRequest(w http.ResponseWriter, r *http.Request) {
 func handleRebootRequest(w http.ResponseWriter, r *http.Request) {
 	setNoCache(w)
 	setJSONHeaders(w)
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 	go delayReboot()
 }
 
@@ -666,9 +663,7 @@ func handleOrientAHRS(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// For an OPTION method request, we return header without processing.
 	// This ensures we are recognized as supporting cross-domain AJAX REST calls.
@@ -708,9 +703,7 @@ func handleCageAHRS(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// For an OPTION method request, we return header without processing.
 	// This ensures we are recognized as supporting cross-domain AJAX REST calls.
@@ -723,9 +716,7 @@ func handleCalibrateAHRS(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// For an OPTION method request, we return header without processing.
 	// This ensures we are recognized as supporting cross-domain AJAX REST calls.
@@ -738,9 +729,7 @@ func handleResetGMeter(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// For an OPTION method request, we return header without processing.
 	// This ensures we are recognized as supporting cross-domain AJAX REST calls.
@@ -853,16 +842,16 @@ func handleUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var temp_filename string
-	var upload_filename string
+	var tempFilename string
+	var uploadFilename string
 
-	var base_dir string
+	var baseDir string
 
 	if common.IsRunningAsRoot() {
-		base_dir = "/overlay/robase/root"
+		baseDir = "/overlay/robase/root"
 	} else {
-		base_dir = "."
-		log.Printf("not running as root, using base_dir of %s", base_dir)
+		baseDir = "."
+		log.Printf("not running as root, using baseDir of %s", baseDir)
 	}
 
 	for {
@@ -879,10 +868,10 @@ func handleUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		temp_filename = fmt.Sprintf("%s/TMP_%s", base_dir, part.FileName())
-		upload_filename = fmt.Sprintf("%s/%s", base_dir, part.FileName())
+		tempFilename = fmt.Sprintf("%s/TMP_%s", baseDir, part.FileName())
+		uploadFilename = fmt.Sprintf("%s/%s", baseDir, part.FileName())
 
-		fi, err := os.OpenFile(temp_filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		fi, err := os.OpenFile(tempFilename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
 			log.Printf("Update failed from %s (%s).\n", r.RemoteAddr, err.Error())
 			return
@@ -897,8 +886,8 @@ func handleUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 
-	os.Rename(temp_filename, upload_filename)
-	log.Printf("%s uploaded %s for update.\n", r.RemoteAddr, upload_filename)
+	os.Rename(tempFilename, uploadFilename)
+	log.Printf("%s uploaded %s for update.\n", r.RemoteAddr, uploadFilename)
 	overlayctl("disable")
 	// Successful update upload. Now reboot.
 	go delayReboot()
@@ -945,6 +934,12 @@ func setNoCache(w http.ResponseWriter) {
 func setJSONHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
+}
+
+func setCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 }
 
 func defaultServer(w http.ResponseWriter, r *http.Request) {

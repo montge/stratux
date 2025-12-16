@@ -26,8 +26,8 @@ log_error() {
 }
 
 # Check if we're on ARM architecture
-if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "armv7l" ]; then
-    log_error "This script is for native builds on Raspberry Pi (ARM architecture)"
+if [[ "$ARCH" != "aarch64" ]] && [[ "$ARCH" != "armv7l" ]]; then
+    log_error "This script is for native builds on Raspberry Pi (ARM architecture)" >&2
     log_info "You're on $ARCH - use ./build-images.sh for cross-compilation instead"
     exit 1
 fi
@@ -49,9 +49,9 @@ build_region() {
     cp "$makefile" "${makefile}.bak"
 
     # Modify for region
-    if [ "$region" = "US" ]; then
+    if [[ "$region" == "US" ]]; then
         sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": true,\"OGN_Enabled\": false,\"DeveloperMode\": false,\"RegionSelected\": 1}'/" "$makefile"
-    elif [ "$region" = "EU" ]; then
+    elif [[ "$region" == "EU" ]]; then
         sed -i "s/echo '{\"UAT_Enabled\": .*}'/echo '{\"UAT_Enabled\": false,\"OGN_Enabled\": true,\"DeveloperMode\": true,\"RegionSelected\": 2}'/" "$makefile"
     fi
 
@@ -64,8 +64,8 @@ build_region() {
 
     # Find and rename the deb
     DEB_FILE=$(ls -1t stratux-*.deb 2>/dev/null | head -1)
-    if [ -z "$DEB_FILE" ]; then
-        log_error "Failed to create .deb file"
+    if [[ -z "$DEB_FILE" ]]; then
+        log_error "Failed to create .deb file" >&2
         mv "${makefile}.bak" "$makefile"
         return 1
     fi

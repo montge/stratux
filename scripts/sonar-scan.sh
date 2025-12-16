@@ -8,15 +8,15 @@ cd "$(dirname "$0")/.."
 
 # Check for sonar-scanner
 if ! command -v sonar-scanner &> /dev/null; then
-    echo "Error: sonar-scanner not installed"
-    echo "Install with: brew install sonar-scanner (macOS) or download from sonarcloud.io"
+    echo "Error: sonar-scanner not installed" >&2
+    echo "Install with: brew install sonar-scanner (macOS) or download from sonarcloud.io" >&2
     exit 1
 fi
 
 # Check for token
-if [ -z "$SONAR_TOKEN" ]; then
-    echo "Error: SONAR_TOKEN environment variable not set"
-    echo "Add to ~/.bashrc: export SONAR_TOKEN=\"your-token\""
+if [[ -z "$SONAR_TOKEN" ]]; then
+    echo "Error: SONAR_TOKEN environment variable not set" >&2
+    echo "Add to ~/.bashrc: export SONAR_TOKEN=\"your-token\"" >&2
     exit 1
 fi
 

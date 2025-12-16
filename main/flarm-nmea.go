@@ -456,8 +456,8 @@ func makeAHRSLevilReport() {
 	roll := int16(0)
 	pitch := int16(0)
 	hdg := int16(mySituation.GPSTrueCourse) // TODO: not really correct, but XCSoar doesn't accept empty string
-	slip_skid := int16(0)
-	yaw_rate := int16(mySituation.GPSTurnRate) // TODO: not really correct, but XCSoar doesn't accept empty string
+	slipSkid := int16(0)
+	yawRate := int16(mySituation.GPSTurnRate) // TODO: not really correct, but XCSoar doesn't accept empty string
 	g := int16(0)
 	if !isAHRSInvalidValue(mySituation.AHRSRoll) {
 		roll = common.RoundToInt16(mySituation.AHRSRoll * 10)
@@ -469,16 +469,16 @@ func makeAHRSLevilReport() {
 		hdg = common.RoundToInt16(mySituation.AHRSGyroHeading * 10)
 	}
 	if !isAHRSInvalidValue(mySituation.AHRSSlipSkid) {
-		slip_skid = common.RoundToInt16(-mySituation.AHRSSlipSkid * 10)
+		slipSkid = common.RoundToInt16(-mySituation.AHRSSlipSkid * 10)
 	}
 	if !isAHRSInvalidValue(mySituation.AHRSTurnRate) {
-		yaw_rate = common.RoundToInt16(mySituation.AHRSTurnRate * 10)
+		yawRate = common.RoundToInt16(mySituation.AHRSTurnRate * 10)
 	}
 	if !isAHRSInvalidValue(mySituation.AHRSGLoad) {
 		g = common.RoundToInt16(mySituation.AHRSGLoad * 1000)
 	}
 
-	msg := fmt.Sprintf("$RPYL,%d,%d,%d,%d,%d,%d,0", roll, pitch, hdg, slip_skid, yaw_rate, g)
+	msg := fmt.Sprintf("$RPYL,%d,%d,%d,%d,%d,%d,0", roll, pitch, hdg, slipSkid, yawRate, g)
 	appendNmeaChecksum(msg)
 	sendNetFLARM(msg+"\r\n", 100*time.Millisecond, 4)
 }
