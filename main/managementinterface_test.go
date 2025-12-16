@@ -20,6 +20,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9613,6 +9614,213 @@ func TestReadMbTilesMetadata(t *testing.T) {
 		// Should not have empty value
 		if val, ok := meta["empty"]; ok {
 			t.Errorf("Empty value should be filtered out, got: %s", val)
+		}
+	})
+}
+
+// Test handleUpdatePostRequest - file upload handler
+func TestHandleUpdatePostRequest(t *testing.T) {
+	// Save and restore original command runner
+	originalRunner := commandRunner
+	defer func() { commandRunner = originalRunner }()
+
+	t.Run("invalid multipart request", func(t *testing.T) {
+		// Setup mock command runner
+		mockRunner := &mockCommandRunner{
+			output: []byte("mocked output"),
+		}
+		commandRunner = mockRunner
+
+		// Request without multipart content type
+		req := httptest.NewRequest("POST", "/updateUpload", strings.NewReader("not multipart"))
+		req.Header.Set("Content-Type", "text/plain")
+		w := httptest.NewRecorder()
+
+		handleUpdatePostRequest(w, req)
+
+		// Should have called overlayctl unlock (via /bin/sh /sbin/overlayctl unlock)
+		foundUnlock := false
+		for _, call := range mockRunner.calls {
+			if len(call) >= 3 && call[1] == "/sbin/overlayctl" && call[2] == "unlock" {
+				foundUnlock = true
+				break
+			}
+		}
+
+		if !foundUnlock {
+			t.Errorf("Expected overlayctl('unlock') to be called, got calls: %v", mockRunner.calls)
+		}
+
+		// Should still return 200 (handler returns early but doesn't set error status)
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", w.Code)
+		}
+	})
+
+	t.Run("multipart with wrong form name", func(t *testing.T) {
+		// Setup mock command runner
+		mockRunner := &mockCommandRunner{
+			output: []byte("mocked output"),
+		}
+		commandRunner = mockRunner
+
+		// Create multipart form with wrong field name
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("wrong_field", "test.deb")
+		if err != nil {
+			t.Fatal(err)
+		}
+		part.Write([]byte("test content"))
+		writer.Close()
+
+		req := httptest.NewRequest("POST", "/updateUpload", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		w := httptest.NewRecorder()
+
+		handleUpdatePostRequest(w, req)
+
+		// Should call unlock
+		foundUnlock := false
+		for _, call := range mockRunner.calls {
+			if len(call) >= 3 && call[1] == "/sbin/overlayctl" && call[2] == "unlock" {
+				foundUnlock = true
+				break
+			}
+		}
+
+		if !foundUnlock {
+			t.Errorf("Expected overlayctl('unlock') to be called, got calls: %v", mockRunner.calls)
+		}
+	})
+
+	t.Run("successful upload non-root", func(t *testing.T) {
+		// Setup mock command runner
+		mockRunner := &mockCommandRunner{
+			output: []byte("mocked output"),
+		}
+		commandRunner = mockRunner
+
+		// Create multipart form with correct field name
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("update_file", "test-update.deb")
+		if err != nil {
+			t.Fatal(err)
+		}
+		testContent := []byte("test update content for stratux")
+		part.Write(testContent)
+		writer.Close()
+
+		req := httptest.NewRequest("POST", "/updateUpload", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.RemoteAddr = "192.168.1.100:12345"
+		w := httptest.NewRecorder()
+
+		// Note: Since we're not running as root, files go to current directory
+		// This test verifies the handler runs without panicking
+		handleUpdatePostRequest(w, req)
+
+		// Clean up any test files that might have been created
+		os.Remove("./TMP_test-update.deb")
+		os.Remove("./test-update.deb")
+
+		// Verify overlayctl calls
+		foundUnlock := false
+		foundDisable := false
+		for _, call := range mockRunner.calls {
+			if len(call) >= 3 && call[1] == "/sbin/overlayctl" {
+				if call[2] == "unlock" {
+					foundUnlock = true
+				}
+				if call[2] == "disable" {
+					foundDisable = true
+				}
+			}
+		}
+
+		if !foundUnlock {
+			t.Error("Expected overlayctl('unlock') to be called")
+		}
+		if !foundDisable {
+			t.Error("Expected overlayctl('disable') to be called for successful upload")
+		}
+	})
+
+	t.Run("verify headers set", func(t *testing.T) {
+		// Setup mock command runner
+		mockRunner := &mockCommandRunner{
+			output: []byte("mocked output"),
+		}
+		commandRunner = mockRunner
+
+		req := httptest.NewRequest("POST", "/updateUpload", strings.NewReader("not multipart"))
+		req.Header.Set("Content-Type", "text/plain")
+		w := httptest.NewRecorder()
+
+		handleUpdatePostRequest(w, req)
+
+		// Verify headers
+		if w.Header().Get("Content-Type") != "application/json" {
+			t.Error("Expected Content-Type: application/json")
+		}
+		if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+			t.Error("Expected Access-Control-Allow-Origin: *")
+		}
+	})
+}
+
+// Test handlePongUpdatePostRequest - Pong device file upload handler
+func TestHandlePongUpdatePostRequest(t *testing.T) {
+	t.Run("invalid multipart request", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/pongUpdateUpload", strings.NewReader("not multipart"))
+		req.Header.Set("Content-Type", "text/plain")
+		w := httptest.NewRecorder()
+
+		handlePongUpdatePostRequest(w, req)
+
+		// Should still return 200 (handler returns early but doesn't set error status)
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", w.Code)
+		}
+	})
+
+	t.Run("multipart with wrong form name", func(t *testing.T) {
+		// Create multipart form with wrong field name
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("wrong_field", "pong_update.bin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		part.Write([]byte("test content"))
+		writer.Close()
+
+		req := httptest.NewRequest("POST", "/pongUpdateUpload", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		w := httptest.NewRecorder()
+
+		handlePongUpdatePostRequest(w, req)
+
+		// Should return 200 (handler doesn't set error status)
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", w.Code)
+		}
+	})
+
+	t.Run("verify headers set", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/pongUpdateUpload", strings.NewReader("not multipart"))
+		req.Header.Set("Content-Type", "text/plain")
+		w := httptest.NewRecorder()
+
+		handlePongUpdatePostRequest(w, req)
+
+		// Verify headers
+		if w.Header().Get("Content-Type") != "application/json" {
+			t.Error("Expected Content-Type: application/json")
+		}
+		if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+			t.Error("Expected Access-Control-Allow-Origin: *")
 		}
 	})
 }

@@ -2459,9 +2459,9 @@ exit 0
 
 	t.Run("edge_cases", func(t *testing.T) {
 		// Test edge cases - empty and unusual command strings
-		overlayctl("")           // Empty command
-		overlayctl("test-123")   // Alphanumeric with dash
-		overlayctl("unknown")    // Unknown command
+		overlayctl("")         // Empty command
+		overlayctl("test-123") // Alphanumeric with dash
+		overlayctl("unknown")  // Unknown command
 		t.Log("Edge case commands tested")
 	})
 
