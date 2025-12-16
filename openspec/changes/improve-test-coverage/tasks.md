@@ -227,6 +227,18 @@
 - [x] Test speed at limits (traffic_test.go)
 - [x] Test timestamp edge cases (monotonic_test.go)
 
+### 7.11 Interface Abstractions for Testability (December 2025)
+- [x] Created interfaces.go with DiskUsageProvider and CommandRunner interfaces
+- [x] logFileWatcherOnce: 64.3% → 100%
+  - Created DiskUsageProvider interface to mock disk usage
+  - Added mockDiskUsageProvider for low/zero disk space testing
+  - Tests now cover disk cleanup loop (lines 133-140)
+- [x] overlayctl: 75.0% → 100%
+  - Created CommandRunner interface to mock shell commands
+  - Added mockCommandRunner for success/error path testing
+  - No longer requires root permissions to test
+- [x] New helper functions: getDiskFreeBytes(), runCommand() at 100%
+
 ## 8. Phase 8: Code Deduplication (Future)
 
 ### 8.1 Identify Duplicate Test Patterns

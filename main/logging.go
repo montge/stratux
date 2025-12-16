@@ -20,8 +20,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/ricochet2200/go-disk-usage/du"
 )
 
 const debugLogFile = "stratux.log"
@@ -128,8 +126,8 @@ func logFileWatcherOnce() bool {
 		actionTaken = true
 	}
 
-	usage := du.NewDiskUsage(logDirf)
-	freeBytes := int64(usage.Free())
+	// Use interface for disk usage to allow mocking in tests
+	freeBytes := int64(getDiskFreeBytes(logDirf))
 	for freeBytes < 50*1024*1024 { // leave 50mb free
 		deleted := deleteOldestLog()
 		if deleted == 0 {

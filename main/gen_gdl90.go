@@ -21,7 +21,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -1474,7 +1473,8 @@ func addSingleSystemErrorf(ident string, format string, a ...interface{}) {
 }
 
 func overlayctl(cmd string) {
-	out, err := exec.Command("/bin/sh", "/sbin/overlayctl", cmd).Output()
+	// Use commandRunner interface for testability
+	out, err := runCommand("/bin/sh", "/sbin/overlayctl", cmd)
 	if err != nil {
 		log.Printf("overlayctl error: %s\n%s", err.Error(), out)
 	} else {
