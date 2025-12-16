@@ -250,6 +250,10 @@
 - [x] handleroPartitionRebuild: 0% → 100%
   - Uses runCommand() for rebuild_ro_part.sh script
   - Tests HTTP response and system error logging
+- [x] Consolidated disk usage calls to use DiskUsageProvider interface
+  - gen_gdl90.go: updateStatus() uses getDiskFreeBytes("/")
+  - trace.go: TraceLogger uses getDiskFreeBytes("/") for space check
+  - Removed redundant du package imports
 
 ## 8. Phase 8: Code Deduplication (Future)
 
