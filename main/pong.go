@@ -232,7 +232,9 @@ func pongShutdown() {
 	}
 }
 
-func pongSetUpdateMode() {
+// pongSetUpdateMode is a function variable for setting Pong update mode.
+// It can be replaced in tests to mock the behavior.
+var pongSetUpdateMode = func() {
 	pongUpdateMode = true
 }
 

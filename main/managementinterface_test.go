@@ -8639,29 +8639,25 @@ func TestHandleJsonIo(t *testing.T) {
 // =============================================================================
 
 // TestHandleUpdatePostRequest tests the update file upload handler
-// DISABLED: Cannot mock overlayctl/delayReboot functions as they're not variables
-func SkipTestHandleUpdatePostRequest(t *testing.T) {
-	t.Skip("Test needs refactoring to use function variables for mocking")
+func TestHandleUpdatePostRequest(t *testing.T) {
 	// Save original function and restore after test
-	//originalOverlayctl := overlayctl
-	//defer func() { overlayctl = originalOverlayctl }()
+	originalOverlayctl := overlayctl
+	defer func() { overlayctl = originalOverlayctl }()
 
 	// Mock overlayctl to prevent actual system calls
 	overlayctlCalls := []string{}
-	_ = overlayctlCalls
-	/*overlayctl = func(cmd string) {
+	overlayctl = func(cmd string) {
 		overlayctlCalls = append(overlayctlCalls, cmd)
-	}*/
+	}
 
 	// Mock delayReboot to prevent actual reboot
-	//originalDelayReboot := delayReboot
-	//defer func() { delayReboot = originalDelayReboot }()
+	originalDelayReboot := delayReboot
+	defer func() { delayReboot = originalDelayReboot }()
 
 	rebootCalled := false
-	_ = rebootCalled
-	/*delayReboot = func() {
+	delayReboot = func() {
 		rebootCalled = true
-	}*/
+	}
 
 	// Create a temporary directory for the test
 	tmpDir, err := os.MkdirTemp("", "stratux-update-test-")
@@ -8714,13 +8710,11 @@ func SkipTestHandleUpdatePostRequest(t *testing.T) {
 }
 
 // TestHandleUpdatePostRequest_InvalidMultipart tests error handling
-// DISABLED: Cannot mock overlayctl function as it's not a variable
-func SkipTestHandleUpdatePostRequest_InvalidMultipart(t *testing.T) {
-	t.Skip("Test needs refactoring to use function variables for mocking")
+func TestHandleUpdatePostRequest_InvalidMultipart(t *testing.T) {
 	// Mock overlayctl
-	//originalOverlayctl := overlayctl
-	//defer func() { overlayctl = originalOverlayctl }()
-	//overlayctl = func(cmd string) {}
+	originalOverlayctl := overlayctl
+	defer func() { overlayctl = originalOverlayctl }()
+	overlayctl = func(cmd string) {}
 
 	// Create request with invalid multipart data
 	req := httptest.NewRequest("POST", "/updateUpload", bytes.NewBufferString("invalid data"))
@@ -8735,18 +8729,15 @@ func SkipTestHandleUpdatePostRequest_InvalidMultipart(t *testing.T) {
 }
 
 // TestHandlePongUpdatePostRequest tests the Pong update handler
-// DISABLED: Cannot mock pongSetUpdateMode function as it's not a variable
-func SkipTestHandlePongUpdatePostRequest(t *testing.T) {
-	t.Skip("Test needs refactoring to use function variables for mocking")
+func TestHandlePongUpdatePostRequest(t *testing.T) {
 	// Mock pongSetUpdateMode to prevent actual operations
-	//originalPongSetUpdateMode := pongSetUpdateMode
-	//defer func() { pongSetUpdateMode = originalPongSetUpdateMode }()
+	originalPongSetUpdateMode := pongSetUpdateMode
+	defer func() { pongSetUpdateMode = originalPongSetUpdateMode }()
 
 	updateModeCalled := false
-	_ = updateModeCalled
-	/*pongSetUpdateMode = func() {
+	pongSetUpdateMode = func() {
 		updateModeCalled = true
-	}*/
+	}
 
 	// Create a zip file in memory
 	var zipBuf bytes.Buffer
@@ -8792,13 +8783,11 @@ func SkipTestHandlePongUpdatePostRequest(t *testing.T) {
 }
 
 // TestHandlePongUpdatePostRequest_InvalidForm tests error handling
-// DISABLED: Cannot mock pongSetUpdateMode function as it's not a variable
-func SkipTestHandlePongUpdatePostRequest_InvalidForm(t *testing.T) {
-	t.Skip("Test needs refactoring to use function variables for mocking")
+func TestHandlePongUpdatePostRequest_InvalidForm(t *testing.T) {
 	// Mock pongSetUpdateMode
-	//originalPongSetUpdateMode := pongSetUpdateMode
-	//defer func() { pongSetUpdateMode = originalPongSetUpdateMode }()
-	//pongSetUpdateMode = func() {}
+	originalPongSetUpdateMode := pongSetUpdateMode
+	defer func() { pongSetUpdateMode = originalPongSetUpdateMode }()
+	pongSetUpdateMode = func() {}
 
 	// Create request without proper form data
 	req := httptest.NewRequest("POST", "/updatePong", bytes.NewBufferString("invalid"))
@@ -8817,21 +8806,18 @@ func SkipTestHandlePongUpdatePostRequest_InvalidForm(t *testing.T) {
 // =============================================================================
 
 // TestHandleroPartitionRebuild tests the RO partition rebuild handler
-// DISABLED: Cannot mock exec.Command as it's not a variable
-func SkipTestHandleroPartitionRebuild(t *testing.T) {
-	t.Skip("Test needs refactoring to use function variables for mocking")
-	// Save original exec.Command
-	//originalExecCommand := exec.Command
-	//defer func() { exec.Command = originalExecCommand }()
+func TestHandleroPartitionRebuild(t *testing.T) {
+	// Initialize global state if needed
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
 
-	// Mock exec.Command to prevent actual execution
-	commandCalled := false
-	_ = commandCalled
-	var commandName string
-	_ = commandName
-
-	// We can't easily mock exec.Command globally, so we'll just test the handler
-	// and check that it doesn't panic
+	// Note: exec.Command can't be easily mocked, but we can test that the handler
+	// doesn't panic and handles the command gracefully.
+	// In test environment, the command will fail but that's expected.
 	req := httptest.NewRequest("POST", "/roPartitionRebuild", nil)
 	w := httptest.NewRecorder()
 
@@ -8841,9 +8827,8 @@ func SkipTestHandleroPartitionRebuild(t *testing.T) {
 
 	resp := w.Result()
 
-	// The handler doesn't write a response, so we just verify it ran
-	t.Logf("roPartitionRebuild handler executed, command called: %v, name: %s", commandCalled, commandName)
-	t.Logf("Response status: %d", resp.StatusCode)
+	// The handler doesn't write a response, so we just verify it ran without panic
+	t.Logf("roPartitionRebuild handler executed, response status: %d", resp.StatusCode)
 }
 
 // =============================================================================
@@ -8909,13 +8894,11 @@ func TestWebSocketHandlers_ErrorPaths(t *testing.T) {
 }
 
 // TestHandleUpdatePostRequest_WrongFormName tests handling of wrong form field name
-// DISABLED: Cannot mock overlayctl function as it's not a variable
-func SkipTestHandleUpdatePostRequest_WrongFormName(t *testing.T) {
-	t.Skip("Test needs refactoring to use function variables for mocking")
+func TestHandleUpdatePostRequest_WrongFormName(t *testing.T) {
 	// Mock overlayctl
-	//originalOverlayctl := overlayctl
-	//defer func() { overlayctl = originalOverlayctl }()
-	//overlayctl = func(cmd string) {}
+	originalOverlayctl := overlayctl
+	defer func() { overlayctl = originalOverlayctl }()
+	overlayctl = func(cmd string) {}
 
 	// Create multipart form data with wrong field name
 	var buf bytes.Buffer
@@ -9590,4 +9573,73 @@ func TestReadMbTilesMetadata(t *testing.T) {
 			t.Errorf("Empty value should be filtered out, got: %s", val)
 		}
 	})
+}
+
+// TestSanitizeLogString tests the sanitizeLogString function for log injection prevention
+func TestSanitizeLogString(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no_special_chars",
+			input:    "normal log message",
+			expected: "normal log message",
+		},
+		{
+			name:     "newline_escape",
+			input:    "line1\nline2",
+			expected: "line1\\nline2",
+		},
+		{
+			name:     "carriage_return_escape",
+			input:    "line1\rline2",
+			expected: "line1\\rline2",
+		},
+		{
+			name:     "tab_escape",
+			input:    "col1\tcol2",
+			expected: "col1\\tcol2",
+		},
+		{
+			name:     "mixed_special_chars",
+			input:    "start\n\r\tend",
+			expected: "start\\n\\r\\tend",
+		},
+		{
+			name:     "log_injection_attempt",
+			input:    "error\n2024-01-01 FAKE LOG ENTRY",
+			expected: "error\\n2024-01-01 FAKE LOG ENTRY",
+		},
+		{
+			name:     "empty_string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "crlf_sequence",
+			input:    "windows\r\nline",
+			expected: "windows\\r\\nline",
+		},
+		{
+			name:     "multiple_newlines",
+			input:    "\n\n\n",
+			expected: "\\n\\n\\n",
+		},
+		{
+			name:     "unicode_preserved",
+			input:    "日本語\ntext",
+			expected: "日本語\\ntext",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := sanitizeLogString(tc.input)
+			if result != tc.expected {
+				t.Errorf("sanitizeLogString(%q) = %q, expected %q", tc.input, result, tc.expected)
+			}
+		})
+	}
 }

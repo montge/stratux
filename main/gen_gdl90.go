@@ -1473,7 +1473,9 @@ func addSingleSystemErrorf(ident string, format string, a ...interface{}) {
 	systemErrsMutex.Unlock()
 }
 
-func overlayctl(cmd string) {
+// overlayctl is a function variable for executing overlay filesystem commands.
+// It can be replaced in tests to mock system calls.
+var overlayctl = func(cmd string) {
 	out, err := exec.Command("/bin/sh", "/sbin/overlayctl", cmd).Output()
 	if err != nil {
 		log.Printf("overlayctl error: %s\n%s", err.Error(), out)

@@ -608,7 +608,9 @@ func handleShutdownRequest(w http.ResponseWriter, r *http.Request) {
 	exec.Command("systemctl", "poweroff").Run()
 }
 
-func doReboot() {
+// doReboot is a function variable for rebooting the system.
+// It can be replaced in tests to mock system calls.
+var doReboot = func() {
 	syscall.Sync()
 	exec.Command("systemctl", "reboot").Run()
 }
@@ -761,7 +763,9 @@ func handleClientsGetRequest(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%s\n", clientsJSON)
 }
 
-func delayReboot() {
+// delayReboot is a function variable for delayed system reboot.
+// It can be replaced in tests to mock system calls.
+var delayReboot = func() {
 	time.Sleep(1 * time.Second)
 	doReboot()
 }
