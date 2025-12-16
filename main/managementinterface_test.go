@@ -7199,12 +7199,20 @@ func TestHandleSettingsSetRequest_PWMDutyMin_ReconfigureFancontrol(t *testing.T)
 		netMutex = &sync.Mutex{}
 	}
 
-	// Save original settings
+	// Save original settings and command runner
 	origSettings := globalSettings
-	defer func() { globalSettings = origSettings }()
+	originalRunner := commandRunner
+	defer func() {
+		globalSettings = origSettings
+		commandRunner = originalRunner
+	}()
 
-	t.Run("set_pwm_duty_min", func(t *testing.T) {
+	t.Run("set_pwm_duty_min_with_mock", func(t *testing.T) {
 		globalSettings = settings{}
+
+		// Set up mock command runner to verify fancontrol command is called
+		mockRunner := &mockCommandRunner{}
+		commandRunner = mockRunner
 
 		req := httptest.NewRequest("POST", "/setSettings", strings.NewReader(`{"PWMDutyMin": 30}`))
 		req.Header.Set("Content-Type", "application/json")
@@ -7221,8 +7229,25 @@ func TestHandleSettingsSetRequest_PWMDutyMin_ReconfigureFancontrol(t *testing.T)
 			t.Errorf("Expected PWMDutyMin to be 30, got %d", globalSettings.PWMDutyMin)
 		}
 
-		// The function will attempt to run "killall -SIGUSR1 fancontrol"
-		// This may fail in test environment but shouldn't cause test failure
+		// Verify that the mock command runner was called for fancontrol
+		if mockRunner.runCalls == 0 {
+			t.Error("Expected runCommandNoOutput to be called for fancontrol reconfiguration")
+		}
+
+		// Check that the correct command was called
+		foundKillall := false
+		for _, call := range mockRunner.calls {
+			if len(call) >= 1 && call[0] == "killall" {
+				foundKillall = true
+				if len(call) < 3 || call[1] != "-SIGUSR1" || call[2] != "fancontrol" {
+					t.Errorf("Expected killall -SIGUSR1 fancontrol, got %v", call)
+				}
+				break
+			}
+		}
+		if !foundKillall {
+			t.Errorf("Expected killall command to be called, got calls: %v", mockRunner.calls)
+		}
 	})
 }
 

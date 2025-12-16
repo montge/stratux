@@ -19,7 +19,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -1332,7 +1331,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 					log.Printf("setting system time from %s to: '%s'\n", time.Now().Format("20060102 15:04:05.000"), setStr)
 					var err error
 					if common.IsRunningAsRoot() {
-						err = exec.Command("date", "-s", setStr).Run()
+						err = runCommandNoOutput("date", "-s", setStr)
 					}
 					if err != nil {
 						log.Printf("Set Date failure: %s error\n", err)

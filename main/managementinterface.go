@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -592,7 +591,7 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 					writeTrackerConfigFromSettings()
 				}
 				if reconfigureFancontrol {
-					exec.Command("killall", "-SIGUSR1", "fancontrol").Run()
+					runCommandNoOutput("killall", "-SIGUSR1", "fancontrol")
 				}
 			}
 		}
