@@ -50,15 +50,21 @@ var diskUsageProvider DiskUsageProvider = &realDiskUsageProvider{}
 // The default implementation uses os/exec, but tests can provide
 // a mock implementation that simulates command output.
 type CommandRunner interface {
-	// Run executes a command and returns its output and any error
-	Run(name string, args ...string) ([]byte, error)
+	// Output executes a command and returns its output and any error
+	Output(name string, args ...string) ([]byte, error)
+	// Run executes a command without capturing output
+	Run(name string, args ...string) error
 }
 
 // realCommandRunner is the production implementation using os/exec
 type realCommandRunner struct{}
 
-func (r *realCommandRunner) Run(name string, args ...string) ([]byte, error) {
+func (r *realCommandRunner) Output(name string, args ...string) ([]byte, error) {
 	return exec.Command(name, args...).Output()
+}
+
+func (r *realCommandRunner) Run(name string, args ...string) error {
+	return exec.Command(name, args...).Run()
 }
 
 // commandRunner is the global instance used by the application.
@@ -75,8 +81,14 @@ func getDiskFreeBytes(path string) uint64 {
 	return diskUsageProvider.Free(path)
 }
 
-// runCommand executes a shell command using the configured CommandRunner.
+// runCommand executes a shell command and returns its output.
 // This allows tests to mock command execution.
 func runCommand(name string, args ...string) ([]byte, error) {
+	return commandRunner.Output(name, args...)
+}
+
+// runCommandNoOutput executes a shell command without capturing output.
+// This allows tests to mock command execution for commands like reboot/shutdown.
+func runCommandNoOutput(name string, args ...string) error {
 	return commandRunner.Run(name, args...)
 }

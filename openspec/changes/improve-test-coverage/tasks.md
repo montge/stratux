@@ -237,7 +237,19 @@
   - Created CommandRunner interface to mock shell commands
   - Added mockCommandRunner for success/error path testing
   - No longer requires root permissions to test
-- [x] New helper functions: getDiskFreeBytes(), runCommand() at 100%
+- [x] New helper functions: getDiskFreeBytes(), runCommand(), runCommandNoOutput() at 100%
+- [x] handleShutdownRequest: 0% → 100%
+  - Uses runCommandNoOutput() for systemctl poweroff
+  - Mocked command runner enables testing without system shutdown
+- [x] doReboot: 0% → 100%
+  - Uses runCommandNoOutput() for systemctl reboot
+  - Mocked command runner enables testing without system reboot
+- [x] doRestartApp: 0% → 100%
+  - Uses runCommand() for systemctl restart stratux
+  - Tests success and error handling paths
+- [x] handleroPartitionRebuild: 0% → 100%
+  - Uses runCommand() for rebuild_ro_part.sh script
+  - Tests HTTP response and system error logging
 
 ## 8. Phase 8: Code Deduplication (Future)
 
@@ -338,5 +350,5 @@ These functions exceed SonarCloud's complexity threshold of 15:
 | Phase 8 | N/A | Deduplication | -500 |
 | Phase 9 | N/A | SonarCloud Issues | N/A |
 
-**Current Coverage**: 63.9% (as of December 2025)
-Total estimated new test code: ~12,500+ lines
+**Current Coverage**: 64.1% (as of December 2025)
+Total estimated new test code: ~12,700+ lines

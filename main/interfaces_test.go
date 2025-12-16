@@ -14,8 +14,10 @@ package main
 
 import (
 	"errors"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -36,17 +38,29 @@ func (m *mockDiskUsageProvider) Free(path string) uint64 {
 
 // mockCommandRunner is a mock that returns configurable command results
 type mockCommandRunner struct {
-	output    []byte
-	err       error
-	calls     [][]string // Track all command invocations
-	callCount int
+	output      []byte
+	outputErr   error
+	runErr      error
+	calls       [][]string // Track all command invocations
+	callCount   int
+	outputCalls int
+	runCalls    int
 }
 
-func (m *mockCommandRunner) Run(name string, args ...string) ([]byte, error) {
+func (m *mockCommandRunner) Output(name string, args ...string) ([]byte, error) {
 	m.callCount++
+	m.outputCalls++
 	call := append([]string{name}, args...)
 	m.calls = append(m.calls, call)
-	return m.output, m.err
+	return m.output, m.outputErr
+}
+
+func (m *mockCommandRunner) Run(name string, args ...string) error {
+	m.callCount++
+	m.runCalls++
+	call := append([]string{name}, args...)
+	m.calls = append(m.calls, call)
+	return m.runErr
 }
 
 // =============================================================================
@@ -120,12 +134,12 @@ func TestGetDiskFreeBytes(t *testing.T) {
 // CommandRunner Tests
 // =============================================================================
 
-func TestRealCommandRunner(t *testing.T) {
+func TestRealCommandRunner_Output(t *testing.T) {
 	// Test with a simple command that exists on all systems
 	runner := &realCommandRunner{}
 
 	// "echo" is available on all platforms
-	output, err := runner.Run("echo", "test")
+	output, err := runner.Output("echo", "test")
 
 	if err != nil {
 		t.Errorf("Unexpected error running echo: %v", err)
@@ -135,6 +149,18 @@ func TestRealCommandRunner(t *testing.T) {
 		t.Error("Expected non-empty output from echo")
 	}
 	t.Logf("Echo output: %s", string(output))
+}
+
+func TestRealCommandRunner_Run(t *testing.T) {
+	// Test with a simple command that exists on all systems
+	runner := &realCommandRunner{}
+
+	// "true" is available on all platforms and always succeeds
+	err := runner.Run("true")
+
+	if err != nil {
+		t.Errorf("Unexpected error running true: %v", err)
+	}
 }
 
 func TestMockCommandRunner(t *testing.T) {
@@ -151,9 +177,9 @@ func TestMockCommandRunner(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mock := &mockCommandRunner{output: tt.output, err: tt.err}
+			mock := &mockCommandRunner{output: tt.output, outputErr: tt.err}
 
-			output, err := mock.Run("test", "arg1", "arg2")
+			output, err := mock.Output("test", "arg1", "arg2")
 
 			if string(output) != string(tt.output) {
 				t.Errorf("Expected output %q, got %q", tt.output, output)
@@ -175,8 +201,8 @@ func TestRunCommand(t *testing.T) {
 
 	// Test with mock
 	mock := &mockCommandRunner{
-		output: []byte("mock output"),
-		err:    nil,
+		output:    []byte("mock output"),
+		outputErr: nil,
 	}
 	commandRunner = mock
 
@@ -204,8 +230,8 @@ func TestRunCommand_Error(t *testing.T) {
 	// Test error case
 	expectedErr := errors.New("execution failed")
 	mock := &mockCommandRunner{
-		output: nil,
-		err:    expectedErr,
+		output:    nil,
+		outputErr: expectedErr,
 	}
 	commandRunner = mock
 
@@ -401,8 +427,8 @@ func TestOverlayctl_WithMockedCommandRunner_Success(t *testing.T) {
 
 	// Mock successful command execution
 	mock := &mockCommandRunner{
-		output: []byte("overlay enabled\n"),
-		err:    nil,
+		output:    []byte("overlay enabled\n"),
+		outputErr: nil,
 	}
 	commandRunner = mock
 
@@ -437,8 +463,8 @@ func TestOverlayctl_WithMockedCommandRunner_Error(t *testing.T) {
 
 	// Mock failed command execution
 	mock := &mockCommandRunner{
-		output: []byte("error: permission denied"),
-		err:    errors.New("exit status 1"),
+		output:    []byte("error: permission denied"),
+		outputErr: errors.New("exit status 1"),
 	}
 	commandRunner = mock
 
@@ -464,8 +490,8 @@ func TestOverlayctl_WithMockedCommandRunner_AllCommands(t *testing.T) {
 	for _, cmd := range commands {
 		t.Run(cmd, func(t *testing.T) {
 			mock := &mockCommandRunner{
-				output: []byte("overlayctl: " + cmd + " completed\n"),
-				err:    nil,
+				output:    []byte("overlayctl: " + cmd + " completed\n"),
+				outputErr: nil,
 			}
 			commandRunner = mock
 
@@ -558,4 +584,232 @@ func TestLogFileWatcherOnce_DiskCleanupLoop(t *testing.T) {
 	if finalLogs >= initialLogs {
 		t.Errorf("Expected fewer logs after cleanup, had %d, now have %d", initialLogs, finalLogs)
 	}
+}
+
+// =============================================================================
+// Tests for Management Interface Functions Using CommandRunner
+// =============================================================================
+
+func TestDoRestartApp_WithMockedCommandRunner(t *testing.T) {
+	// Save original runner
+	origRunner := commandRunner
+	defer func() { commandRunner = origRunner }()
+
+	t.Run("success", func(t *testing.T) {
+		mock := &mockCommandRunner{
+			output:    []byte("Restarting stratux.service\n"),
+			outputErr: nil,
+		}
+		commandRunner = mock
+
+		// Call doRestartApp - should succeed
+		doRestartApp()
+
+		// Verify the mock was called with correct arguments
+		if mock.outputCalls != 1 {
+			t.Errorf("Expected 1 Output call, got %d", mock.outputCalls)
+		}
+
+		if len(mock.calls) != 1 {
+			t.Fatalf("Expected 1 call, got %d", len(mock.calls))
+		}
+
+		call := mock.calls[0]
+		if call[0] != "/bin/systemctl" {
+			t.Errorf("Expected /bin/systemctl, got %s", call[0])
+		}
+		if call[1] != "restart" {
+			t.Errorf("Expected 'restart', got %s", call[1])
+		}
+		if call[2] != "stratux" {
+			t.Errorf("Expected 'stratux', got %s", call[2])
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mock := &mockCommandRunner{
+			output:    []byte("Failed to restart stratux.service"),
+			outputErr: errors.New("exit status 1"),
+		}
+		commandRunner = mock
+
+		// Call doRestartApp - should handle error gracefully
+		doRestartApp()
+
+		// Verify the mock was called
+		if mock.outputCalls != 1 {
+			t.Errorf("Expected 1 Output call, got %d", mock.outputCalls)
+		}
+		t.Log("doRestartApp handled error gracefully")
+	})
+}
+
+func TestHandleShutdownRequest_WithMockedCommandRunner(t *testing.T) {
+	// Save original runner
+	origRunner := commandRunner
+	defer func() { commandRunner = origRunner }()
+
+	mock := &mockCommandRunner{
+		runErr: nil,
+	}
+	commandRunner = mock
+
+	// Create a test request
+	req := httptest.NewRequest("POST", "/shutdown", nil)
+	w := httptest.NewRecorder()
+
+	// Call handleShutdownRequest
+	handleShutdownRequest(w, req)
+
+	// Verify the mock was called with correct arguments
+	if mock.runCalls != 1 {
+		t.Errorf("Expected 1 Run call, got %d", mock.runCalls)
+	}
+
+	if len(mock.calls) != 1 {
+		t.Fatalf("Expected 1 call, got %d", len(mock.calls))
+	}
+
+	call := mock.calls[0]
+	if call[0] != "systemctl" {
+		t.Errorf("Expected systemctl, got %s", call[0])
+	}
+	if call[1] != "poweroff" {
+		t.Errorf("Expected 'poweroff', got %s", call[1])
+	}
+}
+
+func TestDoReboot_WithMockedCommandRunner(t *testing.T) {
+	// Save original runner
+	origRunner := commandRunner
+	defer func() { commandRunner = origRunner }()
+
+	mock := &mockCommandRunner{
+		runErr: nil,
+	}
+	commandRunner = mock
+
+	// Call doReboot
+	doReboot()
+
+	// Verify the mock was called with correct arguments
+	if mock.runCalls != 1 {
+		t.Errorf("Expected 1 Run call, got %d", mock.runCalls)
+	}
+
+	if len(mock.calls) != 1 {
+		t.Fatalf("Expected 1 call, got %d", len(mock.calls))
+	}
+
+	call := mock.calls[0]
+	if call[0] != "systemctl" {
+		t.Errorf("Expected systemctl, got %s", call[0])
+	}
+	if call[1] != "reboot" {
+		t.Errorf("Expected 'reboot', got %s", call[1])
+	}
+}
+
+func TestHandleroPartitionRebuild_WithMockedCommandRunner(t *testing.T) {
+	// Save original runner
+	origRunner := commandRunner
+	defer func() { commandRunner = origRunner }()
+
+	// Initialize system error tracking if needed
+	if systemErrsMutex == nil {
+		systemErrsMutex = &sync.Mutex{}
+	}
+	if systemErrs == nil {
+		systemErrs = make(map[string]string)
+	}
+
+	t.Run("success", func(t *testing.T) {
+		mock := &mockCommandRunner{
+			output:    []byte("Partition rebuilt successfully\n"),
+			outputErr: nil,
+		}
+		commandRunner = mock
+
+		// Create a test request
+		req := httptest.NewRequest("POST", "/roPartitionRebuild", nil)
+		w := httptest.NewRecorder()
+
+		// Call handler
+		handleroPartitionRebuild(w, req)
+
+		// Verify the mock was called
+		if mock.outputCalls != 1 {
+			t.Errorf("Expected 1 Output call, got %d", mock.outputCalls)
+		}
+
+		if len(mock.calls) != 1 {
+			t.Fatalf("Expected 1 call, got %d", len(mock.calls))
+		}
+
+		call := mock.calls[0]
+		if call[0] != "/usr/sbin/rebuild_ro_part.sh" {
+			t.Errorf("Expected /usr/sbin/rebuild_ro_part.sh, got %s", call[0])
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mock := &mockCommandRunner{
+			output:    []byte("Error rebuilding partition"),
+			outputErr: errors.New("exit status 1"),
+		}
+		commandRunner = mock
+
+		// Create a test request
+		req := httptest.NewRequest("POST", "/roPartitionRebuild", nil)
+		w := httptest.NewRecorder()
+
+		// Call handler - should handle error gracefully
+		handleroPartitionRebuild(w, req)
+
+		// Verify the mock was called
+		if mock.outputCalls != 1 {
+			t.Errorf("Expected 1 Output call, got %d", mock.outputCalls)
+		}
+		t.Log("handleroPartitionRebuild handled error gracefully")
+	})
+}
+
+// Test runCommandNoOutput helper function
+func TestRunCommandNoOutput(t *testing.T) {
+	// Save original runner
+	origRunner := commandRunner
+	defer func() { commandRunner = origRunner }()
+
+	t.Run("success", func(t *testing.T) {
+		mock := &mockCommandRunner{
+			runErr: nil,
+		}
+		commandRunner = mock
+
+		err := runCommandNoOutput("test-cmd", "arg1")
+
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if mock.runCalls != 1 {
+			t.Errorf("Expected 1 Run call, got %d", mock.runCalls)
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		expectedErr := errors.New("command failed")
+		mock := &mockCommandRunner{
+			runErr: expectedErr,
+		}
+		commandRunner = mock
+
+		err := runCommandNoOutput("failing-cmd")
+
+		if err == nil {
+			t.Error("Expected error, got nil")
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Errorf("Expected error %v, got %v", expectedErr, err)
+		}
+	})
 }

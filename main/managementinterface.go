@@ -613,12 +613,12 @@ func setPersistentLogging(persistent bool) {
 
 func handleShutdownRequest(w http.ResponseWriter, r *http.Request) {
 	syscall.Sync()
-	exec.Command("systemctl", "poweroff").Run()
+	runCommandNoOutput("systemctl", "poweroff")
 }
 
 func doReboot() {
 	syscall.Sync()
-	exec.Command("systemctl", "reboot").Run()
+	runCommandNoOutput("systemctl", "reboot")
 }
 
 func handleDeleteLogFile(w http.ResponseWriter, r *http.Request) {
@@ -753,7 +753,7 @@ func handleResetGMeter(w http.ResponseWriter, r *http.Request) {
 func doRestartApp() {
 	time.Sleep(1)
 	syscall.Sync()
-	out, err := exec.Command("/bin/systemctl", "restart", "stratux").Output()
+	out, err := runCommand("/bin/systemctl", "restart", "stratux")
 	if err != nil {
 		log.Printf("restart error: %s\n%s", err.Error(), out)
 	} else {
@@ -955,7 +955,7 @@ func defaultServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleroPartitionRebuild(w http.ResponseWriter, r *http.Request) {
-	out, err := exec.Command("/usr/sbin/rebuild_ro_part.sh").Output()
+	out, err := runCommand("/usr/sbin/rebuild_ro_part.sh")
 
 	if err != nil {
 		addSingleSystemErrorf("partition-rebuild", "Rebuild RO Partition error: %s", err.Error())
