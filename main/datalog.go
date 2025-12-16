@@ -260,7 +260,7 @@ func makeTable(i interface{}, tbl string, db *sql.DB) {
 
 	_, err := db.Exec(tblCreate)
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
+		log.Printf("ERROR in makeTable: failed to create table %s: %s\n", tbl, err.Error())
 	}
 }
 
