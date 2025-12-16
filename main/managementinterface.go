@@ -850,7 +850,7 @@ func handleUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
 	overlayctl("unlock")
 	reader, err := r.MultipartReader()
 	if err != nil {
-		log.Printf("Update failed from %s (%s).\n", r.RemoteAddr, err.Error())
+		log.Printf("Update failed from %s (%s).\n", r.RemoteAddr, sanitizeLogString(err.Error()))
 		return
 	}
 
@@ -909,15 +909,15 @@ func handleUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
 func handlePongUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
 	setNoCache(w)
 	setJSONHeaders(w)
-	log.Printf("request: %s\n", r.URL.RequestURI())
+	log.Printf("request: %s\n", sanitizeLogString(r.URL.RequestURI()))
 	err := r.ParseMultipartForm(8 << 20)
 	if err != nil {
-		log.Printf("Step 1 Update failed from %s (%s).\n", r.RemoteAddr, err.Error())
+		log.Printf("Step 1 Update failed from %s (%s).\n", r.RemoteAddr, sanitizeLogString(err.Error()))
 		return
 	}
 	file, _, err := r.FormFile("pong_update_file")
 	if err != nil {
-		log.Printf("FormFile returned error %s\n", err.Error())
+		log.Printf("FormFile returned error %s\n", sanitizeLogString(err.Error()))
 		return
 	}
 	fi, err := os.OpenFile("/tmp/update_pong.zip", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
@@ -946,6 +946,17 @@ func setNoCache(w http.ResponseWriter) {
 func setJSONHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
+}
+
+// sanitizeLogString removes or replaces characters that could be used for log injection attacks.
+// This prevents attackers from injecting fake log entries via user-controlled input.
+func sanitizeLogString(s string) string {
+	// Replace newlines and carriage returns to prevent log forging
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\r", "\\r")
+	// Replace tabs to maintain log format consistency
+	s = strings.ReplaceAll(s, "\t", "\\t")
+	return s
 }
 
 func defaultServer(w http.ResponseWriter, r *http.Request) {

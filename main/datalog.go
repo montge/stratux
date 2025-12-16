@@ -155,6 +155,46 @@ var sqliteMarshalFunctions = map[string]SQLiteMarshal{
 	"notsupported": {FieldType: "notsupported", Marshal: notsupportedMarshal},
 }
 
+// validTableNames is an allowlist of table names that can be used in SQL statements.
+// This prevents SQL injection even though all current callers use hardcoded names.
+// Test table names are included to support unit testing.
+var validTableNames = map[string]bool{
+	// Production tables
+	"timestamp":         true,
+	"mySituation":       true,
+	"status":            true,
+	"settings":          true,
+	"traffic":           true,
+	"messages":          true,
+	"es_messages":       true,
+	"dump1090_terminal": true,
+	"gps_attitude":      true,
+	"startup":           true,
+	"pong_update":       true,
+	"ais_message":       true,
+	// Test tables (used in unit tests)
+	"simple_test":     true,
+	"data_test":       true,
+	"struct_test":     true,
+	"bad_struct_test": true,
+	"data_with_ts":    true,
+	"simple_insert":   true,
+	"multi_insert":    true,
+	"bulk_single":     true,
+	"bulk_multi":      true,
+	"bulk_large":      true,
+	"bulk_detailed":   true,
+}
+
+// validateTableName checks if a table name is in the allowlist of valid table names.
+// Returns an error if the table name is not valid.
+func validateTableName(tbl string) error {
+	if !validTableNames[tbl] {
+		return fmt.Errorf("invalid table name: %s", tbl)
+	}
+	return nil
+}
+
 var sqlTypeMap = map[reflect.Kind]string{
 	reflect.Bool:          "bool",
 	reflect.Int:           "int",
@@ -185,6 +225,12 @@ var sqlTypeMap = map[reflect.Kind]string{
 }
 
 func makeTable(i interface{}, tbl string, db *sql.DB) {
+	// Validate table name to prevent SQL injection
+	if err := validateTableName(tbl); err != nil {
+		log.Printf("ERROR in makeTable: %s\n", err.Error())
+		return
+	}
+
 	val := reflect.ValueOf(i)
 
 	fields := make([]string, 0)
@@ -284,6 +330,12 @@ var insertString map[string]string // INSERT INTO tbl (col1, col2, ...) VALUES(?
 var insertBatchIfs map[string][][]interface{}
 
 func insertData(i interface{}, tbl string, db *sql.DB, ts_num int64) int64 {
+	// Validate table name to prevent SQL injection
+	if err := validateTableName(tbl); err != nil {
+		log.Printf("ERROR in insertData: %s\n", err.Error())
+		return 0
+	}
+
 	val := reflect.ValueOf(i)
 
 	keys := make([]string, 0)

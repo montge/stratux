@@ -460,6 +460,79 @@ func TestIsDataLogReady(t *testing.T) {
 	})
 }
 
+// TestValidateTableName tests the validateTableName function
+func TestValidateTableName(t *testing.T) {
+	t.Run("valid_production_tables", func(t *testing.T) {
+		validTables := []string{
+			"timestamp", "mySituation", "status", "settings",
+			"traffic", "messages", "es_messages", "dump1090_terminal",
+			"gps_attitude", "startup", "pong_update", "ais_message",
+		}
+		for _, tbl := range validTables {
+			err := validateTableName(tbl)
+			if err != nil {
+				t.Errorf("validateTableName(%q) returned error: %v", tbl, err)
+			}
+		}
+		t.Logf("All %d production table names validated successfully", len(validTables))
+	})
+
+	t.Run("valid_test_tables", func(t *testing.T) {
+		testTables := []string{
+			"simple_test", "data_test", "struct_test", "bad_struct_test",
+			"data_with_ts", "simple_insert", "multi_insert",
+			"bulk_single", "bulk_multi", "bulk_large", "bulk_detailed",
+		}
+		for _, tbl := range testTables {
+			err := validateTableName(tbl)
+			if err != nil {
+				t.Errorf("validateTableName(%q) returned error: %v", tbl, err)
+			}
+		}
+		t.Logf("All %d test table names validated successfully", len(testTables))
+	})
+
+	t.Run("invalid_table_names_rejected", func(t *testing.T) {
+		invalidTables := []string{
+			"unknown_table",
+			"DROP TABLE users; --",
+			"; DELETE FROM timestamp",
+			"",
+			"users",
+			"admin",
+			"passwords",
+			"system",
+		}
+		for _, tbl := range invalidTables {
+			err := validateTableName(tbl)
+			if err == nil {
+				t.Errorf("validateTableName(%q) should have returned error but got nil", tbl)
+			}
+		}
+		t.Logf("All %d invalid table names correctly rejected", len(invalidTables))
+	})
+
+	t.Run("sql_injection_attempts_blocked", func(t *testing.T) {
+		// Common SQL injection patterns
+		injectionAttempts := []string{
+			"timestamp; DROP TABLE users",
+			"timestamp' OR '1'='1",
+			"timestamp--",
+			"timestamp/**/",
+			"' OR 1=1--",
+			"'; DROP TABLE timestamp;--",
+			"1; SELECT * FROM users",
+		}
+		for _, tbl := range injectionAttempts {
+			err := validateTableName(tbl)
+			if err == nil {
+				t.Errorf("SQL injection attempt %q should have been blocked", tbl)
+			}
+		}
+		t.Log("All SQL injection attempts correctly blocked")
+	})
+}
+
 // TestLogMsg tests the logMsg function which logs message data
 func TestLogMsg(t *testing.T) {
 	// Save original settings
