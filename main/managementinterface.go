@@ -1175,7 +1175,7 @@ func readMbTilesMetadata(fname string, db *sql.DB) map[string]string {
 		_, file := filepath.Split(fname)
 		if _, err := os.Stat(getMapdataStylesPath() + file + "/style.json"); err == nil {
 			// We found a style!
-			meta["stratux_style_url"] = "/mapdata/styles/" + file + "/style.json"
+			meta["stratux_style_url"] = mapdataStylesURLPath + file + "/style.json"
 		}
 
 	}
@@ -1275,7 +1275,7 @@ func managementInterface() {
 
 	http.HandleFunc("/", defaultServer)
 	//http.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log"))))
-	http.Handle("/mapdata/styles/", http.StripPrefix("/mapdata/styles/", http.FileServer(http.Dir(getMapdataStylesPath()))))
+	http.Handle(mapdataStylesURLPath, http.StripPrefix(mapdataStylesURLPath, http.FileServer(http.Dir(getMapdataStylesPath()))))
 	http.HandleFunc("/logs/", viewLogs)
 
 	http.HandleFunc("/gdl90",

@@ -23,6 +23,9 @@ import (
 	"github.com/stratux/serial"
 )
 
+// pongDevicePath is the path to the Pong device file
+const pongDevicePath = "/dev/pong"
+
 // pong device data
 var pongSerialConfig *serial.Config
 var pongSerialPort *serial.Port
@@ -42,8 +45,8 @@ func initPongSerial() bool {
 
 	log.Printf("Configuring Pong ADS-B\n")
 
-	if _, err := os.Stat("/dev/pong"); err == nil {
-		device = "/dev/pong"
+	if _, err := os.Stat(pongDevicePath); err == nil {
+		device = pongDevicePath
 	} else {
 		log.Printf("No suitable Pong device found.\n")
 		return false
@@ -342,7 +345,7 @@ func pongWatcher() {
 		}
 		// Autodetect Pong
 		if !globalSettings.Pong_Enabled && !prevPongEnabled && pongDownCount > 10 {
-			if _, err := os.Stat("/dev/pong"); err == nil {
+			if _, err := os.Stat("pongDevicePath"); err == nil {
 				log.Printf("Pong device file detected - Enabling the pong radio\n")
 				globalSettings.Pong_Enabled = true
 				saveSettings()

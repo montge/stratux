@@ -13,6 +13,12 @@
 
 package main
 
+// URL path constants for HTTP routing
+const (
+	// mapdataStylesURLPath is the URL path prefix for map style resources
+	mapdataStylesURLPath = "/mapdata/styles/"
+)
+
 // Path variables that can be overridden in tests
 // Default values match the original constants
 var (
