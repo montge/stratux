@@ -346,7 +346,7 @@ These functions exceed SonarCloud's complexity threshold of 15:
 | Phase 4 | 75% | 57.8% (Complete) | +500 |
 | Phase 5 | 65% | 58.4% (Complete) | +100 |
 | Phase 6 | 75% | 59.5% (Complete) | +1,700 |
-| Phase 7 | 90%+ | 63.9% (In Progress) | +6,000 |
+| Phase 7 | 90%+ | 64.1% (In Progress) | +6,100 |
 | Phase 8 | N/A | Deduplication | -500 |
 | Phase 9 | N/A | SonarCloud Issues | N/A |
 
