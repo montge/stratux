@@ -383,13 +383,13 @@ func TestHandleDownloadAHRSLogsRequest_EdgeCasesForCoverage(t *testing.T) {
 
 		// Create a mix of matching and non-matching files
 		files := map[string]string{
-			"sensors_1.csv":    "sensor data 1",
-			"sensors_2.csv":    "sensor data 2",
-			"stratux.log":      "log data",
-			"other.log":        "other log",
-			"data.txt":         "text data",
-			"sensors.csv":      "no underscore - should not match",
-			"sensors_abc.txt":  "wrong extension - should not match",
+			"sensors_1.csv":   "sensor data 1",
+			"sensors_2.csv":   "sensor data 2",
+			"stratux.log":     "log data",
+			"other.log":       "other log",
+			"data.txt":        "text data",
+			"sensors.csv":     "no underscore - should not match",
+			"sensors_abc.txt": "wrong extension - should not match",
 		}
 
 		for filename, content := range files {
