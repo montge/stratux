@@ -303,6 +303,71 @@ These functions exceed SonarCloud's complexity threshold of 15:
 - [x] managementinterface.go:1166 - "/mapdata/styles/" literal (acceptable duplication)
 - [ ] uatparse.go:324 - Rename variable to match convention
 
+## 10. Phase 10: Hardware Testing on Raspberry Pi (Future)
+
+### 10.1 Hardware Coverage Testing
+Run the full test suite on actual Stratux hardware to achieve true 100% coverage
+of system-dependent functions that cannot be tested in CI.
+
+**Prerequisites**:
+- Raspberry Pi with Stratux image
+- SDR dongles (UAT 978MHz, 1090ES)
+- GPS receiver
+- AHRS/IMU sensors
+
+**Test Categories**:
+- [ ] SDR initialization and device detection (`sdrInit`, `createUATDev`, `createESDev`)
+- [ ] GPS serial communication (`gpsSerialReader`, `initGPSSerial`)
+- [ ] Sensor I2C communication (`initI2CSensors`, `initIMU`, `initPressureSensor`)
+- [ ] Network listener functions (`networkOutWatcher`, `tcpNMEAOutListener`)
+- [ ] Bluetooth initialization (`initBluetooth`)
+- [ ] Ping/Pong device communication
+
+**Coverage Script**:
+```bash
+# Run on Raspberry Pi hardware
+go test -coverprofile=hardware_coverage.out -coverpkg=. -timeout 10m
+go tool cover -html=hardware_coverage.out -o hardware_coverage.html
+```
+
+**Expected Outcome**:
+- System-dependent functions tested with actual hardware
+- Coverage report showing hardware-only paths
+- Documentation of hardware-specific test requirements
+
+## 11. Phase 11: Web Interface Modernization (Future)
+
+### 11.1 AngularJS Version Assessment
+Current web interface uses **AngularJS 1.3.0-rc.3** (2014) which is:
+- End-of-life (AngularJS LTS ended December 2021)
+- Missing security patches
+- Incompatible with modern browsers' security features
+
+**Current Dependencies** (from web/plates/*.html):
+- AngularJS 1.3.0-rc.3 (CDN: ajax.googleapis.com)
+- Also references AngularJS 1.8.3 in some files
+- mobile-angular-ui framework
+
+### 11.2 Upgrade Options
+
+**Option A: Upgrade to AngularJS 1.8.3** (Minimal effort)
+- [ ] Update CDN references to 1.8.3
+- [ ] Test all pages for compatibility
+- [ ] Fix any breaking changes
+- **Note**: Still EOL, but better than 1.3.0-rc.3
+
+**Option B: Migrate to Modern Framework** (Recommended, High effort)
+- [ ] Evaluate Vue.js, React, or Angular (modern)
+- [ ] Plan incremental migration strategy
+- [ ] Rewrite web interface components
+- [ ] Maintain backward compatibility during migration
+
+### 11.3 Immediate Actions
+- [ ] Audit all HTML files for AngularJS version references
+- [ ] Document all AngularJS directives and services in use
+- [ ] Identify mobile-angular-ui dependencies
+- [ ] Create migration plan document
+
 ## Success Criteria
 - [ ] Coverage reaches 90%+
 - [x] All tests pass in CI
@@ -311,6 +376,8 @@ These functions exceed SonarCloud's complexity threshold of 15:
 - [x] No hardware dependencies in unit tests
 - [ ] Minimal code duplication in test files (Phase 8)
 - [x] No BLOCKER security vulnerabilities in SonarCloud
+- [ ] Hardware coverage testing documented (Phase 10)
+- [ ] AngularJS upgrade plan created (Phase 11)
 
 ## Coverage Progress
 
@@ -322,9 +389,19 @@ These functions exceed SonarCloud's complexity threshold of 15:
 | Phase 4 | 75% | 57.8% (Complete) | +500 |
 | Phase 5 | 65% | 58.4% (Complete) | +100 |
 | Phase 6 | 75% | 59.5% (Complete) | +1,700 |
-| Phase 7 | 90%+ | 63.9% (In Progress) | +6,000 |
+| Phase 7 | 90%+ | 64.5% (In Progress) | +6,500 |
 | Phase 8 | N/A | Deduplication | -500 |
 | Phase 9 | N/A | SonarCloud Issues | N/A |
+| Phase 10 | 100% | Hardware Testing | N/A |
+| Phase 11 | N/A | AngularJS Upgrade | N/A |
 
-**Current Coverage**: 63.9% (as of December 2025)
-Total estimated new test code: ~12,500+ lines
+**Current Coverage**: 64.5% overall, **98.1% testable code** (as of December 2025)
+
+**Coverage Analysis**:
+- Total functions: 443
+- System-dependent (untestable in CI): 135 functions
+- Testable functions: 308
+- Testable & covered: 302 (98.1%)
+- Testable uncovered: 6 functions
+
+Total estimated new test code: ~13,000+ lines
