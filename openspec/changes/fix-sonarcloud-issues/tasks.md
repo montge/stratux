@@ -47,7 +47,7 @@
 - [x] 5.7 Address sdr.go:764 FIXME comment - converted to descriptive comment
 
 ## 6. Major Code Smells - Function Parameters
-- [ ] 6.1 Fix xplane.go:38 - Reduce function parameters from 9 to 7
+- [x] 6.1 Fix xplane.go:38 - Reduce function parameters from 9 to 1 (using XPlaneTrafficData struct)
 
 ## 7. Test Code Quality (Lower Priority)
 - [ ] 7.1 Fix unused parameters in test mock functions (gps_test.go, managementinterface_test.go, etc.)

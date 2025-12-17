@@ -401,7 +401,17 @@ func sendTrafficUpdates() {
 				}
 
 				// send traffic message to X-Plane
-				sendXPlane(createXPlaneTrafficMsg(ti.Icao_addr, ti.Lat, ti.Lng, ti.Alt, uint32(ti.Speed), int32(ti.Vvel), ti.OnGround, uint32(ti.Track), trafficCallsign), 1000, priority)
+				sendXPlane(createXPlaneTrafficMsg(XPlaneTrafficData{
+					TargetID:  ti.Icao_addr,
+					LatDeg:    ti.Lat,
+					LonDeg:    ti.Lng,
+					AltFt:     ti.Alt,
+					HSpeedKt:  uint32(ti.Speed),
+					VSpeedFpm: int32(ti.Vvel),
+					OnGround:  ti.OnGround,
+					TrackDeg:  uint32(ti.Track),
+					CallSign:  trafficCallsign,
+				}), 1000, priority)
 				if validFLARM {
 					sendNetFLARM(thisMsgFLARM, time.Second, priority)
 				}

@@ -363,8 +363,17 @@ func TestCreateXPlaneTrafficMsg(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := createXPlaneTrafficMsg(tc.targetId, tc.latDeg, tc.lonDeg,
-				tc.altFt, tc.hSpeedKt, tc.vSpeedFpm, tc.onGround, tc.trackDeg, tc.callSign)
+			result := createXPlaneTrafficMsg(XPlaneTrafficData{
+				TargetID:  tc.targetId,
+				LatDeg:    tc.latDeg,
+				LonDeg:    tc.lonDeg,
+				AltFt:     tc.altFt,
+				HSpeedKt:  tc.hSpeedKt,
+				VSpeedFpm: tc.vSpeedFpm,
+				OnGround:  tc.onGround,
+				TrackDeg:  tc.trackDeg,
+				CallSign:  tc.callSign,
+			})
 			resultStr := string(result)
 
 			// Check prefix
@@ -445,7 +454,17 @@ func TestCreateXPlaneTrafficMsgCallsignCleaning(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := createXPlaneTrafficMsg(1, 0.0, 0.0, 0, 0, 0, false, 0, tc.inputCallsign)
+			result := createXPlaneTrafficMsg(XPlaneTrafficData{
+				TargetID:  1,
+				LatDeg:    0.0,
+				LonDeg:    0.0,
+				AltFt:     0,
+				HSpeedKt:  0,
+				VSpeedFpm: 0,
+				OnGround:  false,
+				TrackDeg:  0,
+				CallSign:  tc.inputCallsign,
+			})
 			resultStr := string(result)
 
 			if !strings.HasSuffix(resultStr, tc.expectedCallsign) {

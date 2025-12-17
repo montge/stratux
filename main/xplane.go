@@ -23,6 +23,19 @@ func convertKnotsToXPlaneSpeed(knots float32) float32 {
 	return knots / 1.94384 // meters per second
 }
 
+// XPlaneTrafficData holds traffic information for X-Plane format messages.
+type XPlaneTrafficData struct {
+	TargetID  uint32
+	LatDeg    float32
+	LonDeg    float32
+	AltFt     int32
+	HSpeedKt  uint32
+	VSpeedFpm int32
+	OnGround  bool
+	TrackDeg  uint32
+	CallSign  string
+}
+
 func createXPlaneGpsMsg(latDeg float32, lonDeg float32, altMslFt float32, trackDeg float32, speedKt float32) []byte {
 	// example: XGPS1,-122.298432,47.450756,420.9961,349.7547,57.9145
 	return []byte(fmt.Sprintf("XGPSStratux,%.6f,%.6f,%.4f,%.4f,%.4f", lonDeg, latDeg, convertFeetToMeters(altMslFt), trackDeg, convertKnotsToXPlaneSpeed(speedKt)))
@@ -35,12 +48,12 @@ func createXPlaneAttitudeMsg(headingDeg float32, pitchDeg float32, rollDeg float
 	//return []byte(fmt.Sprintf("XATTStratux,%.1f,%.1f,%.1f")) // this one is what the Foreflight spec says
 }
 
-func createXPlaneTrafficMsg(targetId uint32, latDeg float32, lonDeg float32, altFt int32, hSpeedKt uint32, vSpeedFpm int32, onGround bool, trackDeg uint32, callSign string) []byte {
+func createXPlaneTrafficMsg(data XPlaneTrafficData) []byte {
 	// example: XTRA1,1,47.435484,-122.304048,351,1,0,62,0,N172SP
 
 	// prepare airborne/ground information
 	airborneValue := uint8(0)
-	if onGround {
+	if data.OnGround {
 		airborneValue = 0
 	} else {
 		airborneValue = 1
@@ -48,7 +61,7 @@ func createXPlaneTrafficMsg(targetId uint32, latDeg float32, lonDeg float32, alt
 
 	// prepare callsign (remove all non-alphanumeric characters)
 	regEx, _ := regexp.Compile("[^a-zA-Z0-9]+")
-	cleanCallSign := regEx.ReplaceAllString(callSign, "")
+	cleanCallSign := regEx.ReplaceAllString(data.CallSign, "")
 
-	return []byte(fmt.Sprintf("XTRAFFICStratux,%d,%.6f,%.6f,%d,%d,%d,%d,%d,%s", targetId, latDeg, lonDeg, altFt, vSpeedFpm, airborneValue, trackDeg, hSpeedKt, cleanCallSign))
+	return []byte(fmt.Sprintf("XTRAFFICStratux,%d,%.6f,%.6f,%d,%d,%d,%d,%d,%s", data.TargetID, data.LatDeg, data.LonDeg, data.AltFt, data.VSpeedFpm, airborneValue, data.TrackDeg, data.HSpeedKt, cleanCallSign))
 }
