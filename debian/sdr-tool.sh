@@ -5,7 +5,7 @@
 ######################################################################
 
 #Set Script Name variable
-SCRIPT=`basename ${BASH_SOURCE[0]}`
+SCRIPT=$(basename "${BASH_SOURCE[0]}")
 
 # rtl_eeprom -d 0 -s <String>:<Freq>:<PPM>
 #Initialize variables to default values.
@@ -45,11 +45,11 @@ function STOPSTRATUX {
 	HEAD
 	echo "Give me a few seconds to check if STRATUX is running..."
 	# The service we want to check (according to systemctl)
-	if [ "`systemctl is-active $SERVICE`" = "active" ] 
+	if [ "$(systemctl is-active "$SERVICE")" = "active" ]
 	then
 	    echo "$SERVICE is currently running"
 	    echo "Stopping..."
-	    SDRs=`systemctl stop stratux.service`
+	    systemctl stop stratux.service
 	fi
 	sleep 3
 }
@@ -57,12 +57,12 @@ function STOPSTRATUX {
 function STARTSTRATUX {
 	HEAD
 	echo "Give me a few seconds to get STRATUX running again..."
-	SDRs=`systemctl start stratux.service`
+	systemctl start stratux.service
 	sleep 3
-	if [ "`systemctl is-active $SERVICE`" = "active" ] 
+	if [ "$(systemctl is-active "$SERVICE")" = "active" ]
 	then
 	    echo "$SERVICE is now running"
-	else 
+	else
 		echo "$SERVICE did not restart. Try 'reboot' to restart your RaspberryPI"
 	fi
 }
@@ -78,7 +78,7 @@ function SETSDRSERIAL {
     echo " "
     echo "${REV}Answer 'y' to the qustion: 'Write new configuration to device [y/n]?'${NORM}"
     echo " "
-    SDRs=`rtl_eeprom -d 0 -s stx:${WhichSDR}:${PPMValue}`
+    rtl_eeprom -d 0 -s "stx:${WhichSDR}:${PPMValue}"
     sleep 2
     echo " "
     echo "Do you have another SDR to program?"
@@ -97,11 +97,11 @@ function SETSDRSERIAL {
   		case $choice in
     		'Yes')
             		echo "Shutting down..."
-    	    		SDRs=`shutdown -h now`
+    	    		shutdown -h now
     	    	;;
     		'No')
     	  		echo "Rebooting..."
-                	SDRs=`reboot`
+                	reboot
     	  	;;
     		exit)
 			STARTSTRATUX
@@ -230,7 +230,7 @@ function MAINMENU {
 	HEAD
 	echo "#                CONFIRM ONLY ONE SDR INSTALLED                      #"
 	echo "----------------------------------------------------------------------"
-	SDRs=`rtl_eeprom`
+	rtl_eeprom
     echo "----------------------------------------------------------------------"
 	echo " "
 	echo "${BOLD}${RED}Read the lines above.${NORM}"

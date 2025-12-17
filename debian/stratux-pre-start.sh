@@ -29,13 +29,13 @@ PACKAGE_UPDATE_LOCATION="/root/$PACKAGE_MASK"
 ###############
 # script based update in download location
 if [[ -e ${TEMP_SCRIPT_LOCATION} ]]; then
-	wLog "Found Update Script in $TEMP_SCRIPT_LOCATION$SCRIPT_MASK"
+	wLog "Found Update Script in $TEMP_DIRECTORY"
 	TEMP_SCRIPT_FILE=$(ls -1t "${TEMP_SCRIPT_LOCATION}" | head -1)
 	wLog "Moving Update Script $TEMP_SCRIPT_FILE"
 	cp -r "${TEMP_SCRIPT_FILE}" /root/
-	wLog "Changing permissions to chmod a+x $UPDATE_LOCATION"
+	wLog "Changing permissions to chmod a+x $SCRIPT_UPDATE_LOCATION"
 	chmod a+x "${SCRIPT_UPDATE_LOCATION}"
-	wLog "Removing Script file from $TEMP_SCRIPT_LOCATION"
+	wLog "Removing Script file from $TEMP_DIRECTORY"
 	rm -rf "${TEMP_SCRIPT_FILE}"
 fi
 
@@ -56,13 +56,13 @@ fi
 ##############
 # package based update in download location
 if [[ -e ${TEMP_PACKAGE_LOCATION} ]]; then
-	wLog "Found Update Package in $TEMP_PACKAGE_LOCATION$PACKAGE_MASK"
+	wLog "Found Update Package in $TEMP_DIRECTORY"
 	TEMP_PACKAGE_FILE=$(ls -1t "${TEMP_PACKAGE_LOCATION}" | head -1)
 	wLog "Moving Update Package $TEMP_PACKAGE_FILE"
 	cp -r "${TEMP_PACKAGE_FILE}" /root/
 	wLog "Changing permissions to chmod a+x $PACKAGE_UPDATE_LOCATION"
 	chmod a+x "${PACKAGE_UPDATE_LOCATION}"
-	wLog "Removing Update file from $TEMP_PACKAGE_LOCATION"
+	wLog "Removing Update file from $TEMP_DIRECTORY"
 	rm -rf "${TEMP_PACKAGE_FILE}"
 fi
 

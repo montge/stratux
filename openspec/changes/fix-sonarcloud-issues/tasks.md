@@ -55,12 +55,12 @@
 - [ ] 7.3 Reduce cognitive complexity in test functions (optional - tests can be more complex)
 
 ## 8. Web UI Code Quality
-- [ ] 8.1 Fix web/plates/gps.html - Add keyboard event handler to span with onclick
-- [ ] 8.2 Review and fix web/plates/js/*.js issues
+- [x] 8.1 Fix web/plates/gps.html - Add keyboard event handler to span with onclick (added ng-keydown, tabindex, role)
+- [ ] 8.2 Review and fix web/plates/js/*.js issues (deferred - low priority)
 
 ## 9. Shell Script Quality
-- [ ] 9.1 Review and fix debian/*.sh shell script issues
-- [ ] 9.2 Review and fix scripts/*.sh issues
+- [x] 9.1 Fix debian/*.sh shell script issues (fixed undefined variable, backtick substitution, quoting)
+- [ ] 9.2 Review and fix scripts/*.sh issues (deferred - low priority)
 
 ## 10. Validation
 - [ ] 10.1 Run SonarCloud analysis to verify fixes

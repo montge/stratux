@@ -2,7 +2,7 @@
 	<div class="col-sm-6">
 		<div class="panel panel-default">
 			<div class="panel-heading">
-				<span ng-click="hideClick()" class="panel_label">AHRS</span>
+				<span ng-click="hideClick()" ng-keydown="$event.keyCode === 13 && hideClick()" tabindex="0" role="button" class="panel_label">AHRS</span>
 				<span ng-show="ConnectState == 'Connected'" class="label label-success">{{ConnectState}}</span>
 				<span ng-hide="ConnectState == 'Connected'" class="label label-danger">{{ConnectState}}</span>
 			</div>

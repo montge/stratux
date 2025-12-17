@@ -9,10 +9,10 @@
 
 
 #Logging Function
-SCRIPT=`basename ${BASH_SOURCE[0]}`
+SCRIPT=$(basename "${BASH_SOURCE[0]}")
 STX_LOG="/var/log/stratux.log"
 function wLog () {
-       echo "$(date +"%Y/%m/%d %H:%M:%S")  - $SCRIPT - $1" >> ${STX_LOG}
+       echo "$(date +"%Y/%m/%d %H:%M:%S")  - $SCRIPT - $1" >> "${STX_LOG}"
 }
 wLog "Running Stratux WiFI Script."
 
@@ -32,15 +32,15 @@ echo "interface=${interface},mode=${mode}"
 
 function terminate {
 	# Given a PID file, terminate the process specified
-	if [[ -f $1 ]]; then
-		pid="$(cat $1)"
-		rm $1
+	if [[ -f "$1" ]]; then
+		pid="$(cat "$1")"
+		rm "$1"
 		echo "killing $pid"
-		kill $pid
+		kill "$pid"
 		for i in $(seq 10); do
 			# If process exits successfully, we are done
 			echo "checking..."
-			if ! ps -p $pid; then
+			if ! ps -p "$pid"; then
 				echo "terminated $pid"
 				return
 			fi
@@ -48,7 +48,7 @@ function terminate {
 		done
 		# Didn't exit in 5 secs.. kill it
 		echo "could not kill $pid. Hard kill"
-		kill -9 $pid
+		kill -9 "$pid"
 		sleep 1
 	fi
 
@@ -68,20 +68,20 @@ function prepare-start {
 function ap-start {
 	echo "Starting AP mode on $interface"
 
-	/sbin/wpa_supplicant -P/run/wpa_supplicant_ap.pid -B -i $interface -c /etc/wpa_supplicant/wpa_supplicant_ap.conf
+	/sbin/wpa_supplicant -P/run/wpa_supplicant_ap.pid -B -i "$interface" -c /etc/wpa_supplicant/wpa_supplicant_ap.conf
 	sleep 2
 
 	wLog "Restarting DHCP services"
-	dnsmasq -u dnsmasq --conf-dir=/etc/dnsmasq.d -i $interface
+	dnsmasq -u dnsmasq --conf-dir=/etc/dnsmasq.d -i "$interface"
 }
 
 function wifi-direct-start {
 	echo "Starting wifi direct mode on $interface"
 
-	/sbin/wpa_supplicant -P/run/wpa_supplicant_p2p.pid -B -i $interface -c /etc/wpa_supplicant/wpa_supplicant.conf
+	/sbin/wpa_supplicant -P/run/wpa_supplicant_p2p.pid -B -i "$interface" -c /etc/wpa_supplicant/wpa_supplicant.conf
 
-	wpa_cli -i $interface p2p_group_add persistent=0 freq=2
-	(while wpa_cli -i p2p-wlan0-0 wps_pin any $pin > /dev/null; do sleep 1; done) & disown
+	wpa_cli -i "$interface" p2p_group_add persistent=0 freq=2
+	(while wpa_cli -i p2p-wlan0-0 wps_pin any "$pin" > /dev/null; do sleep 1; done) & disown
 	ifup p2p-wlan0-0
 
 	dnsmasq -u dnsmasq --conf-dir=/etc/dnsmasq.d -i p2p-wlan0-0
