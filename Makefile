@@ -167,7 +167,7 @@ clean:
 #
 # NOTE: 'clean' works outside of docker
 dall:
-	./docker_run.sh "cd data && make all"
+	./docker_run.sh "cd /data && make all"
 
 ddpkg:
-	./docker_run.sh "cd data && make dpkg"
+	./docker_run.sh "cd /data && make dpkg"
