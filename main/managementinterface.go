@@ -256,21 +256,21 @@ func handleSituationWS(conn *websocket.Conn) {
 
 // AJAX call - /getStatus. Responds with current global status
 // a webservice call for the same data available on the websocket but when only a single update is needed
-func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
+func handleStatusRequest(w http.ResponseWriter, _ *http.Request) {
 	setJSONHeadersWithNoCache(w)
 	statusJSON, _ := json.Marshal(&globalStatus)
 	fmt.Fprintf(w, "%s\n", statusJSON)
 }
 
 // AJAX call - /getSituation. Responds with current situation (lat/lon/gdspeed/track/pitch/roll/heading/etc.)
-func handleSituationRequest(w http.ResponseWriter, r *http.Request) {
+func handleSituationRequest(w http.ResponseWriter, _ *http.Request) {
 	setJSONHeadersWithNoCache(w)
 	situationJSON, _ := json.Marshal(&mySituation)
 	fmt.Fprintf(w, "%s\n", situationJSON)
 }
 
 // AJAX call - /getTowers. Responds with all ADS-B ground towers that have sent messages that we were able to parse, along with its stats.
-func handleTowersRequest(w http.ResponseWriter, r *http.Request) {
+func handleTowersRequest(w http.ResponseWriter, _ *http.Request) {
 	setJSONHeadersWithNoCache(w)
 
 	ADSBTowerMutex.Lock()
@@ -285,7 +285,7 @@ func handleTowersRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // AJAX call - /getSatellites. Responds with all GNSS satellites that are being tracked, along with status information.
-func handleSatellitesRequest(w http.ResponseWriter, r *http.Request) {
+func handleSatellitesRequest(w http.ResponseWriter, _ *http.Request) {
 	setJSONHeadersWithNoCache(w)
 	mySituation.muSatellite.Lock()
 	satellitesJSON, err := json.Marshal(&Satellites)
@@ -297,7 +297,7 @@ func handleSatellitesRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // AJAX call - /getSettings. Responds with all stratux.conf data.
-func handleSettingsGetRequest(w http.ResponseWriter, r *http.Request) {
+func handleSettingsGetRequest(w http.ResponseWriter, _ *http.Request) {
 	setJSONHeadersWithNoCache(w)
 	settingsJSON, err := json.Marshal(&globalSettings)
 	if err != nil {
@@ -306,7 +306,7 @@ func handleSettingsGetRequest(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%s\n", settingsJSON)
 }
 
-func handleRegionGet(w http.ResponseWriter, r *http.Request) {
+func handleRegionGet(w http.ResponseWriter, _ *http.Request) {
 	setJSONHeadersWithNoCache(w)
 	switch globalSettings.RegionSelected {
 	case 1:
@@ -615,12 +615,12 @@ var doReboot = func() {
 	exec.Command("systemctl", "reboot").Run()
 }
 
-func handleDeleteLogFile(w http.ResponseWriter, r *http.Request) {
+func handleDeleteLogFile(_ http.ResponseWriter, _ *http.Request) {
 	log.Println("handleDeleteLogFile called!!!")
 	clearDebugLogFile()
 }
 
-func handleDeleteAHRSLogFiles(w http.ResponseWriter, r *http.Request) {
+func handleDeleteAHRSLogFiles(w http.ResponseWriter, _ *http.Request) {
 	files, err := os.ReadDir(varLogDirPath)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error deleting AHRS logs: %s", err), http.StatusNotFound)
@@ -638,13 +638,13 @@ func handleDeleteAHRSLogFiles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleDevelModeToggle(w http.ResponseWriter, r *http.Request) {
+func handleDevelModeToggle(_ http.ResponseWriter, _ *http.Request) {
 	log.Printf("handleDevelModeToggle called!!!\n")
 	globalSettings.DeveloperMode = true
 	saveSettings()
 }
 
-func handleRestartRequest(w http.ResponseWriter, r *http.Request) {
+func handleRestartRequest(_ http.ResponseWriter, _ *http.Request) {
 	log.Printf("handleRestartRequest called\n")
 	go doRestartApp()
 }
@@ -776,7 +776,7 @@ func handleDownloadLogRequest(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filepath.Join(varLogDirPath, "stratux.log"))
 }
 
-func handleDownloadAHRSLogsRequest(w http.ResponseWriter, r *http.Request) {
+func handleDownloadAHRSLogsRequest(w http.ResponseWriter, _ *http.Request) {
 	// Common error handler
 	httpErr := func(w http.ResponseWriter, e error) {
 		http.Error(w, fmt.Sprintf("error zipping AHRS logs: %s", e), http.StatusNotFound)
@@ -1183,7 +1183,7 @@ func readMbTilesMetadata(fname string, db *sql.DB) map[string]string {
 }
 
 // Scans mapdata dir for all .db and .mbtiles files and returns json representation of all metadata values
-func handleTilesets(w http.ResponseWriter, r *http.Request) {
+func handleTilesets(w http.ResponseWriter, _ *http.Request) {
 	files, err := os.ReadDir(getMapdataPath())
 	if err != nil {
 		log.Printf("handleTilesets() error: %s\n", err.Error())

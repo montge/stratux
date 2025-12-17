@@ -350,7 +350,6 @@ input[type="number_format"] {
 
 .panel-heading {
 	padding: 4px 4px 4px 4px;
-	border-bottom: 1px solid transparent;
 	border-top-right-radius: 3px;
 	border-top-left-radius: 3px;
 	border-bottom: 1px solid #cccccc;

@@ -1985,6 +1985,21 @@ type SerialReaderInterface interface {
 	io.Closer
 }
 
+// processNMEAMessages splits a line into individual NMEA messages and processes each one.
+func processNMEAMessages(line string) {
+	messages := strings.Split(line, "$")
+	for _, msg := range messages {
+		if len(msg) == 0 {
+			continue
+		}
+		// Add back the $ prefix that was removed by Split
+		msg = "$" + msg
+		if !processNMEALine(msg) && globalSettings.DEBUG {
+			fmt.Printf("processNMEALine() exited early -- %s\n", msg)
+		}
+	}
+}
+
 // processSerialInput reads NMEA sentences from the given reader and processes them.
 // This function is extracted from gpsSerialReader to enable testing with mock readers.
 // Returns the number of lines processed and any scanner error encountered.
@@ -1996,23 +2011,7 @@ func processSerialInput(reader io.Reader) (int, error) {
 		if globalSettings.DEBUG && i%100 == 0 {
 			log.Printf("processSerialInput() scanner loop iteration i=%d\n", i)
 		}
-
-		s := scanner.Text()
-		// Split the line into individual NMEA messages
-		messages := strings.Split(s, "$")
-		for _, msg := range messages {
-			if len(msg) == 0 {
-				continue
-			}
-			// Add back the $ prefix that was removed by Split
-			msg = "$" + msg
-
-			if !processNMEALine(msg) {
-				if globalSettings.DEBUG {
-					fmt.Printf("processNMEALine() exited early -- %s\n", msg)
-				}
-			}
-		}
+		processNMEAMessages(scanner.Text())
 	}
 	return i, scanner.Err()
 }

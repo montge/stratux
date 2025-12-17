@@ -375,7 +375,7 @@ function MapCtrl($rootScope, $scope, $state, $http, $interval, craftService) {
 				}
 				
 				// At most 9.25km per aircraft
-				aircraft.posHistroy = clipPosHistory(aircraft, 9.25);
+				clipPosHistory(aircraft, 9.25);
 
 				if (!aircraft.Speed_valid) {
 					// Compute fake track from last to current position

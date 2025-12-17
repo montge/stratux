@@ -117,12 +117,12 @@ type SoftRF struct {
 	settings map[string]string
 }
 
-func (tracker *OgnTracker) initNewConnection(serialPort *serial.Port) {
+func (tracker *OgnTracker) initNewConnection(_ *serial.Port) {
 	tracker.detected = false
 	tracker.trackerConfig = nil
 }
 
-func (tracker *OgnTracker) onNmea(serialPort *serial.Port, nmea []string) bool {
+func (tracker *OgnTracker) onNmea(_ *serial.Port, nmea []string) bool {
 	if nmea[0] == "POGNR" {
 		tracker.detected = true
 		return true
@@ -217,13 +217,13 @@ func (tracker *OgnTracker) writeConfigFromSettings(serialPort *serial.Port) bool
 	return true
 }
 
-func (tracker *GxAirCom) initNewConnection(serialPort *serial.Port) {
+func (tracker *GxAirCom) initNewConnection(_ *serial.Port) {
 	tracker.detected = false
 	tracker.trackerConfig = nil
 	tracker.blindAskedForConfig = false
 }
 
-func (tracker *GxAirCom) onNmea(serialPort *serial.Port, nmea []string) bool {
+func (tracker *GxAirCom) onNmea(_ *serial.Port, nmea []string) bool {
 	// Only sent by GxAirCom tracker. We use this to detect that GxAirCom tracker is connected and configure it as needed
 	if nmea[0] == "PFLAV" && nmea[4] == "GXAircom" {
 		tracker.detected = true
@@ -323,7 +323,7 @@ func (tracker *GxAirCom) writeConfigFromSettings(serialPort *serial.Port) bool {
 	return true
 }
 
-func (tracker *SoftRF) initNewConnection(serialPort *serial.Port) {
+func (tracker *SoftRF) initNewConnection(_ *serial.Port) {
 	tracker.detected = false
 	tracker.settings = make(map[string]string)
 }

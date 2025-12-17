@@ -107,9 +107,8 @@ func (conn *networkConnection) GetDesiredPacketSize() int {
 	return 1024
 }
 
-func (conn *networkConnection) OnError(err error) {
+func (conn *networkConnection) OnError(_ error) {
 	// Ignore for UDP. We keep the socket always open and just try to push data
-	//log.Printf("UDP Write error: %s", err.Error())
 }
 
 func (conn *networkConnection) Close() {

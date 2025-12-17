@@ -441,6 +441,7 @@ func dataLogWriter(db *sql.DB) {
 				log.Printf("db.Begin() error: %s\n", err.Error())
 				break // from select {}
 			}
+			defer tx.Rollback() // Rollback is a no-op if Commit() succeeds
 			for _, r := range rowsQueuedForWrite {
 				tblsAffected[r.tbl] = true
 				insertData(r.data, r.tbl, db, r.ts_num)

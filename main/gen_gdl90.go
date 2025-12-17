@@ -1039,7 +1039,7 @@ type WeatherMessage struct {
 }
 
 // Send update to connected websockets.
-func registerADSBTextMessageReceived(msg string, uatMsg *uatparse.UATMsg) {
+func registerADSBTextMessageReceived(msg string, _ *uatparse.UATMsg) {
 	x := strings.Split(msg, " ")
 	if len(x) < 5 {
 		return

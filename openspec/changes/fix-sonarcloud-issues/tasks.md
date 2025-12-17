@@ -1,0 +1,68 @@
+# Tasks: Fix SonarCloud Issues
+
+## 1. Configuration & Exclusions
+- [x] 1.1 Configure SonarCloud to exclude third-party directories (dump978/, web/maui/, test/metar-to-text/)
+- [ ] 1.2 Verify exclusion reduces issue count appropriately
+
+## 2. Reliability Issues (Bugs) - HIGH PRIORITY
+- [x] 2.1 Fix datalog.go:439 - Add `defer tx.Rollback()` after `db.Begin()` error check
+- [x] 2.2 Fix web/plates/js/map.js - Remove use of output from clipPosHistory (void function)
+- [x] 2.3 Fix web/plates/status.html - Remove deprecated `<tt>` element
+- [x] 2.4 Fix web/index.html - Add lang attribute to html element
+- [x] 2.5 Fix web/css/main.css - Remove duplicate border-bottom
+
+## 3. Critical Code Smells - Production Code
+- [x] 3.1 Fix gps.go - Reduce cognitive complexity by extracting processNMEAMessages()
+- [x] 3.2 Fix managementinterface.go - Define constant for "/mapdata/styles/" (done in previous session)
+- [ ] 3.3 Fix managementinterface.go:401 - Reduce switch branches from 48 to 30 (deferred - significant refactor)
+
+## 4. Major Code Smells - Production Code (Unused Parameters)
+- [x] 4.1 Fix managementinterface.go - handleRegionGet unused 'r'
+- [x] 4.2 Fix managementinterface.go - handleDeleteLogFile unused 'w', 'r'
+- [x] 4.3 Fix managementinterface.go - handleDeleteAHRSLogFiles unused 'r'
+- [x] 4.4 Fix managementinterface.go - handleDevelModeToggle unused 'w', 'r'
+- [x] 4.5 Fix managementinterface.go - handleRestartRequest unused 'w', 'r'
+- [x] 4.6 Fix managementinterface.go - handleDownloadAHRSLogsRequest unused 'r'
+- [x] 4.7 Fix managementinterface.go - handleTilesets unused 'r'
+- [x] 4.8 Fix managementinterface.go - handleSatellitesRequest unused 'r'
+- [x] 4.9 Fix managementinterface.go - handleSettingsGetRequest unused 'r'
+- [x] 4.10 Fix managementinterface.go - handleStatusRequest unused 'r'
+- [x] 4.11 Fix managementinterface.go - handleSituationRequest unused 'r'
+- [x] 4.12 Fix managementinterface.go - handleTowersRequest unused 'r'
+- [x] 4.13 Fix gen_gdl90.go:1042 - Remove unused parameter 'uatMsg'
+- [x] 4.14 Fix clientconnection.go:110 - Remove unused parameter 'err'
+- [x] 4.15 Fix tracker.go - OgnTracker.initNewConnection unused 'serialPort'
+- [x] 4.16 Fix tracker.go - OgnTracker.onNmea unused 'serialPort'
+- [x] 4.17 Fix tracker.go - GxAirCom.initNewConnection unused 'serialPort'
+- [x] 4.18 Fix tracker.go - GxAirCom.onNmea unused 'serialPort'
+- [x] 4.19 Fix tracker.go - SoftRF.initNewConnection unused 'serialPort'
+
+## 5. Major Code Smells - FIXME Comments
+- [ ] 5.1 Address network.go:137 FIXME comment
+- [ ] 5.2 Address sensors.go:217 FIXME comment
+- [ ] 5.3 Address gps.go:889 FIXME comment
+- [ ] 5.4 Address gps.go:1002 FIXME comment
+- [ ] 5.5 Address gps.go:1725 FIXME comment
+- [ ] 5.6 Address managementinterface.go:1031 FIXME comment
+- [ ] 5.7 Address sdr.go:764 FIXME comment
+
+## 6. Major Code Smells - Function Parameters
+- [ ] 6.1 Fix xplane.go:38 - Reduce function parameters from 9 to 7
+
+## 7. Test Code Quality (Lower Priority)
+- [ ] 7.1 Fix unused parameters in test mock functions (gps_test.go, managementinterface_test.go, etc.)
+- [ ] 7.2 Define constants for duplicated test strings
+- [ ] 7.3 Reduce cognitive complexity in test functions (optional - tests can be more complex)
+
+## 8. Web UI Code Quality
+- [ ] 8.1 Fix web/plates/gps.html - Add keyboard event handler to span with onclick
+- [ ] 8.2 Review and fix web/plates/js/*.js issues
+
+## 9. Shell Script Quality
+- [ ] 9.1 Review and fix debian/*.sh shell script issues
+- [ ] 9.2 Review and fix scripts/*.sh issues
+
+## 10. Validation
+- [ ] 10.1 Run SonarCloud analysis to verify fixes
+- [ ] 10.2 Ensure no regressions in tests
+- [ ] 10.3 Update documentation if needed
