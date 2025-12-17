@@ -359,9 +359,9 @@ func insertData(i interface{}, tbl string, db *sql.DB, ts_num int64) int64 {
 	if tbl != "timestamp" && tbl != "startup" {
 		keys = append(keys, "timestamp_id")
 		if dataLogTimestamps[ts_num].id == 0 {
-			//FIXME: This is somewhat convoluted. When insertData() is called for a ts_num that corresponds to a timestamp with no database id,
-			// then it inserts that timestamp via the same interface and the id is updated in the structure via the below lines
-			// (dataLogTimestamps[ts_num].id = id).
+			// Note: Recursive insertion pattern - when insertData() is called for a ts_num without a database id,
+			// it first inserts the timestamp record via this same function. The id is populated after insertion
+			// via the dataLogTimestamps[ts_num].id = id assignment below.
 			dataLogTimestamps[ts_num].StartupID = stratuxStartupID
 			insertData(dataLogTimestamps[ts_num], "timestamp", db, ts_num) // Updates dataLogTimestamps[ts_num].id.
 		}

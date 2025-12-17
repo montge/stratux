@@ -108,7 +108,7 @@ func processCotMessage(msg string) {
 	ti.Position_valid = true
 	ti.Reg = event.Uid
 	ti.Tail = event.Uid
-	ti.Last_source = TRAFFIC_SOURCE_OGN // TODO: properly implement TRAFFIC_SOURCE_COT
+	ti.Last_source = TRAFFIC_SOURCE_COT
 	ti.Age = 0
 	ti.AgeLastAlt = 0
 	ti.Last_seen = stratuxClock.Time

@@ -597,9 +597,9 @@ func TestProcessCotMessage_TrafficSourceField(t *testing.T) {
 	}
 	trafficMutex.Unlock()
 
-	// Currently marked as OGN (TODO in code says should be COT)
-	if ti.Last_source != TRAFFIC_SOURCE_OGN {
-		t.Errorf("Expected Last_source=%d (OGN/COT), got %d", TRAFFIC_SOURCE_OGN, ti.Last_source)
+	// Traffic source should be COT (Cursor on Target)
+	if ti.Last_source != TRAFFIC_SOURCE_COT {
+		t.Errorf("Expected Last_source=%d (COT), got %d", TRAFFIC_SOURCE_COT, ti.Last_source)
 	}
 
 	if ti.Addr_type != 1 {

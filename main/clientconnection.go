@@ -21,6 +21,10 @@ import (
 	"tinygo.org/x/bluetooth"
 )
 
+// bleMTUPayloadSize is the default BLE ATT payload size (ATT_MTU 23 - 3 byte header = 20 bytes)
+// This is the standard maximum payload for BLE characteristic writes without MTU negotiation
+const bleMTUPayloadSize = 20
+
 // Connection interface where we will write data - no matter if UDP, Serial or TCP
 type connection interface {
 	GetConnectionKey() string // e.g. "192.168.10.22:12345" for udp, "TCP:192.168.10.22:12345" for TCP, "/dev/serialout0" for serialout
@@ -258,7 +262,7 @@ func (conn *bleConnection) Capabilities() uint8 {
 }
 
 func (conn *bleConnection) GetDesiredPacketSize() int {
-	return 20 // TODO
+	return bleMTUPayloadSize
 }
 
 func (conn *bleConnection) OnError(err error) {

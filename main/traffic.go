@@ -67,6 +67,7 @@ const (
 	TRAFFIC_SOURCE_UAT    = 2
 	TRAFFIC_SOURCE_OGN    = 4
 	TRAFFIC_SOURCE_AIS    = 8
+	TRAFFIC_SOURCE_COT    = 16 // Cursor on Target protocol (TAK/ATAK)
 	TARGET_TYPE_MODE_S    = 0
 	TARGET_TYPE_ADSB      = 1
 	TARGET_TYPE_ADSR      = 2

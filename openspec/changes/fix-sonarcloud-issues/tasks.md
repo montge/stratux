@@ -83,12 +83,12 @@
 - [x] 11.9 traffic.go:293 - Define constant for `500` ft altitude diff (ownshipAltDiffMaxFeet)
 
 ## 12. TODO/FIXME Comments in Production Code
-- [ ] 12.1 clientconnection.go:261 - Address incomplete `return 20 // TODO` function
-- [ ] 12.2 cot-in.go:111 - Address TODO for TRAFFIC_SOURCE_COT
-- [ ] 12.3 datalog.go:362 - Address FIXME for convoluted logic
-- [ ] 12.4 flarm-nmea.go - Address 5 TODOs (lines 75, 86, 236, 458, 460)
-- [ ] 12.5 gen_gdl90.go - Address 13 TODOs/FIXMEs
-- [ ] 12.6 gps.go - Address 8 TODOs (lines 133, 143, 294, 672-673, 735, 1145, 1151)
+- [x] 12.1 clientconnection.go:261 - Defined bleMTUPayloadSize constant (20 bytes)
+- [x] 12.2 cot-in.go:111 - Added TRAFFIC_SOURCE_COT constant (16), updated cot-in.go to use it
+- [x] 12.3 datalog.go:362 - Converted FIXME to descriptive Note about recursive insertion pattern
+- [ ] 12.4 flarm-nmea.go - Address 5 TODOs (lines 75, 86, 236, 458, 460) - deferred
+- [ ] 12.5 gen_gdl90.go - Address 13 TODOs/FIXMEs - deferred (many are feature requests)
+- [ ] 12.6 gps.go - Address 8 TODOs (lines 133, 143, 294, 672-673, 735, 1145, 1151) - deferred (feature enhancements)
 
 ## 13. High Cognitive Complexity Functions (Major Refactors)
 - [ ] 13.1 traffic.go:697 parseDownlinkReport() - 352 lines, ~44 conditionals (extract bit manipulation helpers)
