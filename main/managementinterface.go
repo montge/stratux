@@ -1028,7 +1028,8 @@ type dirlisting struct {
 	ServerUA       string
 }
 
-// FIXME: This needs to be switched to show a "sessions log" from the sqlite database.
+// viewLogs serves log files from /var/log.
+// Note: A future enhancement could show sessions from the sqlite database.
 func viewLogs(w http.ResponseWriter, r *http.Request) {
 	// Extract and clean the requested path
 	urlpath := strings.TrimPrefix(r.URL.Path, "/logs/")

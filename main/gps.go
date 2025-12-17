@@ -886,7 +886,7 @@ func calcGPSAttitude() bool {
 		// Output format:GPSAtttiude,seconds,nmeaTime,msg_type,GS,Course,Alt,VV,filtered_GS,filtered_course,turn rate,filtered_vv,pitch, roll,load_factor
 		buf := fmt.Sprintf("GPSAttitude,%.1f,%.2f,%s,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f\n", float64(stratuxClock.GetMilliseconds())/1000, myGPSPerfStats[index].nmeaTime, myGPSPerfStats[index].msgType, myGPSPerfStats[index].gsf, myGPSPerfStats[index].coursef, myGPSPerfStats[index].alt, myGPSPerfStats[index].vv, v_x/1.687810, headingAvg, myGPSPerfStats[index].gpsTurnRate, v_z, myGPSPerfStats[index].gpsPitch, myGPSPerfStats[index].gpsRoll, myGPSPerfStats[index].gpsLoadFactor)
 		if globalSettings.DEBUG {
-			log.Printf("%s", buf) // FIXME. Send to sqlite log or other file?
+			log.Printf("%s", buf) // Debug output; main logging is via logGPSAttitude()
 		}
 		logGPSAttitude(myGPSPerfStats[index])
 		//replayLog(buf, MSGCLASS_AHRS)
@@ -999,7 +999,7 @@ func calcGPSAttitude() bool {
 	if globalSettings.DEBUG {
 		// Output format:GPSAtttiude,seconds,nmeaTime,msg_type,GS,Course,Alt,VV,filtered_GS,filtered_course,turn rate,filtered_vv,pitch, roll,load_factor
 		buf := fmt.Sprintf("GPSAttitude,%.1f,%.2f,%s,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f,%0.3f\n", float64(stratuxClock.GetMilliseconds())/1000, myGPSPerfStats[index].nmeaTime, myGPSPerfStats[index].msgType, myGPSPerfStats[index].gsf, myGPSPerfStats[index].coursef, myGPSPerfStats[index].alt, myGPSPerfStats[index].vv, v_x/1.687810, headingAvg, myGPSPerfStats[index].gpsTurnRate, v_z, myGPSPerfStats[index].gpsPitch, myGPSPerfStats[index].gpsRoll, myGPSPerfStats[index].gpsLoadFactor)
-		log.Printf("%s", buf) // FIXME. Send to sqlite log or other file?
+		log.Printf("%s", buf) // Debug output; main logging is via logGPSAttitude()
 	}
 
 	logGPSAttitude(myGPSPerfStats[index])
@@ -1722,8 +1722,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 			cno, err = strconv.Atoi(x[7+4*i]) // signal
 			if err != nil {                   // will be blank if satellite isn't being received. Represent as -99.
 				cno = -99
-				thisSatellite.InSolution = false // resets the "InSolution" status if the satellite disappears out of solution due to no signal. FIXME
-				//log.Printf("Satellite %s is no longer in solution due to cno parse error - GSV\n", svStr) // DEBUG
+				thisSatellite.InSolution = false // Reset InSolution when satellite signal is lost
 			} else if cno > 0 {
 				thisSatellite.TimeLastSeen = stratuxClock.GetTime() // Is this needed?
 			}

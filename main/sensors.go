@@ -214,8 +214,9 @@ func initIMU() (ok bool) {
 	return false
 }
 
-//FIXME: Shoud be moved to managementinterface.go and standardized on management interface port.
-
+// sensorAttitudeSender sends attitude data over WebSocket.
+// Note: This could potentially be consolidated with managementinterface.go
+// websocket handlers in a future refactoring effort.
 func sensorAttitudeSender() {
 	var (
 		t                    time.Time

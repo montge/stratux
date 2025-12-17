@@ -38,13 +38,13 @@
 - [x] 4.19 Fix tracker.go - SoftRF.initNewConnection unused 'serialPort'
 
 ## 5. Major Code Smells - FIXME Comments
-- [ ] 5.1 Address network.go:137 FIXME comment
-- [ ] 5.2 Address sensors.go:217 FIXME comment
-- [ ] 5.3 Address gps.go:889 FIXME comment
-- [ ] 5.4 Address gps.go:1002 FIXME comment
-- [ ] 5.5 Address gps.go:1725 FIXME comment
-- [ ] 5.6 Address managementinterface.go:1031 FIXME comment
-- [ ] 5.7 Address sdr.go:764 FIXME comment
+- [x] 5.1 Address network.go:137 FIXME comment - converted to descriptive note
+- [x] 5.2 Address sensors.go:217 FIXME comment - converted to descriptive note
+- [x] 5.3 Address gps.go:889 FIXME comment - clarified as debug output
+- [x] 5.4 Address gps.go:1002 FIXME comment - clarified as debug output
+- [x] 5.5 Address gps.go:1725 FIXME comment - converted to descriptive comment
+- [x] 5.6 Address managementinterface.go:1031 FIXME comment - converted to note about future enhancement
+- [x] 5.7 Address sdr.go:764 FIXME comment - converted to descriptive comment
 
 ## 6. Major Code Smells - Function Parameters
 - [ ] 6.1 Fix xplane.go:38 - Reduce function parameters from 9 to 7

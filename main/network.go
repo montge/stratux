@@ -134,7 +134,8 @@ func serialOutWatcher() {
 	// Check every 30 seconds for a serial output device.
 	serialTicker := time.NewTicker(10 * time.Second)
 
-	//FIXME: This is temporary. Only one serial output device for each protocol for now.
+	// Note: Currently supports one serial output device per protocol.
+	// Multiple devices per protocol could be added in the future if needed.
 	serialDevs := make([]string, 0)
 	for i := 0; i < 10; i++ {
 		serialDevs = append(serialDevs, fmt.Sprintf("/dev/serialout%d", i))

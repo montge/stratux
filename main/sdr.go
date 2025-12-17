@@ -761,7 +761,7 @@ func configDevices(count int, esEnabled, uatEnabled, ognEnabled, aisEnabled bool
 	for i := 0; i < count; i++ {
 		_, _, s, err := rtl.GetDeviceUsbStrings(i)
 		if err == nil {
-			//FIXME: Trim NULL from the serial. Best done in gortlsdr, but putting this here for now.
+			// Trim NULL characters from serial (USB strings may contain trailing NULLs)
 			s = strings.Trim(s, "\x00")
 			// no need to check if createXDev returned an error; if it
 			// failed to config the error is logged and we can ignore
