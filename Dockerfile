@@ -5,6 +5,7 @@ FROM debian:bookworm
 # Install build dependencies and clean apt cache
 RUN apt-get update \
     && apt-get -y install --no-install-recommends \
+        ca-certificates \
         file \
         nano \
         make \
