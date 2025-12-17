@@ -367,12 +367,20 @@ func refreshConnectedClients() {
 
 func parseBleUuid(uuidStr string) (uuid bluetooth.UUID) {
 	if len(uuidStr) == 4 {
-		// Assume hex 16 bit
-		var val uint64
-		val, _ = strconv.ParseUint(uuidStr, 16, 16)
+		// Assume hex 16 bit UUID
+		val, err := strconv.ParseUint(uuidStr, 16, 16)
+		if err != nil {
+			log.Printf("BLE: invalid 16-bit UUID format: %s", uuidStr)
+			return // returns zero-value UUID
+		}
 		uuid = bluetooth.New16BitUUID(uint16(val))
 	} else {
-		uuid, _ = bluetooth.ParseUUID(uuidStr)
+		var err error
+		uuid, err = bluetooth.ParseUUID(uuidStr)
+		if err != nil {
+			log.Printf("BLE: invalid UUID format: %s", uuidStr)
+			return // returns zero-value UUID
+		}
 	}
 	return
 }

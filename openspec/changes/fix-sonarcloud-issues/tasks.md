@@ -100,6 +100,6 @@
 - [ ] 14.1 gen_gdl90.go:93-115 / web/plates/js/status.js - GPS type enumeration sync (add validation or generation)
 
 ## 15. Ignored Error Returns
-- [ ] 15.1 network.go:372,375 - Document or handle ignored returns
-- [ ] 15.2 traffic.go:252 - Document or handle `trafficDist, _, _, _`
-- [ ] 15.3 tracker.go:351 - Handle ignored error from OGNAddrType
+- [x] 15.1 network.go:372,375 - Added error handling with log messages for BLE UUID parsing
+- [ ] 15.2 traffic.go:252 - Intentional ignore of unused DistRect return values (documented by Go idiom)
+- [x] 15.3 tracker.go:351 - Added error handling for strconv.Atoi calls in SoftRF config parsing

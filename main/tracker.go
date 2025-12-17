@@ -344,11 +344,20 @@ func (tracker *SoftRF) onNmea(serialPort *serial.Port, nmea []string) bool {
 		log.Printf("Received SoftRF config %s=%s", key, value)
 		tracker.settings[key] = value
 		if key == "acft_type" {
-			acType, _ := strconv.Atoi(value)
-			acType = mapAircraftType(typeMappingOgn2SoftRF, false, acType)
-			globalSettings.OGNAcftType = acType
+			acType, err := strconv.Atoi(value)
+			if err != nil {
+				log.Printf("Tracker: invalid acft_type value: %s", value)
+			} else {
+				acType = mapAircraftType(typeMappingOgn2SoftRF, false, acType)
+				globalSettings.OGNAcftType = acType
+			}
 		} else if key == "id_method" {
-			globalSettings.OGNAddrType, _ = strconv.Atoi(value)
+			addrType, err := strconv.Atoi(value)
+			if err != nil {
+				log.Printf("Tracker: invalid id_method value: %s", value)
+			} else {
+				globalSettings.OGNAddrType = addrType
+			}
 		} else if key == "aircraft_id" {
 			globalSettings.OGNAddr = value
 		}
