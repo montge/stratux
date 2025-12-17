@@ -79,6 +79,26 @@ const (
 	TARGET_TYPE_AIS    = 5
 )
 
+// Traffic processing constants
+const (
+	// altitudeInvalidFeet marks altitude as invalid/unknown
+	altitudeInvalidFeet = 99999.0
+	// ownshipAltDiffMaxFeet is max altitude difference to consider traffic as potential ownship
+	ownshipAltDiffMaxFeet = 500.0
+	// bearinglessAltDiffMaxFeet is max altitude difference for bearingless target display
+	bearinglessAltDiffMaxFeet = 2000.0
+	// bearinglessDistMaxMeters is max distance for bearingless target consideration
+	bearinglessDistMaxMeters = 15000.0
+	// estimateDistMinMeters is min distance for distance estimation learning (avoid ownship/near targets)
+	estimateDistMinMeters = 1500.0
+	// estimateDistMaxMeters is max distance for distance estimation learning (signal fluctuation)
+	estimateDistMaxMeters = 50000.0
+	// metersPerNauticalMile conversion factor
+	metersPerNauticalMile = 1852.0
+	// radarDisplayMargin is multiplier for radar display boundaries (30% margin)
+	radarDisplayMargin = 1.3
+)
+
 type TrafficInfo struct {
 	Icao_addr           uint32
 	Reg                 string    // Registration. Calculated from Icao_addr for civil aircraft of US registry.
@@ -251,7 +271,7 @@ func isOwnshipTrafficInfo(ti TrafficInfo) (isOwnshipInfo bool, shouldIgnore bool
 			if isGPSValid() {
 				trafficDist, _, _, _ = common.DistRect(float64(mySituation.GPSLatitude), float64(mySituation.GPSLongitude), float64(ti.Lat), float64(ti.Lng))
 			}
-			altDiff := 99999.0
+			altDiff := altitudeInvalidFeet
 			if ti.AltIsGNSS && ti.Alt != 0 {
 				altDiff = math.Abs(float64(mySituation.GPSHeightAboveEllipsoid) - float64(ti.Alt))
 			} else if isTempPressValid() && ti.Alt != 0 {
@@ -270,7 +290,7 @@ func isOwnshipTrafficInfo(ti TrafficInfo) (isOwnshipInfo bool, shouldIgnore bool
 			}
 
 			// If we have a pressure sensor, and the pressure altitude of traffic and ownship is too big, skip...
-			if altDiff > 500 {
+			if altDiff > ownshipAltDiffMaxFeet {
 				log.Printf("Skipping ownship %s because the altitude is off (%f ft)", ownCode, altDiff)
 				continue
 			}
@@ -312,7 +332,7 @@ func sendTrafficUpdates() {
 
 	var currAlt float32
 	currAlt = mySituation.BaroPressureAltitude
-	if currAlt == 99999 { // no valid BaroAlt, take GPS instead, better than nothing
+	if currAlt == altitudeInvalidFeet { // no valid BaroAlt, take GPS instead, better than nothing
 		currAlt = mySituation.GPSAltitudeMSL
 	}
 
@@ -345,10 +365,10 @@ func sendTrafficUpdates() {
 
 		isOwnshipTi, shouldIgnore := isOwnshipTrafficInfo(ti)
 
-		// As bearingless targets, we show the closest estimated traffic that is between +-2000ft
+		// As bearingless targets, we show the closest estimated traffic that is between +-bearinglessAltDiffMaxFeet
 		if !shouldIgnore && !ti.Position_valid && ti.DistanceEstimated > 0 &&
 			(bestEstimate.DistanceEstimated == 0 || ti.DistanceEstimated < bestEstimate.DistanceEstimated) {
-			if ti.Alt != 0 && math.Abs(float64(ti.Alt)-float64(currAlt)) < 2000 {
+			if ti.Alt != 0 && math.Abs(float64(ti.Alt)-float64(currAlt)) < bearinglessAltDiffMaxFeet {
 				bestEstimate = ti
 			}
 		}
@@ -369,9 +389,9 @@ func sendTrafficUpdates() {
 			trafficUpdate.SendJSON(ti)
 		}
 		if !shouldIgnore && isCurrent {
-			if float32(ti.Alt) <= currAlt+float32(globalSettings.RadarLimits)*1.3 && //take 30% more to see moving outs
-				float32(ti.Alt) >= currAlt-float32(globalSettings.RadarLimits)*1.3 && // altitude lower than upper boundary
-				(!ti.Position_valid || ti.Distance < float64(globalSettings.RadarRange)*1852.0*1.3) { //allow more so that aircraft moves out
+			if float32(ti.Alt) <= currAlt+float32(globalSettings.RadarLimits)*radarDisplayMargin && //take 30% more to see moving outs
+				float32(ti.Alt) >= currAlt-float32(globalSettings.RadarLimits)*radarDisplayMargin && // altitude lower than upper boundary
+				(!ti.Position_valid || ti.Distance < float64(globalSettings.RadarRange)*metersPerNauticalMile*radarDisplayMargin) { //allow more so that aircraft moves out
 				radarUpdate.SendJSON(ti)
 			}
 		}
@@ -420,7 +440,7 @@ func sendTrafficUpdates() {
 	}
 
 	// Also send the nearest best bearingless
-	if bestEstimate.DistanceEstimated > 0 && bestEstimate.DistanceEstimated < 15000 {
+	if bestEstimate.DistanceEstimated > 0 && bestEstimate.DistanceEstimated < bearinglessDistMaxMeters {
 		if isGPSValid() {
 			if globalSettings.EstimateBearinglessDist {
 				fakeTargets := calculateModeSFakeTargets(bestEstimate)
@@ -488,7 +508,7 @@ func estimateDistance(ti *TrafficInfo) {
 	// Only learn from 1090ES ADS-B targets
 	// We ignore targets that are too far away (a lot of signal strength fluctuation), too close (non-reception cone or ownship)
 	// and of course extrapolated targets and invalid signal levels
-	if ti.BearingDist_valid && ti.Distance < 50000 && ti.Distance > 1500 && ti.Last_source == TRAFFIC_SOURCE_1090ES &&
+	if ti.BearingDist_valid && ti.Distance < estimateDistMaxMeters && ti.Distance > estimateDistMinMeters && ti.Last_source == TRAFFIC_SOURCE_1090ES &&
 		ti.TargetType == TARGET_TYPE_ADSB && ti.SignalLevel > -30 && ti.SignalLevel < 0 && !ti.ExtrapolatedPosition {
 		var errorFactor float64
 		if ti.DistanceEstimated > ti.Distance {

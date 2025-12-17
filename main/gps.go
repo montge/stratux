@@ -48,6 +48,14 @@ const (
 	BARO_TYPE_ADSBESTIMATE = 4 // If we have no baro, we will try to estimate baro pressure from ADS-B targets reporting GnssDiffFromBaroAlt (HAE<->Baro difference)
 )
 
+// GPS processing constants
+const (
+	// minSpeedForCourseUpdateKnots is minimum ground speed to update true course (avoids noise at low speeds)
+	minSpeedForCourseUpdateKnots = 3.0
+	// gpsPerfStatsMaxEntries is max entries in GPS performance stats array (30 seconds @ 10 Hz)
+	gpsPerfStatsMaxEntries = 299
+)
+
 type SatelliteInfo struct {
 	SatelliteNMEA    uint8     // NMEA ID of the satellite. 1-32 is GPS, 33-54 is SBAS, 65-88 is Glonass.
 	SatelliteID      string    // Formatted code indicating source and PRN code. e.g. S138==WAAS satellite 138, G2==GPS satellites 2
@@ -1142,7 +1150,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		if err != nil {
 			return false
 		}
-		if groundspeed > 3 { //TODO: use average groundspeed over last n seconds to avoid random "jumps"
+		if groundspeed > minSpeedForCourseUpdateKnots { //TODO: use average groundspeed over last n seconds to avoid random "jumps"
 			trueCourse = float32(tc)
 			setTrueCourse(uint16(groundspeed), tc)
 			tmpSituation.GPSTrueCourse = trueCourse
@@ -1259,8 +1267,8 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 			myGPSPerfStats = append(myGPSPerfStats, thisGpsPerf)
 			lenGPSPerfStats := len(myGPSPerfStats)
 			//	log.Printf("GPSPerf array has %n elements. Contents are: %v\n",lenGPSPerfStats,myGPSPerfStats)
-			if lenGPSPerfStats > 299 { //30 seconds @ 10 Hz for UBX, 30 seconds @ 5 Hz for MTK or SIRF with 2x messages per 200 ms)
-				myGPSPerfStats = myGPSPerfStats[(lenGPSPerfStats - 299):] // remove the first n entries if more than 300 in the slice
+			if lenGPSPerfStats > gpsPerfStatsMaxEntries { //30 seconds @ 10 Hz for UBX, 30 seconds @ 5 Hz for MTK or SIRF with 2x messages per 200 ms)
+				myGPSPerfStats = myGPSPerfStats[(lenGPSPerfStats - gpsPerfStatsMaxEntries):] // remove the first n entries if more than 300 in the slice
 			}
 			mySituation.muGPSPerformance.Unlock()
 		}
@@ -1387,7 +1395,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		if err != nil && groundspeed > 3 { // some receivers return null COG at low speeds. Need to ignore this condition.
 			return false
 		}
-		if groundspeed > 3 { //TODO: use average groundspeed over last n seconds to avoid random "jumps"
+		if groundspeed > minSpeedForCourseUpdateKnots { //TODO: use average groundspeed over last n seconds to avoid random "jumps"
 			trueCourse = float32(tc)
 			setTrueCourse(uint16(groundspeed), tc)
 			tmpSituation.GPSTrueCourse = trueCourse
@@ -1409,8 +1417,8 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 			myGPSPerfStats = append(myGPSPerfStats, thisGpsPerf)
 			lenGPSPerfStats := len(myGPSPerfStats)
 			//	log.Printf("GPSPerf array has %n elements. Contents are: %v\n",lenGPSPerfStats,myGPSPerfStats)
-			if lenGPSPerfStats > 299 { //30 seconds @ 10 Hz for UBX, 30 seconds @ 5 Hz for MTK or SIRF with 2x messages per 200 ms)
-				myGPSPerfStats = myGPSPerfStats[(lenGPSPerfStats - 299):] // remove the first n entries if more than 300 in the slice
+			if lenGPSPerfStats > gpsPerfStatsMaxEntries { //30 seconds @ 10 Hz for UBX, 30 seconds @ 5 Hz for MTK or SIRF with 2x messages per 200 ms)
+				myGPSPerfStats = myGPSPerfStats[(lenGPSPerfStats - gpsPerfStatsMaxEntries):] // remove the first n entries if more than 300 in the slice
 			}
 			mySituation.muGPSPerformance.Unlock()
 		}

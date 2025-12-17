@@ -66,3 +66,40 @@
 - [ ] 10.1 Run SonarCloud analysis to verify fixes (requires CI push)
 - [x] 10.2 Ensure no regressions in tests - all tests pass
 - [x] 10.3 Update documentation if needed - tasks.md updated
+
+---
+
+# Phase 2: Additional Code Quality Improvements
+
+## 11. Magic Numbers - Define Constants
+- [x] 11.1 traffic.go:254 - Define constant for `99999.0` (altitudeInvalidFeet)
+- [x] 11.2 traffic.go:351 - Define constant for `2000` feet threshold (bearinglessAltDiffMaxFeet)
+- [x] 11.3 traffic.go:423 - Define constant for `15000` distance threshold (bearinglessDistMaxMeters)
+- [ ] 11.4 traffic.go:468 - Define constants for altitude buckets `[2500.0, 2800.0, 3000.0]` (deferred - used as tunable array)
+- [x] 11.5 traffic.go:491 - Define constants for `50000` and `1500` distance thresholds (estimateDistMaxMeters, estimateDistMinMeters)
+- [x] 11.6 gps.go:1145 - Define constant for `3` knots threshold (minSpeedForCourseUpdateKnots)
+- [x] 11.7 gps.go:1262 - Define constant for `299` GPS perf array size (gpsPerfStatsMaxEntries)
+- [x] 11.8 traffic.go:392-394 - Define constants for radar margin (radarDisplayMargin, metersPerNauticalMile)
+- [x] 11.9 traffic.go:293 - Define constant for `500` ft altitude diff (ownshipAltDiffMaxFeet)
+
+## 12. TODO/FIXME Comments in Production Code
+- [ ] 12.1 clientconnection.go:261 - Address incomplete `return 20 // TODO` function
+- [ ] 12.2 cot-in.go:111 - Address TODO for TRAFFIC_SOURCE_COT
+- [ ] 12.3 datalog.go:362 - Address FIXME for convoluted logic
+- [ ] 12.4 flarm-nmea.go - Address 5 TODOs (lines 75, 86, 236, 458, 460)
+- [ ] 12.5 gen_gdl90.go - Address 13 TODOs/FIXMEs
+- [ ] 12.6 gps.go - Address 8 TODOs (lines 133, 143, 294, 672-673, 735, 1145, 1151)
+
+## 13. High Cognitive Complexity Functions (Major Refactors)
+- [ ] 13.1 traffic.go:697 parseDownlinkReport() - 352 lines, ~44 conditionals (extract bit manipulation helpers)
+- [ ] 13.2 traffic.go:1084 parseDump1090Message() - 321 lines, ~35 conditionals (extract type-code handlers)
+- [ ] 13.3 gps.go:1084 processNMEALineLow() - 800+ lines, ~50 conditionals (extract NMEA sentence handlers)
+- [ ] 13.4 gen_gdl90.go:1095 parseInput() - 306 lines (extract message type handlers)
+
+## 14. Code Synchronization Issues
+- [ ] 14.1 gen_gdl90.go:93-115 / web/plates/js/status.js - GPS type enumeration sync (add validation or generation)
+
+## 15. Ignored Error Returns
+- [ ] 15.1 network.go:372,375 - Document or handle ignored returns
+- [ ] 15.2 traffic.go:252 - Document or handle `trafficDist, _, _, _`
+- [ ] 15.3 tracker.go:351 - Handle ignored error from OGNAddrType
