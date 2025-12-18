@@ -182,5 +182,6 @@
 - 8.2, 9.2: Web JS and shell script issues (low priority)
 - 11.4, 12.4-12.6: Additional TODO/FIXME comments (deferred)
 
-### Pending Verification:
-- 1.2, 10.1: Verify SonarCloud exclusions and fixes (requires CI completion)
+### CI Status:
+- All CI runs passing as of 2025-12-18
+- 1.2, 10.1: SonarCloud verification pending next analysis run
