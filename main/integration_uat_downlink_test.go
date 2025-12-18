@@ -116,14 +116,8 @@ func buildUATDownlinkMessage(msgType byte, icao uint32, callsign string, squawk 
 	}
 	frame[26] = csidBit << 1
 
-	// Convert to hex string with '+' prefix
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
-
-	return hexStr
+	// Convert to hex string with '+' prefix using shared helper
+	return bytesToHexString("+", frame)
 }
 
 // TestUATDownlinkCallsignDecoding tests UAT messages with callsign (CSID=1)
@@ -417,11 +411,7 @@ func TestUATDownlinkAddressTypes(t *testing.T) {
 	frame[25] = 9 << 4 // NACp 9
 	frame[26] = 1 << 1 // CSID=1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, -25)
 

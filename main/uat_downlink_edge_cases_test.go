@@ -4,9 +4,16 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 )
+
+// bytesToHexString converts a byte slice to uppercase hex string with prefix.
+// This is a test helper to reduce duplication in test files.
+func bytesToHexString(prefix string, data []byte) string {
+	return prefix + fmt.Sprintf("%X", data)
+}
 
 // TestUATDownlinkMessageType2WithAUXSV tests msg_type 2 with AUXSV altitude
 func TestUATDownlinkMessageType2WithAUXSV(t *testing.T) {
@@ -58,11 +65,7 @@ func TestUATDownlinkMessageType2WithAUXSV(t *testing.T) {
 	frame[30] = byte((raw_alt_auxsv & 0x0F) << 4)
 
 	// Convert to hex string
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -123,11 +126,7 @@ func TestUATDownlinkInvalidPosition(t *testing.T) {
 	frame[25] = 9 << 4                     // NACp = 9
 	frame[26] = 1 << 1                     // CSID = 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -187,11 +186,7 @@ func TestUATDownlinkLatLngWrapping(t *testing.T) {
 		frame[25] = 9 << 4
 		frame[26] = 1 << 1
 
-		hexStr := "+"
-		for _, b := range frame {
-			hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-			hexStr += string("0123456789ABCDEF"[b&0x0F])
-		}
+		hexStr := bytesToHexString("+", frame)
 
 		parseDownlinkReport(hexStr, 500)
 
@@ -244,11 +239,7 @@ func TestUATDownlinkLatLngWrapping(t *testing.T) {
 		frame[25] = 9 << 4
 		frame[26] = 1 << 1
 
-		hexStr := "+"
-		for _, b := range frame {
-			hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-			hexStr += string("0123456789ABCDEF"[b&0x0F])
-		}
+		hexStr := bytesToHexString("+", frame)
 
 		parseDownlinkReport(hexStr, 500)
 
@@ -423,11 +414,7 @@ func TestUATDownlinkDisplayTrafficSource(t *testing.T) {
 				frame[18] = byte(v & 0xFF)
 			}
 
-			hexStr := "+"
-			for _, b := range frame {
-				hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-				hexStr += string("0123456789ABCDEF"[b&0x0F])
-			}
+			hexStr := bytesToHexString("+", frame)
 
 			parseDownlinkReport(hexStr, 500)
 
@@ -490,11 +477,7 @@ func TestUATDownlinkAirgroundState3(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -591,11 +574,7 @@ func TestUATDownlinkDEBUGModeUATVersion2(t *testing.T) {
 	frame[25] = 9 << 4                         // NACp = 9
 	frame[26] = (1 << 7) | (1 << 6) | (1 << 1) // UAT_in, 1090_in, CSID
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -661,11 +640,7 @@ func TestUATDownlinkSupersonicVelocity(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -736,11 +711,7 @@ func TestUATDownlinkNegativeVelocity(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -804,11 +775,7 @@ func TestUATDownlinkGroundVehicleSpeed(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -869,11 +836,7 @@ func TestUATDownlinkAUXSVWithoutGNSS(t *testing.T) {
 	frame[29] = byte((raw_alt_auxsv >> 4) & 0xFF)
 	frame[30] = byte((raw_alt_auxsv & 0x0F) << 4)
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -944,11 +907,7 @@ func TestUATDownlinkDisplayTrafficSourceLongTail(t *testing.T) {
 	frame[25] = 9 << 4
 	// Don't set CSID so tail comes from existing entry
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1013,11 +972,7 @@ func TestUATDownlinkDisplayTrafficSourceVeryLongTail(t *testing.T) {
 	frame[23] = (0 << 5) | (2 << 2) | 0x02
 	frame[25] = 9 << 4
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1081,11 +1036,7 @@ func TestUATDownlinkWithValidGPS(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1138,11 +1089,7 @@ func TestUATDownlinkMessageType5(t *testing.T) {
 	frame[29] = byte((raw_alt_auxsv >> 4) & 0xFF)
 	frame[30] = byte((raw_alt_auxsv & 0x0F) << 4)
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1192,11 +1139,7 @@ func TestUATDownlinkMessageType6(t *testing.T) {
 	frame[29] = byte((raw_alt_auxsv >> 4) & 0xFF)
 	frame[30] = byte((raw_alt_auxsv & 0x0F) << 4)
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1291,11 +1234,7 @@ func TestParseDownlinkReport_AddrType2HighNIC(t *testing.T) {
 	frame[26] = 0x02 // CSID bit set (bit 1)
 
 	// Build hex string
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1377,11 +1316,7 @@ func TestParseDownlinkReport_ShortTailPrefix(t *testing.T) {
 	}
 
 	// Build hex string
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1447,11 +1382,7 @@ func TestParseDownlinkReport_ZeroVelocityHover(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1521,11 +1452,7 @@ func TestParseDownlinkReport_SquawkCodeUATVersion1(t *testing.T) {
 	frame[25] = 9 << 4                     // NACp = 9
 	frame[26] = 0 << 1                     // CSID = 0 (squawk mode, not callsign)
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1590,11 +1517,7 @@ func TestParseDownlinkReport_GroundVehicleZeroSpeed(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1657,11 +1580,7 @@ func TestParseDownlinkReport_AUXSVZeroAltitude(t *testing.T) {
 	frame[29] = 0x00
 	frame[30] = 0x00
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1717,11 +1636,7 @@ func TestParseDownlinkReport_ZeroPrimaryAltitude(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1788,11 +1703,7 @@ func TestParseDownlinkReport_NoNSVelocity(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1856,11 +1767,7 @@ func TestParseDownlinkReport_NoEWVelocity(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1928,11 +1835,7 @@ func TestParseDownlinkReport_NoVerticalVelocity(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -1984,11 +1887,7 @@ func TestParseDownlinkReport_MessageType3(t *testing.T) {
 	frame[25] = 9 << 4                     // NACp = 9
 	frame[26] = 1 << 1                     // CSID = 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -2035,11 +1934,7 @@ func TestParseDownlinkReport_MessageType4(t *testing.T) {
 
 	frame[12] = 0x00
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -2082,11 +1977,7 @@ func TestParseDownlinkReport_MessageType0(t *testing.T) {
 
 	frame[12] = 0x00
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -2134,11 +2025,7 @@ func TestParseDownlinkReport_AddrType3TISB(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -2189,11 +2076,7 @@ func TestParseDownlinkReport_AddrType6ADSR(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 1 << 1
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -2254,11 +2137,7 @@ func TestParseDownlinkReport_ExistingTraffic(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 0 << 1 // CSID = 0 (don't overwrite tail)
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -2322,11 +2201,7 @@ func TestParseDownlinkReport_DisplayTrafficSourceEmptyTail(t *testing.T) {
 	frame[25] = 9 << 4
 	frame[26] = 0x00 // CSID=0
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
@@ -2394,11 +2269,7 @@ func TestParseDownlinkReport_DisplayTrafficSourceWithPrefixedLongTail(t *testing
 	frame[23] = (0 << 5) | (2 << 2) | 0x02
 	frame[25] = 9 << 4
 
-	hexStr := "+"
-	for _, b := range frame {
-		hexStr += string("0123456789ABCDEF"[(b>>4)&0x0F])
-		hexStr += string("0123456789ABCDEF"[b&0x0F])
-	}
+	hexStr := bytesToHexString("+", frame)
 
 	parseDownlinkReport(hexStr, 500)
 
