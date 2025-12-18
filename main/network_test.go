@@ -1896,7 +1896,7 @@ func (m *mockConnection) IsThrottled() bool           { return m.throttled }
 func (m *mockConnection) IsSleeping() bool            { return m.sleeping }
 func (m *mockConnection) Capabilities() uint8         { return m.capability }
 func (m *mockConnection) GetDesiredPacketSize() int   { return m.desiredPacketSize }
-func (m *mockConnection) OnError(error)               {}
+func (m *mockConnection) OnError(_ error)             {}
 func (m *mockConnection) Close()                      {}
 
 // TestCollectMessages_MockSleepingConnection tests sleeping connection behavior with mock

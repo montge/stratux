@@ -4152,18 +4152,18 @@ type mockTrackerForGPS struct {
 	shouldReturnChanged bool
 }
 
-func (m *mockTrackerForGPS) initNewConnection(serialPort *serial.Port)          {}
-func (m *mockTrackerForGPS) onNmea(serialPort *serial.Port, nmea []string) bool { return false }
-func (m *mockTrackerForGPS) gpsTimeOffsetPps() time.Duration                    { return 0 }
-func (m *mockTrackerForGPS) getGpsHardwareType() uint                           { return 0 }
-func (m *mockTrackerForGPS) isDetected() bool                                   { return true }
-func (m *mockTrackerForGPS) isConfigRead() bool                                 { return true }
-func (m *mockTrackerForGPS) writeReadDelay() time.Duration                      { return m.writeDelay }
-func (m *mockTrackerForGPS) writeInitialConfig(serialPort *serial.Port) bool    { return false }
-func (m *mockTrackerForGPS) requestTrackerConfig(serialPort *serial.Port) {
+func (m *mockTrackerForGPS) initNewConnection(_ *serial.Port)          {}
+func (m *mockTrackerForGPS) onNmea(_ *serial.Port, _ []string) bool    { return false }
+func (m *mockTrackerForGPS) gpsTimeOffsetPps() time.Duration           { return 0 }
+func (m *mockTrackerForGPS) getGpsHardwareType() uint                  { return 0 }
+func (m *mockTrackerForGPS) isDetected() bool                          { return true }
+func (m *mockTrackerForGPS) isConfigRead() bool                        { return true }
+func (m *mockTrackerForGPS) writeReadDelay() time.Duration             { return m.writeDelay }
+func (m *mockTrackerForGPS) writeInitialConfig(_ *serial.Port) bool    { return false }
+func (m *mockTrackerForGPS) requestTrackerConfig(_ *serial.Port) {
 	m.configRequested = true
 }
-func (m *mockTrackerForGPS) writeConfigFromSettings(serialPort *serial.Port) bool {
+func (m *mockTrackerForGPS) writeConfigFromSettings(_ *serial.Port) bool {
 	m.configWritten = true
 	return m.shouldReturnChanged
 }

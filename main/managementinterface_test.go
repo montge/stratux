@@ -6615,8 +6615,8 @@ type mockTracker struct {
 	configWritten bool
 }
 
-func (m *mockTracker) initNewConnection(serialPort *serial.Port) {}
-func (m *mockTracker) onNmea(serialPort *serial.Port, nmea []string) bool {
+func (m *mockTracker) initNewConnection(_ *serial.Port) {}
+func (m *mockTracker) onNmea(_ *serial.Port, _ []string) bool {
 	return false
 }
 func (m *mockTracker) gpsTimeOffsetPps() time.Duration {
@@ -6634,11 +6634,11 @@ func (m *mockTracker) isConfigRead() bool {
 func (m *mockTracker) writeReadDelay() time.Duration {
 	return 0
 }
-func (m *mockTracker) writeInitialConfig(serialPort *serial.Port) bool {
+func (m *mockTracker) writeInitialConfig(_ *serial.Port) bool {
 	return false
 }
-func (m *mockTracker) requestTrackerConfig(serialPort *serial.Port) {}
-func (m *mockTracker) writeConfigFromSettings(serialPort *serial.Port) bool {
+func (m *mockTracker) requestTrackerConfig(_ *serial.Port) {}
+func (m *mockTracker) writeConfigFromSettings(_ *serial.Port) bool {
 	m.configWritten = true
 	return true
 }

@@ -50,7 +50,7 @@
 - [x] 6.1 Fix xplane.go:38 - Reduce function parameters from 9 to 1 (using XPlaneTrafficData struct)
 
 ## 7. Test Code Quality (Lower Priority)
-- [ ] 7.1 Fix unused parameters in test mock functions (gps_test.go, managementinterface_test.go, etc.)
+- [x] 7.1 Fix unused parameters in test mock functions (network_test.go, gps_test.go, managementinterface_test.go)
 - [ ] 7.2 Define constants for duplicated test strings
 - [ ] 7.3 Reduce cognitive complexity in test functions (optional - tests can be more complex)
 
