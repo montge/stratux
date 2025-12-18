@@ -489,21 +489,27 @@ func applyBaudRate(val interface{}) settingResult {
 // This eliminates the need for switch statements and makes adding new settings trivial.
 var settingHandlers = map[string]settingHandler{
 	// Simple boolean settings (no side effects)
-	"DarkMode":              func(v interface{}) settingResult { globalSettings.DarkMode = v.(bool); return noSideEffects },
-	"UAT_Enabled":           func(v interface{}) settingResult { globalSettings.UAT_Enabled = v.(bool); return noSideEffects },
-	"ES_Enabled":            func(v interface{}) settingResult { globalSettings.ES_Enabled = v.(bool); return noSideEffects },
-	"OGN_Enabled":           func(v interface{}) settingResult { globalSettings.OGN_Enabled = v.(bool); return noSideEffects },
-	"AIS_Enabled":           func(v interface{}) settingResult { globalSettings.AIS_Enabled = v.(bool); return noSideEffects },
-	"APRS_Enabled":          func(v interface{}) settingResult { globalSettings.APRS_Enabled = v.(bool); return noSideEffects },
-	"Ping_Enabled":          func(v interface{}) settingResult { globalSettings.Ping_Enabled = v.(bool); return noSideEffects },
-	"Pong_Enabled":          func(v interface{}) settingResult { globalSettings.Pong_Enabled = v.(bool); return noSideEffects },
-	"OGNI2CTXEnabled":       func(v interface{}) settingResult { globalSettings.OGNI2CTXEnabled = v.(bool); return noSideEffects },
-	"GPS_Enabled":           func(v interface{}) settingResult { globalSettings.GPS_Enabled = v.(bool); return noSideEffects },
-	"DEBUG":                 func(v interface{}) settingResult { globalSettings.DEBUG = v.(bool); return noSideEffects },
-	"DisplayTrafficSource":  func(v interface{}) settingResult { globalSettings.DisplayTrafficSource = v.(bool); return noSideEffects },
-	"TraceLog":              func(v interface{}) settingResult { globalSettings.TraceLog = v.(bool); return noSideEffects },
-	"AHRSLog":               func(v interface{}) settingResult { globalSettings.AHRSLog = v.(bool); return noSideEffects },
-	"EstimateBearinglessDist": func(v interface{}) settingResult { globalSettings.EstimateBearinglessDist = v.(bool); return noSideEffects },
+	"DarkMode":        func(v interface{}) settingResult { globalSettings.DarkMode = v.(bool); return noSideEffects },
+	"UAT_Enabled":     func(v interface{}) settingResult { globalSettings.UAT_Enabled = v.(bool); return noSideEffects },
+	"ES_Enabled":      func(v interface{}) settingResult { globalSettings.ES_Enabled = v.(bool); return noSideEffects },
+	"OGN_Enabled":     func(v interface{}) settingResult { globalSettings.OGN_Enabled = v.(bool); return noSideEffects },
+	"AIS_Enabled":     func(v interface{}) settingResult { globalSettings.AIS_Enabled = v.(bool); return noSideEffects },
+	"APRS_Enabled":    func(v interface{}) settingResult { globalSettings.APRS_Enabled = v.(bool); return noSideEffects },
+	"Ping_Enabled":    func(v interface{}) settingResult { globalSettings.Ping_Enabled = v.(bool); return noSideEffects },
+	"Pong_Enabled":    func(v interface{}) settingResult { globalSettings.Pong_Enabled = v.(bool); return noSideEffects },
+	"OGNI2CTXEnabled": func(v interface{}) settingResult { globalSettings.OGNI2CTXEnabled = v.(bool); return noSideEffects },
+	"GPS_Enabled":     func(v interface{}) settingResult { globalSettings.GPS_Enabled = v.(bool); return noSideEffects },
+	"DEBUG":           func(v interface{}) settingResult { globalSettings.DEBUG = v.(bool); return noSideEffects },
+	"DisplayTrafficSource": func(v interface{}) settingResult {
+		globalSettings.DisplayTrafficSource = v.(bool)
+		return noSideEffects
+	},
+	"TraceLog": func(v interface{}) settingResult { globalSettings.TraceLog = v.(bool); return noSideEffects },
+	"AHRSLog":  func(v interface{}) settingResult { globalSettings.AHRSLog = v.(bool); return noSideEffects },
+	"EstimateBearinglessDist": func(v interface{}) settingResult {
+		globalSettings.EstimateBearinglessDist = v.(bool)
+		return noSideEffects
+	},
 
 	// Boolean settings with side effects
 	"IMU_Sensor_Enabled": func(v interface{}) settingResult {
@@ -544,9 +550,12 @@ var settingHandlers = map[string]settingHandler{
 	},
 
 	// Numeric settings
-	"Dump1090Gain":   func(v interface{}) settingResult { globalSettings.Dump1090Gain = v.(float64); return noSideEffects },
-	"PPM":            func(v interface{}) settingResult { globalSettings.PPM = int(v.(float64)); return noSideEffects },
-	"AltitudeOffset": func(v interface{}) settingResult { globalSettings.AltitudeOffset = int(v.(float64)); return noSideEffects },
+	"Dump1090Gain": func(v interface{}) settingResult { globalSettings.Dump1090Gain = v.(float64); return noSideEffects },
+	"PPM":          func(v interface{}) settingResult { globalSettings.PPM = int(v.(float64)); return noSideEffects },
+	"AltitudeOffset": func(v interface{}) settingResult {
+		globalSettings.AltitudeOffset = int(v.(float64))
+		return noSideEffects
+	},
 	"RadarLimits": func(v interface{}) settingResult {
 		globalSettings.RadarLimits = int(v.(float64))
 		radarUpdate.SendJSON(globalSettings)
@@ -572,24 +581,42 @@ var settingHandlers = map[string]settingHandler{
 	"Baud":         applyBaudRate,
 
 	// WiFi settings
-	"WiFiCountry":                   func(v interface{}) settingResult { setWifiCountry(v.(string)); return noSideEffects },
-	"WiFiSSID":                      func(v interface{}) settingResult { setWifiSSID(v.(string)); return noSideEffects },
-	"WiFiChannel":                   func(v interface{}) settingResult { setWifiChannel(int(v.(float64))); return noSideEffects },
-	"WiFiSecurityEnabled":           func(v interface{}) settingResult { setWifiSecurityEnabled(v.(bool)); return noSideEffects },
-	"WiFiPassphrase":                func(v interface{}) settingResult { setWifiPassphrase(v.(string)); return noSideEffects },
-	"WiFiIPAddress":                 func(v interface{}) settingResult { setWifiIPAddress(v.(string)); return noSideEffects },
-	"WiFiMode":                      func(v interface{}) settingResult { setWiFiMode(int(v.(float64))); return noSideEffects },
-	"WiFiDirectPin":                 func(v interface{}) settingResult { setWifiDirectPin(v.(string)); return noSideEffects },
-	"WiFiClientNetworks":            applyWiFiClientNetworks,
+	"WiFiCountry":                    func(v interface{}) settingResult { setWifiCountry(v.(string)); return noSideEffects },
+	"WiFiSSID":                       func(v interface{}) settingResult { setWifiSSID(v.(string)); return noSideEffects },
+	"WiFiChannel":                    func(v interface{}) settingResult { setWifiChannel(int(v.(float64))); return noSideEffects },
+	"WiFiSecurityEnabled":            func(v interface{}) settingResult { setWifiSecurityEnabled(v.(bool)); return noSideEffects },
+	"WiFiPassphrase":                 func(v interface{}) settingResult { setWifiPassphrase(v.(string)); return noSideEffects },
+	"WiFiIPAddress":                  func(v interface{}) settingResult { setWifiIPAddress(v.(string)); return noSideEffects },
+	"WiFiMode":                       func(v interface{}) settingResult { setWiFiMode(int(v.(float64))); return noSideEffects },
+	"WiFiDirectPin":                  func(v interface{}) settingResult { setWifiDirectPin(v.(string)); return noSideEffects },
+	"WiFiClientNetworks":             applyWiFiClientNetworks,
 	"WiFiInternetPassThroughEnabled": func(v interface{}) settingResult { setWifiInternetPassthroughEnabled(v.(bool)); return noSideEffects },
 
 	// OGN settings (all trigger tracker reconfiguration)
-	"OGNAddrType": func(v interface{}) settingResult { globalSettings.OGNAddrType = int(v.(float64)); return settingResult{reconfigureTracker: true} },
-	"OGNAddr":     func(v interface{}) settingResult { globalSettings.OGNAddr = v.(string); return settingResult{reconfigureTracker: true} },
-	"OGNAcftType": func(v interface{}) settingResult { globalSettings.OGNAcftType = int(v.(float64)); return settingResult{reconfigureTracker: true} },
-	"OGNPilot":    func(v interface{}) settingResult { globalSettings.OGNPilot = v.(string); return settingResult{reconfigureTracker: true} },
-	"OGNReg":      func(v interface{}) settingResult { globalSettings.OGNReg = v.(string); return settingResult{reconfigureTracker: true} },
-	"OGNTxPower":  func(v interface{}) settingResult { globalSettings.OGNTxPower = int(v.(float64)); return settingResult{reconfigureTracker: true} },
+	"OGNAddrType": func(v interface{}) settingResult {
+		globalSettings.OGNAddrType = int(v.(float64))
+		return settingResult{reconfigureTracker: true}
+	},
+	"OGNAddr": func(v interface{}) settingResult {
+		globalSettings.OGNAddr = v.(string)
+		return settingResult{reconfigureTracker: true}
+	},
+	"OGNAcftType": func(v interface{}) settingResult {
+		globalSettings.OGNAcftType = int(v.(float64))
+		return settingResult{reconfigureTracker: true}
+	},
+	"OGNPilot": func(v interface{}) settingResult {
+		globalSettings.OGNPilot = v.(string)
+		return settingResult{reconfigureTracker: true}
+	},
+	"OGNReg": func(v interface{}) settingResult {
+		globalSettings.OGNReg = v.(string)
+		return settingResult{reconfigureTracker: true}
+	},
+	"OGNTxPower": func(v interface{}) settingResult {
+		globalSettings.OGNTxPower = int(v.(float64))
+		return settingResult{reconfigureTracker: true}
+	},
 }
 
 // AJAX call - /setSettings. receives via POST command, any/all stratux.conf data.
