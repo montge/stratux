@@ -179,9 +179,9 @@
 11. **Test Code Quality**: Created bytesToHexString helper function, replaced 36 duplicated hex conversion patterns
 
 ### Remaining (Deferred):
-- 7.3: Reduce cognitive complexity in test functions (optional)
-- 11.4, 12.4-12.6: Additional TODO/FIXME comments (deferred)
+- 11.4, 12.4-12.6: Additional TODO/FIXME comments (deferred - legitimate feature requests)
 
 ### CI Status:
 - All CI runs passing as of 2025-12-18
+- Latest commit: style: Fix gofmt formatting (31aff30b)
 - 1.2, 10.1: SonarCloud verification pending next analysis run
