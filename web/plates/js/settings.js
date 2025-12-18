@@ -464,9 +464,9 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 		}
 	};
 	$scope.pongUpdateRun = function () {
-		console.log($scope.pongUpdateForm);
+		// console.log($scope.pongUpdateForm);
 		const curFiles = inputfile.files;
-		console.log($curFiles);
+		// console.log(curFiles);
 	};
 	$scope.updatemodes = function () {
 		if ($scope.OwnshipModeS !== settings["OwnshipModeS"]) {
@@ -543,8 +543,8 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 	$scope.setPongUploadFile = function (files) {
 		$scope.pong_update_files = files;
 		$scope.$apply();
-		console.log("setPongUploadFile");
-		console.log($scope.pong_update_files);
+		// console.log("setPongUploadFile");
+		// console.log($scope.pong_update_files);
 	};
 
 	$scope.resetUploadFile = function () {
@@ -601,8 +601,8 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			alert ("file does not appear to be an update");
 			return;
 		}
-		console.log("Pong update file");
-		console.log(filename);
+		// console.log("Pong update file");
+		// console.log(filename);
 		fd.append("pong_update_file", file);
 		$scope.uploading_pong_update = true;
 		$scope.$apply();
