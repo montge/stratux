@@ -101,7 +101,7 @@
 
 ## 15. Ignored Error Returns
 - [x] 15.1 network.go:372,375 - Added error handling with log messages for BLE UUID parsing
-- [ ] 15.2 traffic.go:252 - Intentional ignore of unused DistRect return values (documented by Go idiom)
+- [x] 15.2 traffic.go:273 - Intentional ignore of unused DistRect return values (using blank identifier idiom - correct Go practice)
 - [x] 15.3 tracker.go:351 - Added error handling for strconv.Atoi calls in SoftRF config parsing
 - [x] 15.4 logging.go:62,64,69 - Added error handling for os.Remove and os.Rename in log rotation
 - [x] 15.5 managementinterface.go:640 - Added error handling for os.Remove in AHRS log deletion
