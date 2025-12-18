@@ -93,7 +93,7 @@
 ## 13. High Cognitive Complexity Functions (Major Refactors)
 - [x] 13.1 traffic.go parseDownlinkReport() - extracted decodeBase40Callsign() helper function
 - [x] 13.2 traffic.go parseDump1090Message() - extracted calculateNICFromTypeCode() helper function
-- [x] 13.3 gps.go processNMEALineLow() - extracted identifySatellite() helper (reduces duplication in GSA/GSV handlers)
+- [x] 13.3 gps.go processNMEALineLow() - extracted identifySatellite() and recordGPSPerfStats() helpers
 - [x] 13.4 gen_gdl90.go parseInput() - extracted determineUATMessageType() helper function
 
 ## 14. Code Synchronization Issues
@@ -167,7 +167,7 @@
 
 ### Key Improvements Made:
 1. **Reliability Issues Fixed**: Transaction rollback handling, void function usage, deprecated HTML elements, missing lang attributes, duplicate CSS
-2. **Cognitive Complexity Reduced**: Extracted helper functions (processNMEAMessages, decodeBase40Callsign, calculateNICFromTypeCode, determineUATMessageType, identifySatellite)
+2. **Cognitive Complexity Reduced**: Extracted helper functions (processNMEAMessages, decodeBase40Callsign, calculateNICFromTypeCode, determineUATMessageType, identifySatellite, recordGPSPerfStats)
 3. **Unused Parameters**: Fixed 19 unused parameters in production code, 3 in test mocks
 4. **FIXME Comments**: Converted 7 FIXME comments to descriptive notes
 5. **Magic Numbers**: Defined 11 constants for magic numbers in production code

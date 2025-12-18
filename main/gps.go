@@ -173,6 +173,18 @@ var gpsPerf gpsPerfStats
 var myGPSPerfStats []gpsPerfStats
 var gpsTimeOffsetPpsMs = 100.0 * time.Millisecond
 
+// recordGPSPerfStats appends a GPS performance measurement to the stats array,
+// maintaining a maximum of gpsPerfStatsMaxEntries entries.
+// The caller must ensure mySituation.muGPS is held when calling this function.
+func recordGPSPerfStats(perf gpsPerfStats) {
+	mySituation.muGPSPerformance.Lock()
+	myGPSPerfStats = append(myGPSPerfStats, perf)
+	if len(myGPSPerfStats) > gpsPerfStatsMaxEntries {
+		myGPSPerfStats = myGPSPerfStats[len(myGPSPerfStats)-gpsPerfStatsMaxEntries:]
+	}
+	mySituation.muGPSPerformance.Unlock()
+}
+
 var serialConfig *serial.Config
 var serialPort *serial.Port
 
@@ -1291,14 +1303,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		mySituation = tmpSituation
 
 		if updateGPSPerf {
-			mySituation.muGPSPerformance.Lock()
-			myGPSPerfStats = append(myGPSPerfStats, thisGpsPerf)
-			lenGPSPerfStats := len(myGPSPerfStats)
-			//	log.Printf("GPSPerf array has %n elements. Contents are: %v\n",lenGPSPerfStats,myGPSPerfStats)
-			if lenGPSPerfStats > gpsPerfStatsMaxEntries { //30 seconds @ 10 Hz for UBX, 30 seconds @ 5 Hz for MTK or SIRF with 2x messages per 200 ms)
-				myGPSPerfStats = myGPSPerfStats[(lenGPSPerfStats - gpsPerfStatsMaxEntries):] // remove the first n entries if more than 300 in the slice
-			}
-			mySituation.muGPSPerformance.Unlock()
+			recordGPSPerfStats(thisGpsPerf)
 		}
 
 		return true
@@ -1441,14 +1446,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		mySituation = tmpSituation
 
 		if updateGPSPerf {
-			mySituation.muGPSPerformance.Lock()
-			myGPSPerfStats = append(myGPSPerfStats, thisGpsPerf)
-			lenGPSPerfStats := len(myGPSPerfStats)
-			//	log.Printf("GPSPerf array has %n elements. Contents are: %v\n",lenGPSPerfStats,myGPSPerfStats)
-			if lenGPSPerfStats > gpsPerfStatsMaxEntries { //30 seconds @ 10 Hz for UBX, 30 seconds @ 5 Hz for MTK or SIRF with 2x messages per 200 ms)
-				myGPSPerfStats = myGPSPerfStats[(lenGPSPerfStats - gpsPerfStatsMaxEntries):] // remove the first n entries if more than 300 in the slice
-			}
-			mySituation.muGPSPerformance.Unlock()
+			recordGPSPerfStats(thisGpsPerf)
 		}
 
 		setDataLogTimeWithGPS(mySituation)

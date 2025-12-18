@@ -116,6 +116,61 @@ func TestIdentifySatellite(t *testing.T) {
 	}
 }
 
+// TestRecordGPSPerfStats tests the GPS performance stats recording helper function
+func TestRecordGPSPerfStats(t *testing.T) {
+	setUp()
+
+	// Reset global state
+	myGPSPerfStats = nil
+
+	// Create a test performance measurement
+	perf := gpsPerfStats{
+		stratuxTime: 1000,
+		nmeaTime:    12345.0,
+		msgType:     "GPGGA",
+		gsf:         100.0,
+		coursef:     45.0,
+		alt:         5000.0,
+	}
+
+	// Test adding a single measurement
+	recordGPSPerfStats(perf)
+	if len(myGPSPerfStats) != 1 {
+		t.Errorf("Expected 1 entry, got %d", len(myGPSPerfStats))
+	}
+	if myGPSPerfStats[0].msgType != "GPGGA" {
+		t.Errorf("Expected msgType 'GPGGA', got '%s'", myGPSPerfStats[0].msgType)
+	}
+
+	// Test adding multiple measurements up to limit
+	myGPSPerfStats = nil
+	for i := 0; i < gpsPerfStatsMaxEntries; i++ {
+		perf.stratuxTime = uint64(i)
+		recordGPSPerfStats(perf)
+	}
+	if len(myGPSPerfStats) != gpsPerfStatsMaxEntries {
+		t.Errorf("Expected %d entries, got %d", gpsPerfStatsMaxEntries, len(myGPSPerfStats))
+	}
+
+	// Test that adding beyond limit trims old entries
+	perf.stratuxTime = 99999
+	recordGPSPerfStats(perf)
+	if len(myGPSPerfStats) != gpsPerfStatsMaxEntries {
+		t.Errorf("Expected %d entries after overflow, got %d", gpsPerfStatsMaxEntries, len(myGPSPerfStats))
+	}
+	// Oldest entry (stratuxTime=0) should have been removed
+	if myGPSPerfStats[0].stratuxTime == 0 {
+		t.Error("Oldest entry should have been removed")
+	}
+	// Newest entry should be at the end
+	if myGPSPerfStats[len(myGPSPerfStats)-1].stratuxTime != 99999 {
+		t.Error("Newest entry should be at the end")
+	}
+
+	// Cleanup
+	myGPSPerfStats = nil
+}
+
 // TestChksumUBX tests UBX checksum calculation
 func TestChksumUBX(t *testing.T) {
 	testCases := []struct {
