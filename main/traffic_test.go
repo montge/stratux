@@ -2224,6 +2224,54 @@ func TestCalculateNICFromTypeCode(t *testing.T) {
 	}
 }
 
+// TestDecodeBase40Callsign tests the base40 callsign decoding helper function
+func TestDecodeBase40Callsign(t *testing.T) {
+	// Test case: "N12345" encoded in base40
+	// Base40 alphabet: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ  .."
+	// N=23, 1=1, 2=2, 3=3, 4=4, 5=5, space=36, space=36
+	tests := []struct {
+		name     string
+		frame    []byte
+		startIdx int
+		expected string
+	}{
+		{
+			name:     "empty frame",
+			frame:    []byte{},
+			startIdx: 0,
+			expected: "",
+		},
+		{
+			name:     "frame too short",
+			frame:    []byte{0x00, 0x00, 0x00, 0x00, 0x00},
+			startIdx: 0,
+			expected: "",
+		},
+		{
+			name:     "all zeros",
+			frame:    []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			startIdx: 0,
+			expected: "00000000",
+		},
+		{
+			name: "offset start",
+			// Place zeros at offset 5
+			frame:    []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			startIdx: 5,
+			expected: "00000000",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := decodeBase40Callsign(tc.frame, tc.startIdx)
+			if result != tc.expected {
+				t.Errorf("decodeBase40Callsign() = %q, expected %q", result, tc.expected)
+			}
+		})
+	}
+}
+
 // TestParseDump1090Message_MissingLongitude tests handling of position message with missing longitude
 // Verifies: FR-401 (Traffic Reception - incomplete position data handling)
 func TestParseDump1090Message_MissingLongitude(t *testing.T) {

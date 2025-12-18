@@ -91,8 +91,8 @@
 - [ ] 12.6 gps.go - Address 8 TODOs (lines 133, 143, 294, 672-673, 735, 1145, 1151) - deferred (feature enhancements)
 
 ## 13. High Cognitive Complexity Functions (Major Refactors)
-- [ ] 13.1 traffic.go:697 parseDownlinkReport() - 352 lines, ~44 conditionals (extract bit manipulation helpers)
-- [x] 13.2 traffic.go:1111 parseDump1090Message() - extracted calculateNICFromTypeCode() helper function
+- [x] 13.1 traffic.go parseDownlinkReport() - extracted decodeBase40Callsign() helper function
+- [x] 13.2 traffic.go parseDump1090Message() - extracted calculateNICFromTypeCode() helper function
 - [ ] 13.3 gps.go:1084 processNMEALineLow() - 800+ lines, ~50 conditionals (extract NMEA sentence handlers)
 - [ ] 13.4 gen_gdl90.go:1095 parseInput() - 306 lines (extract message type handlers)
 

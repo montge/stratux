@@ -710,6 +710,40 @@ func makeTrafficReportMsg(ti TrafficInfo) []byte {
 	return prepareMessage(msg)
 }
 
+// base40Alphabet is used for decoding UAT callsigns.
+// Reference: DO-282B section 2.2.4.5.1.2
+const base40Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ  .."
+
+// decodeBase40Callsign decodes an 8-character callsign from 6 bytes using base40 encoding.
+// The bytes are packed as three pairs, each pair encoding 2-3 characters.
+// Returns the decoded callsign with trailing spaces removed.
+func decodeBase40Callsign(frame []byte, startIndex int) string {
+	if len(frame) < startIndex+6 {
+		return ""
+	}
+
+	tail := ""
+
+	// First pair: bytes [startIndex, startIndex+1] encodes 2 characters
+	v := (uint16(frame[startIndex]) << 8) | uint16(frame[startIndex+1])
+	tail += string(base40Alphabet[(v/40)%40])
+	tail += string(base40Alphabet[v%40])
+
+	// Second pair: bytes [startIndex+2, startIndex+3] encodes 3 characters
+	v = (uint16(frame[startIndex+2]) << 8) | uint16(frame[startIndex+3])
+	tail += string(base40Alphabet[(v/1600)%40])
+	tail += string(base40Alphabet[(v/40)%40])
+	tail += string(base40Alphabet[v%40])
+
+	// Third pair: bytes [startIndex+4, startIndex+5] encodes 3 characters
+	v = (uint16(frame[startIndex+4]) << 8) | uint16(frame[startIndex+5])
+	tail += string(base40Alphabet[(v/1600)%40])
+	tail += string(base40Alphabet[(v/40)%40])
+	tail += string(base40Alphabet[v%40])
+
+	return strings.Trim(tail, " ")
+}
+
 // parseDownlinkReport decodes a UAT downlink message to extract identity, state vector, and mode status data.
 // Decoded data is used to update a TrafficInfo object, keyed to the 24-bit ICAO code contained in the
 // downlink message.
@@ -776,23 +810,7 @@ func parseDownlinkReport(s string, signalLevel int) {
 		csid := (frame[26] >> 1) & 0x01
 
 		if csid == 1 { // decode as callsign
-			base40_alphabet := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ  .."
-			tail := ""
-
-			v := (uint16(frame[17]) << 8) | uint16(frame[18])
-			tail += string(base40_alphabet[(v/40)%40])
-			tail += string(base40_alphabet[v%40])
-			v = (uint16(frame[19]) << 8) | uint16(frame[20])
-			tail += string(base40_alphabet[(v/1600)%40])
-			tail += string(base40_alphabet[(v/40)%40])
-			tail += string(base40_alphabet[v%40])
-			v = (uint16(frame[21]) << 8) | uint16(frame[22])
-			tail += string(base40_alphabet[(v/1600)%40])
-			tail += string(base40_alphabet[(v/40)%40])
-			tail += string(base40_alphabet[v%40])
-			tail = strings.Trim(tail, " ")
-			ti.Tail = tail
-
+			ti.Tail = decodeBase40Callsign(frame, 17)
 		} else if uat_version >= 2 { // decode as Mode 3/A code, if UAT version is at least 2
 			v := (uint16(frame[17]) << 8) | uint16(frame[18])
 			squawk_a := (v / 40) % 40
