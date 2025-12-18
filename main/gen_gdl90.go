@@ -1094,6 +1094,22 @@ func UpdateUATStats(ProductID uint32) {
 	}
 }
 
+// determineUATMessageType determines the UAT message type based on message length and uplink status.
+// Returns MSGTYPE_UPLINK, MSGTYPE_LONG_REPORT, MSGTYPE_BASIC_REPORT, or 0 for unknown.
+func determineUATMessageType(msglen int, isUplink bool) uint16 {
+	if isUplink && msglen == UPLINK_FRAME_DATA_BYTES {
+		return MSGTYPE_UPLINK
+	} else if msglen == 48 {
+		// With Reed Solomon appended
+		return MSGTYPE_LONG_REPORT
+	} else if msglen == 34 {
+		return MSGTYPE_LONG_REPORT
+	} else if msglen == 18 {
+		return MSGTYPE_BASIC_REPORT
+	}
+	return 0
+}
+
 func parseInput(buf string) ([]byte, uint16) {
 	//FIXME: We're ignoring all invalid format UAT messages (not sending to datalog).
 	x := strings.Split(buf, ";") // Discard everything after the first ';'.
@@ -1143,19 +1159,7 @@ func parseInput(buf string) ([]byte, uint16) {
 		return nil, 0
 	}
 
-	if isUplink && msglen == UPLINK_FRAME_DATA_BYTES {
-		msgtype = MSGTYPE_UPLINK
-	} else if msglen == 48 {
-		// With Reed Solomon appended
-		msgtype = MSGTYPE_LONG_REPORT
-	} else if msglen == 34 {
-		msgtype = MSGTYPE_LONG_REPORT
-	} else if msglen == 18 {
-		msgtype = MSGTYPE_BASIC_REPORT
-	} else {
-		msgtype = 0
-	}
-
+	msgtype = determineUATMessageType(msglen, isUplink)
 	if msgtype == 0 {
 		log.Printf("UNKNOWN MESSAGE TYPE: %s - msglen=%d\n", s, msglen)
 	}

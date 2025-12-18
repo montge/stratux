@@ -1339,6 +1339,34 @@ func TestRelayMessage(t *testing.T) {
 // parseInput Tests
 // =============================================================================
 
+// TestDetermineUATMessageType tests the UAT message type determination helper
+func TestDetermineUATMessageType(t *testing.T) {
+	tests := []struct {
+		name     string
+		msglen   int
+		isUplink bool
+		expected uint16
+	}{
+		{"uplink message", UPLINK_FRAME_DATA_BYTES, true, MSGTYPE_UPLINK},
+		{"long report 48 bytes", 48, false, MSGTYPE_LONG_REPORT},
+		{"long report 34 bytes", 34, false, MSGTYPE_LONG_REPORT},
+		{"basic report 18 bytes", 18, false, MSGTYPE_BASIC_REPORT},
+		{"unknown length", 25, false, 0},
+		{"downlink not uplink", UPLINK_FRAME_DATA_BYTES, false, 0},
+		{"zero length", 0, false, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := determineUATMessageType(tc.msglen, tc.isUplink)
+			if result != tc.expected {
+				t.Errorf("determineUATMessageType(%d, %v) = %d, expected %d",
+					tc.msglen, tc.isUplink, result, tc.expected)
+			}
+		})
+	}
+}
+
 // TestParseInput_BasicCases tests parseInput with various message types
 func TestParseInput_BasicCases(t *testing.T) {
 	// Initialize required globals

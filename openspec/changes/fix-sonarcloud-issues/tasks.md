@@ -94,7 +94,7 @@
 - [x] 13.1 traffic.go parseDownlinkReport() - extracted decodeBase40Callsign() helper function
 - [x] 13.2 traffic.go parseDump1090Message() - extracted calculateNICFromTypeCode() helper function
 - [ ] 13.3 gps.go:1084 processNMEALineLow() - 800+ lines, ~50 conditionals (extract NMEA sentence handlers)
-- [ ] 13.4 gen_gdl90.go:1095 parseInput() - 306 lines (extract message type handlers)
+- [x] 13.4 gen_gdl90.go parseInput() - extracted determineUATMessageType() helper function
 
 ## 14. Code Synchronization Issues
 - [x] 14.1 gen_gdl90.go:93-115 / web/plates/js/status.js - GPS type enumeration sync (verified in sync, added SYNC WARNING comments)
