@@ -139,36 +139,38 @@ func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 
 	// Handle ShipStaticData
 	if header.MessageID == 5 {
-		var shipStaticData ais.ShipStaticData = msg.Packet.(ais.ShipStaticData)
-
-		ti.Tail = strings.TrimSpace(shipStaticData.Name)
-		ti.Reg = strings.TrimSpace(shipStaticData.CallSign)
-		ti.SurfaceVehicleType = uint16(shipStaticData.Type)
-		// Store in case this was the first message and we disgard die to GPS not available
-		traffic[key] = ti
+		if shipStaticData, ok := msg.Packet.(ais.ShipStaticData); ok {
+			ti.Tail = strings.TrimSpace(shipStaticData.Name)
+			ti.Reg = strings.TrimSpace(shipStaticData.CallSign)
+			ti.SurfaceVehicleType = uint16(shipStaticData.Type)
+			// Store in case this was the first message and we disgard die to GPS not available
+			traffic[key] = ti
+		}
 	}
 
 	// Handle LongRangeAisBroadcastMessage
 	if header.MessageID == 27 {
-		var positionReport ais.LongRangeAisBroadcastMessage = msg.Packet.(ais.LongRangeAisBroadcastMessage)
+		if positionReport, ok := msg.Packet.(ais.LongRangeAisBroadcastMessage); ok {
+			ti.Lat = float32(positionReport.Latitude)
+			ti.Lng = float32(positionReport.Longitude)
 
-		ti.Lat = float32(positionReport.Latitude)
-		ti.Lng = float32(positionReport.Longitude)
-
-		if positionReport.Cog != 511 {
-			cog := float32(positionReport.Cog)
-			ti.Track = cog
-		}
-		if positionReport.Sog < 63 {
-			ti.Speed = uint16(positionReport.Sog)
-			ti.Speed_valid = true
+			if positionReport.Cog != 511 {
+				cog := float32(positionReport.Cog)
+				ti.Track = cog
+			}
+			if positionReport.Sog < 63 {
+				ti.Speed = uint16(positionReport.Sog)
+				ti.Speed_valid = true
+			}
 		}
 	}
 
 	// Handle MessageID 1,2 & 3 Position reports
 	if header.MessageID == 1 || header.MessageID == 2 || header.MessageID == 3 {
-		var positionReport ais.PositionReport = msg.Packet.(ais.PositionReport)
-
+		positionReport, ok := msg.Packet.(ais.PositionReport)
+		if !ok {
+			return
+		}
 		ti.OnGround = true
 		ti.Position_valid = true
 		ti.Lat = float32(positionReport.Latitude)

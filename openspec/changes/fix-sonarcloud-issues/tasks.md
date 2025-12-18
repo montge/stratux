@@ -149,3 +149,5 @@
 - [x] 22.2 network.go:609 - Added netMutex.Lock() to fix data race in getNetworkConnsByIp
 - [x] 22.3 traffic.go:718 - Added minimum frame length validation (4 bytes for header)
 - [x] 22.4 traffic.go:760 - Added frame length check (31 bytes) for msg_type 1/3 processing
+- [x] 22.5 datalog.go:298 - Use safe type assertion for query size calculation
+- [x] 22.6 ais.go:142,153,170 - Use safe type assertions for AIS message packet handling

@@ -295,7 +295,9 @@ func bulkInsert(tbl string, db *sql.DB) (res sql.Result, err error) {
 				querySize += uint64(len(addStr))
 			}
 			for _, val := range batchVals[0] {
-				querySize += uint64(len(val.(string)))
+				if str, ok := val.(string); ok {
+					querySize += uint64(len(str))
+				}
 			}
 			vals = append(vals, batchVals[0]...)
 			batchVals = batchVals[1:]
