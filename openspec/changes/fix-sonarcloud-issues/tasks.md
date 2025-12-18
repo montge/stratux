@@ -151,3 +151,10 @@
 - [x] 22.4 traffic.go:760 - Added frame length check (31 bytes) for msg_type 1/3 processing
 - [x] 22.5 datalog.go:298 - Use safe type assertion for query size calculation
 - [x] 22.6 ais.go:142,153,170 - Use safe type assertions for AIS message packet handling
+
+## 23. Logging Consistency
+- [x] 23.1 network.go:210,217 - Replace fmt.Println with log.Printf for error messages
+- [x] 23.2 sensors.go:54 - Replace fmt.Println with log.Printf for panic recovery
+- [x] 23.3 gps.go:1930 - Replace fmt.Printf with log.Printf for baro computation warning
+- [x] 23.4 gps.go:2005 - Replace fmt.Printf with log.Printf for debug message
+- [x] 23.5 pong.go:279 - Replace fmt.Printf with log.Printf for completion message
