@@ -372,11 +372,11 @@ func handleRegionSet(w http.ResponseWriter, r *http.Request) {
 					// log.Printf("handleRegionSet:json: testing for key:%s of type %s\n", key, reflect.TypeOf(val))
 					switch key {
 					case "Region":
-						val := val.(string)
-						log.Printf("String is %s\n", val)
-						if val == "US" {
+						regionStr := val.(string)
+						log.Printf("String is %s\n", regionStr)
+						if regionStr == "US" {
 							globalSettings.RegionSelected = 1
-						} else if val == "EU" {
+						} else if regionStr == "EU" {
 							globalSettings.RegionSelected = 2
 						} else {
 							globalSettings.RegionSelected = 0

@@ -139,3 +139,7 @@
 - [x] 20.3 ping.go:46 - Removed unnecessary int() conversion
 - [x] 20.4 pong.go:44 - Removed unnecessary int() conversion
 - [x] 20.5 datalog.go:283 - Removed unnecessary int() conversion
+
+## 21. Variable Shadowing
+- [x] 21.1 ping.go:404-405 - Renamed shadowed lat/lng to ownLat/ownLng
+- [x] 21.2 managementinterface.go:375 - Renamed shadowed val to regionStr

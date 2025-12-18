@@ -401,9 +401,9 @@ func mavLinkFormat(x []byte) {
 				ti.Lat = lat
 				ti.Lng = lng
 				if isGPSValid() {
-					lat := float64(mySituation.GPSLatitude)
-					lng := float64(mySituation.GPSLongitude)
-					ti.Distance, ti.Bearing = common.Distance(float64(lat), float64(lng), float64(ti.Lat), float64(ti.Lng))
+					ownLat := float64(mySituation.GPSLatitude)
+					ownLng := float64(mySituation.GPSLongitude)
+					ti.Distance, ti.Bearing = common.Distance(ownLat, ownLng, float64(ti.Lat), float64(ti.Lng))
 					ti.BearingDist_valid = true
 				} else {
 					ti.BearingDist_valid = false
