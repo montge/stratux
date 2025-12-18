@@ -218,7 +218,7 @@ func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 	}
 
 	// Do not display targets more than 150km
-	if ti.BearingDist_valid == false || ti.Distance >= 150000 {
+	if !ti.BearingDist_valid || ti.Distance >= 150000 {
 		return
 	}
 

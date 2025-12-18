@@ -280,7 +280,7 @@ func bulkInsert(tbl string, db *sql.DB) (res sql.Result, err error) {
 	//	log.Printf("table %s. %d cols per row. max batch %d\n", tbl, numColsPerRow, maxRowBatch)
 	for len(batchVals) > 0 {
 		//     timeInit := time.Now()
-		i := int(0) // Variable number of rows per INSERT statement.
+		i := 0 // Variable number of rows per INSERT statement.
 
 		stmt := ""
 		vals := make([]interface{}, 0)

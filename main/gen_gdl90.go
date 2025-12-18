@@ -1824,12 +1824,12 @@ func main() {
 
 	// Disable replay logs when replaying - so that messages replay data isn't copied into the logs.
 	// Override after reading in the settings.
-	if *replayFlag == true {
+	if *replayFlag {
 		log.Printf("Replay file %s\n", *replayUATFilename)
 		globalSettings.ReplayLog = false
 	}
 
-	if globalSettings.DeveloperMode == true {
+	if globalSettings.DeveloperMode {
 		log.Printf("Developer mode set\n")
 	}
 
@@ -1887,7 +1887,7 @@ func main() {
 
 	reader := bufio.NewReader(os.Stdin)
 
-	if *replayFlag == true {
+	if *replayFlag {
 		fp := openReplayFile(*replayUATFilename)
 
 		playSpeed := uint64(*replaySpeed)
@@ -1902,7 +1902,7 @@ func main() {
 			}
 		}
 
-	} else if *stdinFlag == true {
+	} else if *stdinFlag {
 		for {
 			buf, err := reader.ReadString('\n')
 			if err != nil {

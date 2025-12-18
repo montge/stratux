@@ -770,7 +770,7 @@ func parseDownlinkReport(s string, signalLevel int) {
 		csid := (frame[26] >> 1) & 0x01
 
 		if csid == 1 { // decode as callsign
-			base40_alphabet := string("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ  ..")
+			base40_alphabet := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ  .."
 			tail := ""
 
 			v := (uint16(frame[17]) << 8) | uint16(frame[18])
@@ -1611,7 +1611,7 @@ func updateDemoTraffic(icao uint32, tail string, relAlt float32, gs float64, off
 
 func icao2reg(icao_addr uint32) (string, bool) {
 	// Initialize local variables
-	base34alphabet := string("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789")
+	base34alphabet := "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"
 	nationalOffset := uint32(0xA00001) // default is US
 	tail := ""
 	nation := ""

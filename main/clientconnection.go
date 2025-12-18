@@ -83,7 +83,7 @@ isSleeping().
 */
 func (conn *networkConnection) IsSleeping() bool {
 	// Unable to listen to ICMP without root - send to everything. Just for debugging.
-	if isX86DebugMode() || globalSettings.NoSleep == true {
+	if isX86DebugMode() || globalSettings.NoSleep {
 		return false
 	}
 	// No ping response. Assume disconnected/sleeping device.

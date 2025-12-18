@@ -43,7 +43,7 @@ var pingDeviceSuccessfullyWorking bool
 
 func initPingSerial() bool {
 	var device string
-	baudrate := int(2000000)
+	baudrate := 2000000
 
 	pingDeviceModel = 0
 	log.Printf("Configuring Ping ADS-B\n")
@@ -229,7 +229,7 @@ func pingShutdown() {
 	//log.Println("Ping shutdown(): pingWG.Wait() returned...")
 	// Serial Port Gracefully Close and Read() returns
 	//globalStatus.Ping_connected = false
-	if globalStatus.Ping_connected == true {
+	if globalStatus.Ping_connected {
 		pingSerialPort.Close()
 	}
 }
@@ -264,7 +264,7 @@ func pingWatcher() {
 			break
 		}
 		// Autoreconnect the device
-		if pingDeviceSuccessfullyWorking == true && globalSettings.Ping_Enabled && !globalStatus.Ping_connected {
+		if pingDeviceSuccessfullyWorking && globalSettings.Ping_Enabled && !globalStatus.Ping_connected {
 			prevPingEnabled = false
 		}
 
@@ -276,7 +276,7 @@ func pingWatcher() {
 		if globalSettings.Ping_Enabled && !globalStatus.Ping_connected {
 			globalStatus.Ping_connected = initPingSerial()
 			// This will retry next loop to connect again to the device
-			if globalStatus.Ping_connected == false {
+			if !globalStatus.Ping_connected {
 				// Relaxed polling to wait the device to be discovered
 				time.Sleep(10 * time.Second)
 				continue

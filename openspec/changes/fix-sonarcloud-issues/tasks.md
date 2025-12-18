@@ -125,3 +125,17 @@
 ## 18. Strconv Error Handling
 - [x] 18.1 managementinterface.go:1192 - Added error handling for strconv.ParseInt in mbtiles metadata
 - [x] 18.2 managementinterface.go:1289,1291 - Added error handling for x, z, and file parsing in handleTile
+
+## 19. Redundant Boolean Equality Checks
+- [x] 19.1 ping.go - Removed `== true` and `== false` comparisons (3 locations)
+- [x] 19.2 pong.go - Removed `== true` and `== false` comparisons (4 locations)
+- [x] 19.3 gen_gdl90.go - Removed `== true` comparisons (4 locations)
+- [x] 19.4 ais.go - Removed `== false` comparison (1 location)
+- [x] 19.5 clientconnection.go - Removed `== true` comparison (1 location)
+
+## 20. Redundant Type Conversions
+- [x] 20.1 traffic.go:773,1614 - Removed unnecessary string() conversion from string literals
+- [x] 20.2 gps.go:241 - Removed unnecessary bool() and int() conversions
+- [x] 20.3 ping.go:46 - Removed unnecessary int() conversion
+- [x] 20.4 pong.go:44 - Removed unnecessary int() conversion
+- [x] 20.5 datalog.go:283 - Removed unnecessary int() conversion

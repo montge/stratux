@@ -41,7 +41,7 @@ type PongTermMessage struct {
 
 func initPongSerial() bool {
 	var device string
-	baudrate := int(3000000)
+	baudrate := 3000000
 
 	log.Printf("Configuring Pong ADS-B\n")
 
@@ -230,7 +230,7 @@ func pongSerialReader() {
 
 func pongShutdown() {
 	log.Println("Entered Pong shutdown() ...")
-	if globalStatus.Pong_connected == true {
+	if globalStatus.Pong_connected {
 		pongSerialPort.Close()
 	}
 }
@@ -312,7 +312,7 @@ func pongWatcher() {
 			break
 		}
 		// Autoreconnect the device
-		if pongDeviceSuccessfullyWorking == true && globalSettings.Pong_Enabled && !globalStatus.Pong_connected {
+		if pongDeviceSuccessfullyWorking && globalSettings.Pong_Enabled && !globalStatus.Pong_connected {
 			prevPongEnabled = false
 		}
 
@@ -338,7 +338,7 @@ func pongWatcher() {
 			log.Printf("update process complete - continue\n")
 		}
 		// Keep a counter of how long its been down
-		if prevPongEnabled == false && globalSettings.Pong_Enabled == false {
+		if !prevPongEnabled && !globalSettings.Pong_Enabled {
 			pongDownCount++
 		} else {
 			pongDownCount = 0
@@ -360,7 +360,7 @@ func pongWatcher() {
 		if globalSettings.Pong_Enabled && !globalStatus.Pong_connected {
 			globalStatus.Pong_connected = initPongSerial()
 			// This will retry next loop to connect again to the device
-			if globalStatus.Pong_connected == false {
+			if !globalStatus.Pong_connected {
 				// Relaxed polling to wait the device to be discovered
 				time.Sleep(10 * time.Second)
 				continue

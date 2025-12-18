@@ -237,8 +237,8 @@ func initGPSSerial() bool {
 		return true
 	}
 	// Possible baud rates for this device. We will try to auto detect the correct one
-	baudrates := []int{int(9600)}
-	isSirfIV := bool(false)
+	baudrates := []int{9600}
+	isSirfIV := false
 	globalStatus.GPS_detected_type = 0 // reset detected type on each initialization
 	detectedTracker = nil
 
