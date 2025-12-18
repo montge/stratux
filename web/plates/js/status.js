@@ -92,7 +92,8 @@ function StatusCtrl($rootScope, $scope, $state, $http, $interval, craftService) 
 			var gpsHardwareCode = (status.GPS_detected_type & 0x0f);
 			var tempGpsHardwareString = "Not installed";
 			switch(gpsHardwareCode) {
-				// Keep in mind that this must be in sync with the enumeration in gen_gdl90.go
+				// SYNC WARNING: These case values must match the GPS_TYPE_* constants in main/gen_gdl90.go
+				// When updating, check both files to ensure they remain synchronized.
 				case 1:
 					tempGpsHardwareString = "Generic GPS device";
 					break;

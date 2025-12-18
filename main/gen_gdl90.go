@@ -90,9 +90,11 @@ const (
 		GPS_TYPE_GARMIN   = 0x06
 	*/
 
-	// for historical reasons lower nibbe contains gps type, upper nibble containsprotocol type.
-	// Additionally this enumeration has a javascript duplicte in web/plates/js/status.js, they have to be kept in sync manually
-	// This is somewhat ugly but difficult to change without breaking backward compatibility
+	// For historical reasons lower nibble contains GPS type, upper nibble contains protocol type.
+	// SYNC WARNING: This enumeration has a JavaScript duplicate in web/plates/js/status.js
+	// that must be kept in sync manually. When adding/changing GPS types here, also update
+	// the switch statement in status.js that maps gpsHardwareCode to display strings.
+	// This is somewhat ugly but difficult to change without breaking backward compatibility.
 
 	// lower nibble gps type   (dont forget to use only numbers form 0 to 15)
 
