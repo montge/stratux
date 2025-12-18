@@ -6,4 +6,4 @@ fi
 if [ "$ARCH" == "aarch64" ]; then
 	ARCH="arm64"
 fi
-echo $ARCH
+echo "$ARCH"

@@ -4,4 +4,4 @@
 # where enp0s1 is the interface name of your outgoing internet connection
 
 sysctl -w net.ipv4.ip_forward=1
-iptables -t nat -A POSTROUTING -o $1 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o "$1" -j MASQUERADE

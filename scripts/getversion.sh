@@ -13,4 +13,4 @@ if ! [[ "$VER" =~ ^[0-9] ]]; then
 	VER="0.0.$VER"
 fi
 
-echo $VER
+echo "$VER"
