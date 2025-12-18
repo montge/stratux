@@ -185,7 +185,7 @@ function WeatherCtrl($rootScope, $scope, $state, $http, $interval) {
 		};
 
 		socket.onmessage = function (msg) {
-			console.log('Received data_list update.');
+			// console.log('Received data_list update.');
 
 			$scope.raw_data = angular.toJson(msg.data, true);
 			var message = JSON.parse(msg.data);

@@ -36,7 +36,7 @@ function DeveloperCtrl($rootScope, $scope, $state, $http, $interval) {
 		};
 
 		socket.onmessage = function (msg) {
-			console.log('Received status update.');
+			// console.log('Received status update.');
 
 			var status = JSON.parse(msg.data);
 			// Update Status

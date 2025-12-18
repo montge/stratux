@@ -193,7 +193,7 @@ function StatusCtrl($rootScope, $scope, $state, $http, $interval, craftService) 
 		// Simple POST request example (note: response is asynchronous)
 		var jsonData = {};
 		jsonData["Region"] = val;
-		console.log("setRegion() called "+ jsonData);
+		// console.log("setRegion() called "+ jsonData);
 		$http.post(URL_REGION_SET, angular.toJson(jsonData)).
 		then(function (response) {
 		}, function (response) {
@@ -207,7 +207,7 @@ function StatusCtrl($rootScope, $scope, $state, $http, $interval, craftService) 
 		then(function (response) {
 			settings = angular.fromJson(response.data);
 			// Update Status
-			console.log("Check for region called: "+settings.IsSet);
+			// console.log("Check for region called: "+settings.IsSet);
 			if (settings.IsSet == false) {
 				$scope.Ui.turnOn('RegionSelect');
 				$scope.Region = settings.RegionSelect;
