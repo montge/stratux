@@ -393,102 +393,203 @@ func handleRegionSet(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// applySimpleBooleanSetting applies a simple boolean setting that requires no side effects.
-// Returns true if the key was handled.
-func applySimpleBooleanSetting(key string, val bool) bool {
-	switch key {
-	case "DarkMode":
-		globalSettings.DarkMode = val
-	case "UAT_Enabled":
-		globalSettings.UAT_Enabled = val
-	case "ES_Enabled":
-		globalSettings.ES_Enabled = val
-	case "OGN_Enabled":
-		globalSettings.OGN_Enabled = val
-	case "AIS_Enabled":
-		globalSettings.AIS_Enabled = val
-	case "APRS_Enabled":
-		globalSettings.APRS_Enabled = val
-	case "Ping_Enabled":
-		globalSettings.Ping_Enabled = val
-	case "Pong_Enabled":
-		globalSettings.Pong_Enabled = val
-	case "OGNI2CTXEnabled":
-		globalSettings.OGNI2CTXEnabled = val
-	case "GPS_Enabled":
-		globalSettings.GPS_Enabled = val
-	case "DEBUG":
-		globalSettings.DEBUG = val
-	case "DisplayTrafficSource":
-		globalSettings.DisplayTrafficSource = val
-	case "TraceLog":
-		globalSettings.TraceLog = val
-	case "AHRSLog":
-		globalSettings.AHRSLog = val
-	case "EstimateBearinglessDist":
-		globalSettings.EstimateBearinglessDist = val
-	default:
-		return false
-	}
-	return true
+// settingResult holds the side effects from applying a setting.
+type settingResult struct {
+	reconfigureTracker    bool
+	reconfigureFancontrol bool
 }
 
-// applyWiFiSetting applies WiFi-related settings.
-// Returns true if the key was handled.
-func applyWiFiSetting(key string, val interface{}) bool {
-	switch key {
-	case "WiFiCountry":
-		setWifiCountry(val.(string))
-	case "WiFiSSID":
-		setWifiSSID(val.(string))
-	case "WiFiChannel":
-		setWifiChannel(int(val.(float64)))
-	case "WiFiSecurityEnabled":
-		setWifiSecurityEnabled(val.(bool))
-	case "WiFiPassphrase":
-		setWifiPassphrase(val.(string))
-	case "WiFiIPAddress":
-		setWifiIPAddress(val.(string))
-	case "WiFiMode":
-		setWiFiMode(int(val.(float64)))
-	case "WiFiDirectPin":
-		setWifiDirectPin(val.(string))
-	case "WiFiClientNetworks":
-		var networks = make([]wifiClientNetwork, 0)
-		for _, rawNetwork := range val.([]interface{}) {
-			network := rawNetwork.(map[string]interface{})
-			networks = append(networks, wifiClientNetwork{network["SSID"].(string), network["Password"].(string)})
+// settingHandler is a function that applies a setting value and returns any side effects.
+type settingHandler func(val interface{}) settingResult
+
+// noSideEffects is a convenience for handlers with no side effects.
+var noSideEffects = settingResult{}
+
+// applyOwnshipModeS parses and validates Mode S codes.
+func applyOwnshipModeS(val interface{}) settingResult {
+	codes := strings.Split(val.(string), ",")
+	codesFinal := make([]string, 0)
+	for _, code := range codes {
+		code = strings.Trim(code, " ")
+		// Expecting a hex string less than 6 characters (24 bits) long.
+		if len(code) > 6 { // Too long.
+			continue
 		}
-		setWifiClientNetworks(networks)
-	case "WiFiInternetPassThroughEnabled":
-		setWifiInternetPassthroughEnabled(val.(bool))
-	default:
-		return false
+		// Pad string, must be 6 characters long.
+		vals := strings.ToUpper(code)
+		for len(vals) < 6 {
+			vals = "0" + vals
+		}
+		hexn, err := hex.DecodeString(vals)
+		if err != nil { // Number not valid.
+			log.Printf("handleSettingsSetRequest:OwnshipModeS: %s\n", err.Error())
+			continue
+		}
+		codesFinal = append(codesFinal, fmt.Sprintf("%02X%02X%02X", hexn[0], hexn[1], hexn[2]))
 	}
-	return true
+	globalSettings.OwnshipModeS = strings.Join(codesFinal, ",")
+	return noSideEffects
 }
 
-// applyOGNSetting applies OGN tracker-related settings.
-// Returns (handled, reconfigureTracker) - handled indicates if the key was processed,
-// reconfigureTracker indicates if the tracker needs to be reconfigured.
-func applyOGNSetting(key string, val interface{}) (bool, bool) {
-	switch key {
-	case "OGNAddrType":
-		globalSettings.OGNAddrType = int(val.(float64))
-	case "OGNAddr":
-		globalSettings.OGNAddr = val.(string)
-	case "OGNAcftType":
-		globalSettings.OGNAcftType = int(val.(float64))
-	case "OGNPilot":
-		globalSettings.OGNPilot = val.(string)
-	case "OGNReg":
-		globalSettings.OGNReg = val.(string)
-	case "OGNTxPower":
-		globalSettings.OGNTxPower = int(val.(float64))
-	default:
-		return false, false
+// ipValidationRegex is compiled once for efficiency.
+var ipValidationRegex = regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+
+// applyStaticIps parses and validates static IP addresses.
+func applyStaticIps(val interface{}) settingResult {
+	ipsStr := val.(string)
+	ips := strings.Split(ipsStr, " ")
+	if ipsStr == "" {
+		ips = make([]string, 0)
 	}
-	return true, true
+
+	errMsg := ""
+	for _, ip := range ips {
+		// Verify IP format
+		if !ipValidationRegex.MatchString(ip) {
+			errMsg = errMsg + "Invalid IP: " + ip + ". "
+		}
+	}
+	if errMsg != "" {
+		log.Printf("handleSettingsSetRequest:StaticIps: %s\n", errMsg)
+		return noSideEffects // Don't update on validation error
+	}
+	globalSettings.StaticIps = ips
+	return noSideEffects
+}
+
+// applyWiFiClientNetworks parses WiFi client network configurations.
+func applyWiFiClientNetworks(val interface{}) settingResult {
+	var networks = make([]wifiClientNetwork, 0)
+	for _, rawNetwork := range val.([]interface{}) {
+		network := rawNetwork.(map[string]interface{})
+		networks = append(networks, wifiClientNetwork{network["SSID"].(string), network["Password"].(string)})
+	}
+	setWifiClientNetworks(networks)
+	return noSideEffects
+}
+
+// applyBaudRate updates baud rate for all serial outputs.
+func applyBaudRate(val interface{}) settingResult {
+	if globalSettings.SerialOutputs != nil {
+		for dev, serialOut := range globalSettings.SerialOutputs {
+			newBaud := int(val.(float64))
+			if newBaud == serialOut.Baud { // Same baud rate. No change.
+				continue
+			}
+			log.Printf("changing %s baud rate from %d to %d.\n", dev, serialOut.Baud, newBaud)
+			serialOut.Baud = newBaud
+			globalSettings.SerialOutputs[dev] = serialOut
+			closeSerial(dev)
+		}
+	}
+	return noSideEffects
+}
+
+// settingHandlers maps setting keys to their handler functions.
+// This eliminates the need for switch statements and makes adding new settings trivial.
+var settingHandlers = map[string]settingHandler{
+	// Simple boolean settings (no side effects)
+	"DarkMode":              func(v interface{}) settingResult { globalSettings.DarkMode = v.(bool); return noSideEffects },
+	"UAT_Enabled":           func(v interface{}) settingResult { globalSettings.UAT_Enabled = v.(bool); return noSideEffects },
+	"ES_Enabled":            func(v interface{}) settingResult { globalSettings.ES_Enabled = v.(bool); return noSideEffects },
+	"OGN_Enabled":           func(v interface{}) settingResult { globalSettings.OGN_Enabled = v.(bool); return noSideEffects },
+	"AIS_Enabled":           func(v interface{}) settingResult { globalSettings.AIS_Enabled = v.(bool); return noSideEffects },
+	"APRS_Enabled":          func(v interface{}) settingResult { globalSettings.APRS_Enabled = v.(bool); return noSideEffects },
+	"Ping_Enabled":          func(v interface{}) settingResult { globalSettings.Ping_Enabled = v.(bool); return noSideEffects },
+	"Pong_Enabled":          func(v interface{}) settingResult { globalSettings.Pong_Enabled = v.(bool); return noSideEffects },
+	"OGNI2CTXEnabled":       func(v interface{}) settingResult { globalSettings.OGNI2CTXEnabled = v.(bool); return noSideEffects },
+	"GPS_Enabled":           func(v interface{}) settingResult { globalSettings.GPS_Enabled = v.(bool); return noSideEffects },
+	"DEBUG":                 func(v interface{}) settingResult { globalSettings.DEBUG = v.(bool); return noSideEffects },
+	"DisplayTrafficSource":  func(v interface{}) settingResult { globalSettings.DisplayTrafficSource = v.(bool); return noSideEffects },
+	"TraceLog":              func(v interface{}) settingResult { globalSettings.TraceLog = v.(bool); return noSideEffects },
+	"AHRSLog":               func(v interface{}) settingResult { globalSettings.AHRSLog = v.(bool); return noSideEffects },
+	"EstimateBearinglessDist": func(v interface{}) settingResult { globalSettings.EstimateBearinglessDist = v.(bool); return noSideEffects },
+
+	// Boolean settings with side effects
+	"IMU_Sensor_Enabled": func(v interface{}) settingResult {
+		globalSettings.IMU_Sensor_Enabled = v.(bool)
+		if !globalSettings.IMU_Sensor_Enabled && globalStatus.IMUConnected {
+			myIMUReader.Close()
+			globalStatus.IMUConnected = false
+		}
+		return noSideEffects
+	},
+	"BMP_Sensor_Enabled": func(v interface{}) settingResult {
+		globalSettings.BMP_Sensor_Enabled = v.(bool)
+		if !globalSettings.BMP_Sensor_Enabled && globalStatus.BMPConnected {
+			myPressureReader.Close()
+			globalStatus.BMPConnected = false
+		}
+		return noSideEffects
+	},
+	"ReplayLog": func(v interface{}) settingResult {
+		newVal := v.(bool)
+		if newVal != globalSettings.ReplayLog { // Don't mark the files unless there is a change.
+			globalSettings.ReplayLog = newVal
+		}
+		return noSideEffects
+	},
+	"PersistentLogging": func(v interface{}) settingResult {
+		globalSettings.PersistentLogging = v.(bool)
+		setPersistentLogging(globalSettings.PersistentLogging)
+		return noSideEffects
+	},
+	"IMUMapping": func(v interface{}) settingResult {
+		if globalSettings.IMUMapping != v.([2]int) {
+			globalSettings.IMUMapping = v.([2]int)
+			myIMUReader.Close()
+			globalStatus.IMUConnected = false // Force a restart of the IMU reader
+		}
+		return noSideEffects
+	},
+
+	// Numeric settings
+	"Dump1090Gain":   func(v interface{}) settingResult { globalSettings.Dump1090Gain = v.(float64); return noSideEffects },
+	"PPM":            func(v interface{}) settingResult { globalSettings.PPM = int(v.(float64)); return noSideEffects },
+	"AltitudeOffset": func(v interface{}) settingResult { globalSettings.AltitudeOffset = int(v.(float64)); return noSideEffects },
+	"RadarLimits": func(v interface{}) settingResult {
+		globalSettings.RadarLimits = int(v.(float64))
+		radarUpdate.SendJSON(globalSettings)
+		return noSideEffects
+	},
+	"RadarRange": func(v interface{}) settingResult {
+		globalSettings.RadarRange = int(v.(float64))
+		radarUpdate.SendJSON(globalSettings)
+		return noSideEffects
+	},
+	"PWMDutyMin": func(v interface{}) settingResult {
+		globalSettings.PWMDutyMin = int(v.(float64))
+		return settingResult{reconfigureFancontrol: true}
+	},
+
+	// String settings
+	"WatchList": func(v interface{}) settingResult { globalSettings.WatchList = v.(string); return noSideEffects },
+	"GLimits":   func(v interface{}) settingResult { globalSettings.GLimits = v.(string); return noSideEffects },
+
+	// Complex validation handlers
+	"OwnshipModeS": applyOwnshipModeS,
+	"StaticIps":    applyStaticIps,
+	"Baud":         applyBaudRate,
+
+	// WiFi settings
+	"WiFiCountry":                   func(v interface{}) settingResult { setWifiCountry(v.(string)); return noSideEffects },
+	"WiFiSSID":                      func(v interface{}) settingResult { setWifiSSID(v.(string)); return noSideEffects },
+	"WiFiChannel":                   func(v interface{}) settingResult { setWifiChannel(int(v.(float64))); return noSideEffects },
+	"WiFiSecurityEnabled":           func(v interface{}) settingResult { setWifiSecurityEnabled(v.(bool)); return noSideEffects },
+	"WiFiPassphrase":                func(v interface{}) settingResult { setWifiPassphrase(v.(string)); return noSideEffects },
+	"WiFiIPAddress":                 func(v interface{}) settingResult { setWifiIPAddress(v.(string)); return noSideEffects },
+	"WiFiMode":                      func(v interface{}) settingResult { setWiFiMode(int(v.(float64))); return noSideEffects },
+	"WiFiDirectPin":                 func(v interface{}) settingResult { setWifiDirectPin(v.(string)); return noSideEffects },
+	"WiFiClientNetworks":            applyWiFiClientNetworks,
+	"WiFiInternetPassThroughEnabled": func(v interface{}) settingResult { setWifiInternetPassthroughEnabled(v.(bool)); return noSideEffects },
+
+	// OGN settings (all trigger tracker reconfiguration)
+	"OGNAddrType": func(v interface{}) settingResult { globalSettings.OGNAddrType = int(v.(float64)); return settingResult{reconfigureTracker: true} },
+	"OGNAddr":     func(v interface{}) settingResult { globalSettings.OGNAddr = v.(string); return settingResult{reconfigureTracker: true} },
+	"OGNAcftType": func(v interface{}) settingResult { globalSettings.OGNAcftType = int(v.(float64)); return settingResult{reconfigureTracker: true} },
+	"OGNPilot":    func(v interface{}) settingResult { globalSettings.OGNPilot = v.(string); return settingResult{reconfigureTracker: true} },
+	"OGNReg":      func(v interface{}) settingResult { globalSettings.OGNReg = v.(string); return settingResult{reconfigureTracker: true} },
+	"OGNTxPower":  func(v interface{}) settingResult { globalSettings.OGNTxPower = int(v.(float64)); return settingResult{reconfigureTracker: true} },
 }
 
 // AJAX call - /setSettings. receives via POST command, any/all stratux.conf data.
@@ -518,130 +619,11 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 				reconfigureFancontrol := false
 				for key, val := range msg {
 					// log.Printf("handleSettingsSetRequest:json: testing for key:%s of type %s\n", key, reflect.TypeOf(val))
-
-					// Try simple boolean settings first
-					if boolVal, ok := val.(bool); ok {
-						if applySimpleBooleanSetting(key, boolVal) {
-							continue
-						}
-					}
-
-					// Try WiFi settings
-					if applyWiFiSetting(key, val) {
-						continue
-					}
-
-					// Try OGN settings
-					if handled, reconfig := applyOGNSetting(key, val); handled {
-						if reconfig {
-							reconfigureTracker = true
-						}
-						continue
-					}
-
-					// Handle remaining settings with special logic
-					switch key {
-					case "IMU_Sensor_Enabled":
-						globalSettings.IMU_Sensor_Enabled = val.(bool)
-						if !globalSettings.IMU_Sensor_Enabled && globalStatus.IMUConnected {
-							myIMUReader.Close()
-							globalStatus.IMUConnected = false
-						}
-					case "BMP_Sensor_Enabled":
-						globalSettings.BMP_Sensor_Enabled = val.(bool)
-						if !globalSettings.BMP_Sensor_Enabled && globalStatus.BMPConnected {
-							myPressureReader.Close()
-							globalStatus.BMPConnected = false
-						}
-					case "ReplayLog":
-						v := val.(bool)
-						if v != globalSettings.ReplayLog { // Don't mark the files unless there is a change.
-							globalSettings.ReplayLog = v
-						}
-					case "PersistentLogging":
-						globalSettings.PersistentLogging = val.(bool)
-						setPersistentLogging(globalSettings.PersistentLogging)
-					case "IMUMapping":
-						if globalSettings.IMUMapping != val.([2]int) {
-							globalSettings.IMUMapping = val.([2]int)
-							myIMUReader.Close()
-							globalStatus.IMUConnected = false // Force a restart of the IMU reader
-						}
-					case "Dump1090Gain":
-						globalSettings.Dump1090Gain = val.(float64)
-					case "PPM":
-						globalSettings.PPM = int(val.(float64))
-					case "AltitudeOffset":
-						globalSettings.AltitudeOffset = int(val.(float64))
-					case "RadarLimits":
-						globalSettings.RadarLimits = int(val.(float64))
-						radarUpdate.SendJSON(globalSettings)
-					case "RadarRange":
-						globalSettings.RadarRange = int(val.(float64))
-						radarUpdate.SendJSON(globalSettings)
-					case "Baud":
-						if globalSettings.SerialOutputs != nil {
-							for dev, serialOut := range globalSettings.SerialOutputs {
-								newBaud := int(val.(float64))
-								if newBaud == serialOut.Baud { // Same baud rate. No change.
-									continue
-								}
-								log.Printf("changing %s baud rate from %d to %d.\n", dev, serialOut.Baud, newBaud)
-								serialOut.Baud = newBaud
-								globalSettings.SerialOutputs[dev] = serialOut
-								closeSerial(dev)
-							}
-						}
-					case "WatchList":
-						globalSettings.WatchList = val.(string)
-					case "GLimits":
-						globalSettings.GLimits = val.(string)
-					case "OwnshipModeS":
-						codes := strings.Split(val.(string), ",")
-						codesFinal := make([]string, 0)
-						for _, code := range codes {
-							code = strings.Trim(code, " ")
-							// Expecting a hex string less than 6 characters (24 bits) long.
-							if len(code) > 6 { // Too long.
-								continue
-							}
-							// Pad string, must be 6 characters long.
-							vals := strings.ToUpper(code)
-							for len(vals) < 6 {
-								vals = "0" + vals
-							}
-							hexn, err := hex.DecodeString(vals)
-							if err != nil { // Number not valid.
-								log.Printf("handleSettingsSetRequest:OwnshipModeS: %s\n", err.Error())
-								continue
-							}
-							codesFinal = append(codesFinal, fmt.Sprintf("%02X%02X%02X", hexn[0], hexn[1], hexn[2]))
-						}
-						globalSettings.OwnshipModeS = strings.Join(codesFinal, ",")
-					case "StaticIps":
-						ipsStr := val.(string)
-						ips := strings.Split(ipsStr, " ")
-						if ipsStr == "" {
-							ips = make([]string, 0)
-						}
-
-						re, _ := regexp.Compile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
-						err := ""
-						for _, ip := range ips {
-							// Verify IP format
-							if !re.MatchString(ip) {
-								err = err + "Invalid IP: " + ip + ". "
-							}
-						}
-						if err != "" {
-							log.Printf("handleSettingsSetRequest:StaticIps: %s\n", err)
-							continue
-						}
-						globalSettings.StaticIps = ips
-					case "PWMDutyMin":
-						globalSettings.PWMDutyMin = int(val.(float64))
-						reconfigureFancontrol = true
-					default:
+					if handler, ok := settingHandlers[key]; ok {
+						result := handler(val)
+						reconfigureTracker = reconfigureTracker || result.reconfigureTracker
+						reconfigureFancontrol = reconfigureFancontrol || result.reconfigureFancontrol
+					} else {
 						log.Printf("handleSettingsSetRequest:json: unrecognized key:%s\n", key)
 					}
 				}

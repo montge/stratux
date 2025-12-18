@@ -9644,148 +9644,420 @@ func TestSanitizeLogString(t *testing.T) {
 	}
 }
 
-// TestApplySimpleBooleanSetting tests the applySimpleBooleanSetting helper function
-func TestApplySimpleBooleanSetting(t *testing.T) {
-	// Save original settings
-	origSettings := globalSettings
-
-	// Test cases for boolean settings
-	testCases := []struct {
-		name        string
-		key         string
-		val         bool
-		expectFound bool
-		checkField  func() bool
-	}{
-		{"DarkMode_true", "DarkMode", true, true, func() bool { return globalSettings.DarkMode }},
-		{"DarkMode_false", "DarkMode", false, true, func() bool { return !globalSettings.DarkMode }},
-		{"UAT_Enabled", "UAT_Enabled", true, true, func() bool { return globalSettings.UAT_Enabled }},
-		{"ES_Enabled", "ES_Enabled", true, true, func() bool { return globalSettings.ES_Enabled }},
-		{"OGN_Enabled", "OGN_Enabled", true, true, func() bool { return globalSettings.OGN_Enabled }},
-		{"AIS_Enabled", "AIS_Enabled", true, true, func() bool { return globalSettings.AIS_Enabled }},
-		{"APRS_Enabled", "APRS_Enabled", true, true, func() bool { return globalSettings.APRS_Enabled }},
-		{"Ping_Enabled", "Ping_Enabled", true, true, func() bool { return globalSettings.Ping_Enabled }},
-		{"Pong_Enabled", "Pong_Enabled", true, true, func() bool { return globalSettings.Pong_Enabled }},
-		{"OGNI2CTXEnabled", "OGNI2CTXEnabled", true, true, func() bool { return globalSettings.OGNI2CTXEnabled }},
-		{"GPS_Enabled", "GPS_Enabled", true, true, func() bool { return globalSettings.GPS_Enabled }},
-		{"DEBUG", "DEBUG", true, true, func() bool { return globalSettings.DEBUG }},
-		{"DisplayTrafficSource", "DisplayTrafficSource", true, true, func() bool { return globalSettings.DisplayTrafficSource }},
-		{"TraceLog", "TraceLog", true, true, func() bool { return globalSettings.TraceLog }},
-		{"AHRSLog", "AHRSLog", true, true, func() bool { return globalSettings.AHRSLog }},
-		{"EstimateBearinglessDist", "EstimateBearinglessDist", true, true, func() bool { return globalSettings.EstimateBearinglessDist }},
-		{"unknown_key", "UnknownKey", true, false, func() bool { return true }},
-		{"empty_key", "", true, false, func() bool { return true }},
+// TestSettingHandlers tests that all expected setting handlers exist in the map
+func TestSettingHandlers(t *testing.T) {
+	// List of all expected setting keys
+	expectedKeys := []string{
+		// Simple booleans
+		"DarkMode", "UAT_Enabled", "ES_Enabled", "OGN_Enabled", "AIS_Enabled",
+		"APRS_Enabled", "Ping_Enabled", "Pong_Enabled", "OGNI2CTXEnabled",
+		"GPS_Enabled", "DEBUG", "DisplayTrafficSource", "TraceLog", "AHRSLog",
+		"EstimateBearinglessDist",
+		// Booleans with side effects
+		"IMU_Sensor_Enabled", "BMP_Sensor_Enabled", "ReplayLog", "PersistentLogging", "IMUMapping",
+		// Numeric settings
+		"Dump1090Gain", "PPM", "AltitudeOffset", "RadarLimits", "RadarRange", "PWMDutyMin",
+		// String settings
+		"WatchList", "GLimits",
+		// Complex validation
+		"OwnshipModeS", "StaticIps", "Baud",
+		// WiFi settings
+		"WiFiCountry", "WiFiSSID", "WiFiChannel", "WiFiSecurityEnabled",
+		"WiFiPassphrase", "WiFiIPAddress", "WiFiMode", "WiFiDirectPin",
+		"WiFiClientNetworks", "WiFiInternetPassThroughEnabled",
+		// OGN settings
+		"OGNAddrType", "OGNAddr", "OGNAcftType", "OGNPilot", "OGNReg", "OGNTxPower",
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Reset settings
-			globalSettings = settings{}
-
-			found := applySimpleBooleanSetting(tc.key, tc.val)
-
-			if found != tc.expectFound {
-				t.Errorf("applySimpleBooleanSetting(%q, %v) returned %v, expected %v", tc.key, tc.val, found, tc.expectFound)
-			}
-
-			if tc.expectFound && !tc.checkField() {
-				t.Errorf("applySimpleBooleanSetting(%q, %v) did not set field correctly", tc.key, tc.val)
+	for _, key := range expectedKeys {
+		t.Run(key, func(t *testing.T) {
+			if _, ok := settingHandlers[key]; !ok {
+				t.Errorf("settingHandlers missing key: %s", key)
 			}
 		})
 	}
-
-	// Restore original settings
-	globalSettings = origSettings
 }
 
-// TestApplyWiFiSetting tests the applyWiFiSetting helper function
-func TestApplyWiFiSetting(t *testing.T) {
-	// Save original settings
+// TestSettingHandlersBooleanSettings tests all boolean setting handlers
+func TestSettingHandlersBooleanSettings(t *testing.T) {
 	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	boolSettings := []struct {
+		key        string
+		checkField func() bool
+	}{
+		{"DarkMode", func() bool { return globalSettings.DarkMode }},
+		{"UAT_Enabled", func() bool { return globalSettings.UAT_Enabled }},
+		{"ES_Enabled", func() bool { return globalSettings.ES_Enabled }},
+		{"OGN_Enabled", func() bool { return globalSettings.OGN_Enabled }},
+		{"AIS_Enabled", func() bool { return globalSettings.AIS_Enabled }},
+		{"APRS_Enabled", func() bool { return globalSettings.APRS_Enabled }},
+		{"Ping_Enabled", func() bool { return globalSettings.Ping_Enabled }},
+		{"Pong_Enabled", func() bool { return globalSettings.Pong_Enabled }},
+		{"OGNI2CTXEnabled", func() bool { return globalSettings.OGNI2CTXEnabled }},
+		{"GPS_Enabled", func() bool { return globalSettings.GPS_Enabled }},
+		{"DEBUG", func() bool { return globalSettings.DEBUG }},
+		{"DisplayTrafficSource", func() bool { return globalSettings.DisplayTrafficSource }},
+		{"TraceLog", func() bool { return globalSettings.TraceLog }},
+		{"AHRSLog", func() bool { return globalSettings.AHRSLog }},
+		{"EstimateBearinglessDist", func() bool { return globalSettings.EstimateBearinglessDist }},
+	}
+
+	for _, tc := range boolSettings {
+		t.Run(tc.key+"_true", func(t *testing.T) {
+			globalSettings = settings{}
+			handler := settingHandlers[tc.key]
+			result := handler(true)
+
+			if !tc.checkField() {
+				t.Errorf("handler for %s did not set field to true", tc.key)
+			}
+			if result.reconfigureTracker || result.reconfigureFancontrol {
+				t.Errorf("handler for %s should have no side effects", tc.key)
+			}
+		})
+
+		t.Run(tc.key+"_false", func(t *testing.T) {
+			globalSettings = settings{}
+			// First set to true
+			handler := settingHandlers[tc.key]
+			handler(true)
+			// Then set to false
+			handler(false)
+
+			if tc.checkField() {
+				t.Errorf("handler for %s did not set field to false", tc.key)
+			}
+		})
+	}
+}
+
+// TestSettingHandlersNumericSettings tests numeric setting handlers
+func TestSettingHandlersNumericSettings(t *testing.T) {
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	testCases := []struct {
+		key        string
+		val        float64
+		checkField func() bool
+	}{
+		{"Dump1090Gain", 25.5, func() bool { return globalSettings.Dump1090Gain == 25.5 }},
+		{"PPM", 10.0, func() bool { return globalSettings.PPM == 10 }},
+		{"AltitudeOffset", 500.0, func() bool { return globalSettings.AltitudeOffset == 500 }},
+		{"RadarLimits", 100.0, func() bool { return globalSettings.RadarLimits == 100 }},
+		{"RadarRange", 50.0, func() bool { return globalSettings.RadarRange == 50 }},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.key, func(t *testing.T) {
+			globalSettings = settings{}
+			handler := settingHandlers[tc.key]
+			result := handler(tc.val)
+
+			if !tc.checkField() {
+				t.Errorf("handler for %s did not set field correctly", tc.key)
+			}
+			if result.reconfigureTracker {
+				t.Errorf("handler for %s should not trigger tracker reconfiguration", tc.key)
+			}
+		})
+	}
+}
+
+// TestSettingHandlersStringSettings tests string setting handlers
+func TestSettingHandlersStringSettings(t *testing.T) {
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	testCases := []struct {
+		key        string
+		val        string
+		checkField func() bool
+	}{
+		{"WatchList", "KBOS KJFK", func() bool { return globalSettings.WatchList == "KBOS KJFK" }},
+		{"GLimits", "-1.5,4.0", func() bool { return globalSettings.GLimits == "-1.5,4.0" }},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.key, func(t *testing.T) {
+			globalSettings = settings{}
+			handler := settingHandlers[tc.key]
+			handler(tc.val)
+
+			if !tc.checkField() {
+				t.Errorf("handler for %s did not set field correctly", tc.key)
+			}
+		})
+	}
+}
+
+// TestSettingHandlersOGNSettings tests OGN setting handlers trigger tracker reconfiguration
+func TestSettingHandlersOGNSettings(t *testing.T) {
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	testCases := []struct {
+		key        string
+		val        interface{}
+		checkField func() bool
+	}{
+		{"OGNAddrType", float64(2), func() bool { return globalSettings.OGNAddrType == 2 }},
+		{"OGNAddr", "ABCDEF", func() bool { return globalSettings.OGNAddr == "ABCDEF" }},
+		{"OGNAcftType", float64(8), func() bool { return globalSettings.OGNAcftType == 8 }},
+		{"OGNPilot", "John Doe", func() bool { return globalSettings.OGNPilot == "John Doe" }},
+		{"OGNReg", "N12345", func() bool { return globalSettings.OGNReg == "N12345" }},
+		{"OGNTxPower", float64(10), func() bool { return globalSettings.OGNTxPower == 10 }},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.key, func(t *testing.T) {
+			globalSettings = settings{}
+			handler := settingHandlers[tc.key]
+			result := handler(tc.val)
+
+			if !tc.checkField() {
+				t.Errorf("handler for %s did not set field correctly", tc.key)
+			}
+			if !result.reconfigureTracker {
+				t.Errorf("handler for %s should trigger tracker reconfiguration", tc.key)
+			}
+		})
+	}
+}
+
+// TestSettingHandlersPWMDutyMin tests PWMDutyMin triggers fancontrol reconfiguration
+func TestSettingHandlersPWMDutyMin(t *testing.T) {
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	globalSettings = settings{}
+	handler := settingHandlers["PWMDutyMin"]
+	result := handler(float64(50))
+
+	if globalSettings.PWMDutyMin != 50 {
+		t.Error("PWMDutyMin handler did not set value correctly")
+	}
+	if !result.reconfigureFancontrol {
+		t.Error("PWMDutyMin handler should trigger fancontrol reconfiguration")
+	}
+}
+
+// TestApplyOwnshipModeS tests the OwnshipModeS handler
+func TestApplyOwnshipModeS(t *testing.T) {
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"single_code", "abc123", "ABC123"},
+		{"lowercase", "abcdef", "ABCDEF"},
+		{"short_code_padded", "123", "000123"},
+		{"multiple_codes", "abc123,def456", "ABC123,DEF456"},
+		{"with_spaces", "abc123 , def456", "ABC123,DEF456"},
+		{"empty", "", "000000"}, // Empty string gets padded to valid 6-char code
+		{"too_long_ignored", "abc1234", ""},
+		{"invalid_hex_ignored", "ghijkl", ""},
+		{"mixed_valid_invalid", "abc123,ghijkl,def456", "ABC123,DEF456"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			globalSettings = settings{}
+			result := applyOwnshipModeS(tc.input)
+
+			if globalSettings.OwnshipModeS != tc.expected {
+				t.Errorf("applyOwnshipModeS(%q) = %q, expected %q", tc.input, globalSettings.OwnshipModeS, tc.expected)
+			}
+			if result.reconfigureTracker || result.reconfigureFancontrol {
+				t.Error("applyOwnshipModeS should have no side effects")
+			}
+		})
+	}
+}
+
+// TestApplyStaticIps tests the StaticIps handler
+func TestApplyStaticIps(t *testing.T) {
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
 
 	testCases := []struct {
 		name        string
-		key         string
-		val         interface{}
-		expectFound bool
+		input       string
+		expectedIps []string
+		shouldSet   bool
 	}{
-		{"WiFiCountry", "WiFiCountry", "US", true},
-		{"WiFiSSID", "WiFiSSID", "TestNetwork", true},
-		{"WiFiChannel", "WiFiChannel", float64(6), true},
-		{"WiFiSecurityEnabled", "WiFiSecurityEnabled", true, true},
-		{"WiFiPassphrase", "WiFiPassphrase", "password123", true},
-		{"WiFiIPAddress", "WiFiIPAddress", "192.168.10.1", true},
-		{"WiFiMode", "WiFiMode", float64(1), true},
-		{"WiFiDirectPin", "WiFiDirectPin", "1234", true},
-		{"WiFiClientNetworks", "WiFiClientNetworks", []interface{}{
-			map[string]interface{}{"SSID": "Net1", "Password": "Pass1"},
-		}, true},
-		{"WiFiInternetPassThroughEnabled", "WiFiInternetPassThroughEnabled", true, true},
-		{"unknown_key", "UnknownKey", "value", false},
-		{"non_wifi_key", "DarkMode", true, false},
+		{"single_valid_ip", "192.168.1.1", []string{"192.168.1.1"}, true},
+		{"multiple_valid_ips", "192.168.1.1 10.0.0.1", []string{"192.168.1.1", "10.0.0.1"}, true},
+		{"empty_string", "", []string{}, true},
+		{"invalid_ip", "999.999.999.999", nil, false},
+		{"mixed_valid_invalid", "192.168.1.1 invalid", nil, false},
+		{"boundary_ips", "0.0.0.0 255.255.255.255", []string{"0.0.0.0", "255.255.255.255"}, true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Reset settings
 			globalSettings = settings{}
+			result := applyStaticIps(tc.input)
 
-			found := applyWiFiSetting(tc.key, tc.val)
-
-			if found != tc.expectFound {
-				t.Errorf("applyWiFiSetting(%q, %v) returned %v, expected %v", tc.key, tc.val, found, tc.expectFound)
+			if tc.shouldSet {
+				if len(globalSettings.StaticIps) != len(tc.expectedIps) {
+					t.Errorf("applyStaticIps(%q) set %d IPs, expected %d", tc.input, len(globalSettings.StaticIps), len(tc.expectedIps))
+				}
+				for i, ip := range tc.expectedIps {
+					if i < len(globalSettings.StaticIps) && globalSettings.StaticIps[i] != ip {
+						t.Errorf("applyStaticIps(%q) IP[%d] = %q, expected %q", tc.input, i, globalSettings.StaticIps[i], ip)
+					}
+				}
+			} else {
+				if len(globalSettings.StaticIps) != 0 {
+					t.Errorf("applyStaticIps(%q) should not set IPs on validation error", tc.input)
+				}
+			}
+			if result.reconfigureTracker || result.reconfigureFancontrol {
+				t.Error("applyStaticIps should have no side effects")
 			}
 		})
 	}
-
-	// Restore original settings
-	globalSettings = origSettings
 }
 
-// TestApplyOGNSetting tests the applyOGNSetting helper function
-func TestApplyOGNSetting(t *testing.T) {
-	// Save original settings
+// TestApplyWiFiClientNetworks tests the WiFiClientNetworks handler
+func TestApplyWiFiClientNetworks(t *testing.T) {
 	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
 
 	testCases := []struct {
-		name             string
-		key              string
-		val              interface{}
-		expectHandled    bool
-		expectReconfig   bool
-		checkField       func() bool
+		name     string
+		input    []interface{}
+		expected int
 	}{
-		{"OGNAddrType", "OGNAddrType", float64(2), true, true, func() bool { return globalSettings.OGNAddrType == 2 }},
-		{"OGNAddr", "OGNAddr", "ABCDEF", true, true, func() bool { return globalSettings.OGNAddr == "ABCDEF" }},
-		{"OGNAcftType", "OGNAcftType", float64(8), true, true, func() bool { return globalSettings.OGNAcftType == 8 }},
-		{"OGNPilot", "OGNPilot", "John Doe", true, true, func() bool { return globalSettings.OGNPilot == "John Doe" }},
-		{"OGNReg", "OGNReg", "N12345", true, true, func() bool { return globalSettings.OGNReg == "N12345" }},
-		{"OGNTxPower", "OGNTxPower", float64(10), true, true, func() bool { return globalSettings.OGNTxPower == 10 }},
-		{"unknown_key", "UnknownKey", "value", false, false, func() bool { return true }},
-		{"non_ogn_key", "DarkMode", true, false, false, func() bool { return true }},
+		{
+			"single_network",
+			[]interface{}{map[string]interface{}{"SSID": "Net1", "Password": "Pass1"}},
+			1,
+		},
+		{
+			"multiple_networks",
+			[]interface{}{
+				map[string]interface{}{"SSID": "Net1", "Password": "Pass1"},
+				map[string]interface{}{"SSID": "Net2", "Password": "Pass2"},
+			},
+			2,
+		},
+		{
+			"empty_list",
+			[]interface{}{},
+			0,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Reset settings
 			globalSettings = settings{}
+			result := applyWiFiClientNetworks(tc.input)
 
-			handled, reconfig := applyOGNSetting(tc.key, tc.val)
-
-			if handled != tc.expectHandled {
-				t.Errorf("applyOGNSetting(%q, %v) handled = %v, expected %v", tc.key, tc.val, handled, tc.expectHandled)
+			if len(globalSettings.WiFiClientNetworks) != tc.expected {
+				t.Errorf("applyWiFiClientNetworks set %d networks, expected %d", len(globalSettings.WiFiClientNetworks), tc.expected)
 			}
-
-			if reconfig != tc.expectReconfig {
-				t.Errorf("applyOGNSetting(%q, %v) reconfig = %v, expected %v", tc.key, tc.val, reconfig, tc.expectReconfig)
-			}
-
-			if tc.expectHandled && !tc.checkField() {
-				t.Errorf("applyOGNSetting(%q, %v) did not set field correctly", tc.key, tc.val)
+			if result.reconfigureTracker || result.reconfigureFancontrol {
+				t.Error("applyWiFiClientNetworks should have no side effects")
 			}
 		})
 	}
+}
 
-	// Restore original settings
-	globalSettings = origSettings
+// TestApplyBaudRate tests the Baud rate handler
+func TestApplyBaudRate(t *testing.T) {
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	t.Run("nil_serial_outputs", func(t *testing.T) {
+		globalSettings = settings{}
+		globalSettings.SerialOutputs = nil
+		result := applyBaudRate(float64(9600))
+
+		if result.reconfigureTracker || result.reconfigureFancontrol {
+			t.Error("applyBaudRate should have no side effects")
+		}
+	})
+
+	t.Run("empty_serial_outputs", func(t *testing.T) {
+		globalSettings = settings{}
+		globalSettings.SerialOutputs = make(map[string]serialConnection)
+		result := applyBaudRate(float64(9600))
+
+		if result.reconfigureTracker || result.reconfigureFancontrol {
+			t.Error("applyBaudRate should have no side effects")
+		}
+	})
+
+	t.Run("same_baud_rate_no_change", func(t *testing.T) {
+		globalSettings = settings{}
+		globalSettings.SerialOutputs = map[string]serialConnection{
+			"/dev/ttyUSB0": {Baud: 9600},
+		}
+		applyBaudRate(float64(9600))
+
+		// Baud should remain 9600
+		if globalSettings.SerialOutputs["/dev/ttyUSB0"].Baud != 9600 {
+			t.Error("applyBaudRate should not change baud when same")
+		}
+	})
+
+	// Note: Testing baud rate change with different values would trigger closeSerial
+	// which requires infrastructure not available in unit tests. The baud change
+	// logic is tested via the integration tests in TestHandleSettingsSetRequest_Baud.
+}
+
+// TestSettingHandlersUnknownKey tests that unknown keys are not in the map
+func TestSettingHandlersUnknownKey(t *testing.T) {
+	unknownKeys := []string{"UnknownKey", "", "invalid", "notasetting"}
+
+	for _, key := range unknownKeys {
+		t.Run(key, func(t *testing.T) {
+			if _, ok := settingHandlers[key]; ok {
+				t.Errorf("settingHandlers should not contain key: %q", key)
+			}
+		})
+	}
+}
+
+// TestSettingHandlersWiFiSettings tests WiFi setting handlers
+func TestSettingHandlersWiFiSettings(t *testing.T) {
+	origSettings := globalSettings
+	defer func() { globalSettings = origSettings }()
+
+	testCases := []struct {
+		key string
+		val interface{}
+	}{
+		{"WiFiCountry", "US"},
+		{"WiFiSSID", "TestNetwork"},
+		{"WiFiChannel", float64(6)},
+		{"WiFiSecurityEnabled", true},
+		{"WiFiPassphrase", "password123"},
+		{"WiFiIPAddress", "192.168.10.1"},
+		{"WiFiMode", float64(1)},
+		{"WiFiDirectPin", "1234"},
+		{"WiFiInternetPassThroughEnabled", true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.key, func(t *testing.T) {
+			globalSettings = settings{}
+			handler := settingHandlers[tc.key]
+			result := handler(tc.val)
+
+			if result.reconfigureTracker {
+				t.Errorf("handler for %s should not trigger tracker reconfiguration", tc.key)
+			}
+			if result.reconfigureFancontrol {
+				t.Errorf("handler for %s should not trigger fancontrol reconfiguration", tc.key)
+			}
+		})
+	}
 }
