@@ -56,7 +56,7 @@
 
 ## 8. Web UI Code Quality
 - [x] 8.1 Fix web/plates/gps.html - Add keyboard event handler to span with onclick (added ng-keydown, tabindex, role)
-- [x] 8.2 Fix web/plates/js/settings.js - Comment out debug console.log statements, fix $curFiles typo
+- [x] 8.2 Fix web/plates/js/*.js - Comment out debug console.log statements (settings.js, status.js, weather.js, developer.js), fix $curFiles typo
 
 ## 9. Shell Script Quality
 - [x] 9.1 Fix debian/*.sh shell script issues (fixed undefined variable, backtick substitution, quoting)
