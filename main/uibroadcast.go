@@ -12,6 +12,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"sync"
 	"time"
 
@@ -41,7 +42,11 @@ func (u *uibroadcaster) Send(msg []byte) {
 }
 
 func (u *uibroadcaster) SendJSON(i interface{}) {
-	j, _ := json.Marshal(&i)
+	j, err := json.Marshal(&i)
+	if err != nil {
+		log.Printf("Error marshaling JSON for broadcast: %s", err.Error())
+		return
+	}
 	u.Send(j)
 }
 

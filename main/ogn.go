@@ -338,8 +338,12 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 	seenTraffic[key] = true
 
 	if globalSettings.DEBUG {
-		txt, _ := json.Marshal(ti)
-		log.Printf("OGN traffic imported: %s", string(txt))
+		txt, err := json.Marshal(ti)
+		if err != nil {
+			log.Printf("Error marshaling OGN traffic for debug: %s", err.Error())
+		} else {
+			log.Printf("OGN traffic imported: %s", string(txt))
+		}
 	}
 }
 

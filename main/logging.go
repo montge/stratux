@@ -59,14 +59,20 @@ func rotateLogs() {
 		newPath := filepath.Join(logDirf, debugLogFile+"."+strconv.Itoa(logNum+1))
 
 		if logNum == 9 {
-			os.Remove(stratuxLogs[i])
+			if err := os.Remove(stratuxLogs[i]); err != nil {
+				log.Printf("Error removing old log file %s: %s\n", stratuxLogs[i], err.Error())
+			}
 		} else {
-			os.Rename(stratuxLogs[i], newPath)
+			if err := os.Rename(stratuxLogs[i], newPath); err != nil {
+				log.Printf("Error rotating log file %s to %s: %s\n", stratuxLogs[i], newPath, err.Error())
+			}
 		}
 	}
 
 	// Now rename current log file and re-open
-	os.Rename(debugLogf, debugLogf+".1")
+	if err := os.Rename(debugLogf, debugLogf+".1"); err != nil {
+		log.Printf("Error rotating current log file: %s\n", err.Error())
+	}
 	openLogFile()
 }
 

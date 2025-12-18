@@ -228,7 +228,11 @@ func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 	seenTraffic[key] = true
 
 	if globalSettings.DEBUG {
-		txt, _ := json.Marshal(ti)
-		log.Printf("AIS traffic imported: %s", string(txt))
+		txt, err := json.Marshal(ti)
+		if err != nil {
+			log.Printf("Error marshaling AIS traffic for debug: %s", err.Error())
+		} else {
+			log.Printf("AIS traffic imported: %s", string(txt))
+		}
 	}
 }

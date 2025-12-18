@@ -103,3 +103,21 @@
 - [x] 15.1 network.go:372,375 - Added error handling with log messages for BLE UUID parsing
 - [ ] 15.2 traffic.go:252 - Intentional ignore of unused DistRect return values (documented by Go idiom)
 - [x] 15.3 tracker.go:351 - Added error handling for strconv.Atoi calls in SoftRF config parsing
+- [x] 15.4 logging.go:62,64,69 - Added error handling for os.Remove and os.Rename in log rotation
+- [x] 15.5 managementinterface.go:640 - Added error handling for os.Remove in AHRS log deletion
+- [x] 15.6 managementinterface.go:261,268 - Added error handling for json.Marshal in status/situation handlers
+
+## 16. Debug Log Messages
+- [x] 16.1 managementinterface.go:625 - Changed "handleDeleteLogFile called!!!" to professional message
+- [x] 16.2 managementinterface.go:648 - Changed "handleDevelModeToggle called!!!" to professional message
+
+## 17. Additional JSON Marshal Error Handling
+- [x] 17.1 ais.go:231 - Added error handling in DEBUG block for AIS traffic marshal
+- [x] 17.2 ogn.go:341 - Added error handling in DEBUG block for OGN traffic marshal
+- [x] 17.3 cot-in.go:137 - Added error handling in DEBUG block for COT traffic marshal
+- [x] 17.4 uibroadcast.go:44 - Added error handling in SendJSON utility function
+- [x] 17.5 managementinterface.go:137,174 - Added error handling in handleJsonIo and handleTrafficWS
+- [x] 17.6 managementinterface.go:239,257 - Added error handling in handleStatusWS and handleSituationWS
+- [x] 17.7 managementinterface.go:615 - Added error handling in setSettings response
+- [x] 17.8 managementinterface.go:790 - Added error handling in handleClientsGetRequest
+- [x] 17.9 managementinterface.go:1239 - Added error handling in handleTilesets

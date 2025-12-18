@@ -134,7 +134,11 @@ func handleJsonIo(conn *websocket.Conn) {
 		if !traf.Position_valid { // Don't send unless a valid position exists.
 			continue
 		}
-		trafficJSON, _ := json.Marshal(&traf)
+		trafficJSON, err := json.Marshal(&traf)
+		if err != nil {
+			log.Printf("Error marshaling traffic JSON: %s", err.Error())
+			continue
+		}
 		conn.Write(trafficJSON)
 	}
 	// Subscribe the socket to receive updates.
@@ -167,7 +171,11 @@ func handleTrafficWS(conn *websocket.Conn) {
 		if !traf.Position_valid { // Don't send unless a valid position exists.
 			continue
 		}
-		trafficJSON, _ := json.Marshal(&traf)
+		trafficJSON, err := json.Marshal(&traf)
+		if err != nil {
+			log.Printf("Error marshaling traffic JSON: %s", err.Error())
+			continue
+		}
 		conn.Write(trafficJSON)
 	}
 	// Subscribe the socket to receive updates.
@@ -228,8 +236,12 @@ func handleStatusWS(conn *websocket.Conn) {
 		*/
 
 		// Send status.
-		update, _ := json.Marshal(&globalStatus)
-		_, err := conn.Write(update)
+		update, err := json.Marshal(&globalStatus)
+		if err != nil {
+			log.Printf("Error marshaling status JSON: %s", err.Error())
+			continue
+		}
+		_, err = conn.Write(update)
 
 		if err != nil {
 			//			log.Printf("Web client disconnected.\n")
@@ -242,8 +254,12 @@ func handleStatusWS(conn *websocket.Conn) {
 func handleSituationWS(conn *websocket.Conn) {
 	timer := time.NewTicker(100 * time.Millisecond)
 	for {
-		situationJSON, _ := json.Marshal(&mySituation)
-		_, err := conn.Write(situationJSON)
+		situationJSON, err := json.Marshal(&mySituation)
+		if err != nil {
+			log.Printf("Error marshaling situation JSON: %s", err.Error())
+			continue
+		}
+		_, err = conn.Write(situationJSON)
 
 		if err != nil {
 			break
@@ -258,14 +274,20 @@ func handleSituationWS(conn *websocket.Conn) {
 // a webservice call for the same data available on the websocket but when only a single update is needed
 func handleStatusRequest(w http.ResponseWriter, _ *http.Request) {
 	setJSONHeadersWithNoCache(w)
-	statusJSON, _ := json.Marshal(&globalStatus)
+	statusJSON, err := json.Marshal(&globalStatus)
+	if err != nil {
+		log.Printf("Error marshaling status JSON: %s\n", err.Error())
+	}
 	fmt.Fprintf(w, "%s\n", statusJSON)
 }
 
 // AJAX call - /getSituation. Responds with current situation (lat/lon/gdspeed/track/pitch/roll/heading/etc.)
 func handleSituationRequest(w http.ResponseWriter, _ *http.Request) {
 	setJSONHeadersWithNoCache(w)
-	situationJSON, _ := json.Marshal(&mySituation)
+	situationJSON, err := json.Marshal(&mySituation)
+	if err != nil {
+		log.Printf("Error marshaling situation JSON: %s\n", err.Error())
+	}
 	fmt.Fprintf(w, "%s\n", situationJSON)
 }
 
@@ -590,7 +612,10 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// while it may be redundant, we return the latest settings
-		settingsJSON, _ := json.Marshal(&globalSettings)
+		settingsJSON, err := json.Marshal(&globalSettings)
+		if err != nil {
+			log.Printf("Error marshaling settings JSON: %s", err.Error())
+		}
 		fmt.Fprintf(w, "%s\n", settingsJSON)
 	}
 }
@@ -616,7 +641,7 @@ var doReboot = func() {
 }
 
 func handleDeleteLogFile(_ http.ResponseWriter, _ *http.Request) {
-	log.Println("handleDeleteLogFile called!!!")
+	log.Println("Clearing debug log file")
 	clearDebugLogFile()
 }
 
@@ -631,15 +656,19 @@ func handleDeleteAHRSLogFiles(w http.ResponseWriter, _ *http.Request) {
 	for _, f := range files {
 		fn = f.Name()
 		if v, _ := filepath.Match("sensors_*.csv", fn); v {
-			os.Remove(filepath.Join(varLogDirPath, fn))
-			log.Printf("Deleting AHRS log file %s\n", fn)
+			filePath := filepath.Join(varLogDirPath, fn)
+			if err := os.Remove(filePath); err != nil {
+				log.Printf("Error deleting AHRS log file %s: %s\n", fn, err.Error())
+			} else {
+				log.Printf("Deleted AHRS log file %s\n", fn)
+			}
 		}
 		analysisLogger = nil
 	}
 }
 
 func handleDevelModeToggle(_ http.ResponseWriter, _ *http.Request) {
-	log.Printf("handleDevelModeToggle called!!!\n")
+	log.Println("Enabling developer mode")
 	globalSettings.DeveloperMode = true
 	saveSettings()
 }
@@ -758,8 +787,11 @@ func doRestartApp() {
 func handleClientsGetRequest(w http.ResponseWriter, r *http.Request) {
 	setJSONHeadersWithNoCache(w)
 	netMutex.Lock()
-	clientsJSON, _ := json.Marshal(&clientConnections)
+	clientsJSON, err := json.Marshal(&clientConnections)
 	netMutex.Unlock()
+	if err != nil {
+		log.Printf("Error marshaling clients JSON: %s", err.Error())
+	}
 	fmt.Fprintf(w, "%s\n", clientsJSON)
 }
 
@@ -1204,7 +1236,10 @@ func handleTilesets(w http.ResponseWriter, _ *http.Request) {
 			result[f.Name()] = meta
 		}
 	}
-	resJson, _ := json.Marshal(result)
+	resJson, err := json.Marshal(result)
+	if err != nil {
+		log.Printf("Error marshaling tilesets JSON: %s", err.Error())
+	}
 	w.Write(resJson)
 }
 
