@@ -143,3 +143,9 @@
 ## 21. Variable Shadowing
 - [x] 21.1 ping.go:404-405 - Renamed shadowed lat/lng to ownLat/ownLng
 - [x] 21.2 managementinterface.go:375 - Renamed shadowed val to regionStr
+
+## 22. Reliability Issues - Phase 2
+- [x] 22.1 managementinterface.go:834 - Added defer unzippedFile.Close() to fix resource leak
+- [x] 22.2 network.go:609 - Added netMutex.Lock() to fix data race in getNetworkConnsByIp
+- [x] 22.3 traffic.go:718 - Added minimum frame length validation (4 bytes for header)
+- [x] 22.4 traffic.go:760 - Added frame length check (31 bytes) for msg_type 1/3 processing

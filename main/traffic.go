@@ -722,6 +722,11 @@ func parseDownlinkReport(s string, signalLevel int) {
 	frame := make([]byte, len(s)/2)
 	hex.Decode(frame, []byte(s))
 
+	// Validate minimum frame length for header extraction (need at least 4 bytes)
+	if len(frame) < 4 {
+		return
+	}
+
 	// Extract header
 	msg_type := (uint8(frame[0]) >> 3) & 0x1f
 	addr_type := uint8(frame[0]) & 0x07
@@ -752,7 +757,8 @@ func parseDownlinkReport(s string, signalLevel int) {
 	var uat_version byte // sent as part of MS element, byte 24
 
 	// Extract parameters from Mode Status elements, if available.
-	if msg_type == 1 || msg_type == 3 {
+	// msg_type 1 or 3 requires at least 31 bytes (accesses up to frame[30])
+	if (msg_type == 1 || msg_type == 3) && len(frame) >= 31 {
 
 		// Determine UAT message version. This is needed for some capability decoding and is useful for debugging.
 		uat_version = (frame[23] >> 2) & 0x07

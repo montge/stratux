@@ -611,6 +611,8 @@ func getNetworkConnsByIp(ip string) []*networkConnection {
 	if ip == "" {
 		return conns
 	}
+	netMutex.Lock()
+	defer netMutex.Unlock()
 	// Search for any connection with the same IP to match ping responses
 	for key, conn := range clientConnections {
 		if netconn, ok := conn.(*networkConnection); ok {

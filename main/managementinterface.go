@@ -836,6 +836,7 @@ func handleDownloadAHRSLogsRequest(w http.ResponseWriter, _ *http.Request) {
 			httpErr(w, err)
 			return
 		}
+		defer unzippedFile.Close()
 
 		finfo, err := f.Info()
 		if err != nil {
