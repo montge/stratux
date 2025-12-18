@@ -92,7 +92,7 @@
 
 ## 13. High Cognitive Complexity Functions (Major Refactors)
 - [ ] 13.1 traffic.go:697 parseDownlinkReport() - 352 lines, ~44 conditionals (extract bit manipulation helpers)
-- [ ] 13.2 traffic.go:1084 parseDump1090Message() - 321 lines, ~35 conditionals (extract type-code handlers)
+- [x] 13.2 traffic.go:1111 parseDump1090Message() - extracted calculateNICFromTypeCode() helper function
 - [ ] 13.3 gps.go:1084 processNMEALineLow() - 800+ lines, ~50 conditionals (extract NMEA sentence handlers)
 - [ ] 13.4 gen_gdl90.go:1095 parseInput() - 306 lines (extract message type handlers)
 

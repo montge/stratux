@@ -2176,6 +2176,54 @@ func TestMakeTrafficReportMsg_OnGround(t *testing.T) {
 	// The on-ground flag should be encoded in the "m" field
 }
 
+// TestCalculateNICFromTypeCode tests the NIC calculation helper function
+func TestCalculateNICFromTypeCode(t *testing.T) {
+	tests := []struct {
+		typeCode    int
+		subtypeCode int
+		expected    int
+	}{
+		// TypeCode 0, 8, 18, 22 -> NIC 0
+		{0, 0, 0},
+		{8, 0, 0},
+		{18, 0, 0},
+		{22, 0, 0},
+		// TypeCode 17 -> NIC 1
+		{17, 0, 1},
+		// TypeCode 16 with subtype 1 -> NIC 3, otherwise NIC 2
+		{16, 1, 3},
+		{16, 0, 2},
+		// TypeCode 15 -> NIC 4
+		{15, 0, 4},
+		// TypeCode 14 -> NIC 5
+		{14, 0, 5},
+		// TypeCode 13 -> NIC 6
+		{13, 0, 6},
+		// TypeCode 12 -> NIC 7
+		{12, 0, 7},
+		// TypeCode 11 with subtype 1 -> NIC 9, otherwise NIC 8
+		{11, 1, 9},
+		{11, 0, 8},
+		// TypeCode 10, 21 -> NIC 10
+		{10, 0, 10},
+		{21, 0, 10},
+		// TypeCode 9, 20 -> NIC 11
+		{9, 0, 11},
+		{20, 0, 11},
+		// Unknown type codes -> NIC 0
+		{99, 0, 0},
+		{-1, 0, 0},
+	}
+
+	for _, tc := range tests {
+		result := calculateNICFromTypeCode(tc.typeCode, tc.subtypeCode)
+		if result != tc.expected {
+			t.Errorf("calculateNICFromTypeCode(%d, %d) = %d, expected %d",
+				tc.typeCode, tc.subtypeCode, result, tc.expected)
+		}
+	}
+}
+
 // TestParseDump1090Message_MissingLongitude tests handling of position message with missing longitude
 // Verifies: FR-401 (Traffic Reception - incomplete position data handling)
 func TestParseDump1090Message_MissingLongitude(t *testing.T) {

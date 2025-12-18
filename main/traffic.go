@@ -1108,6 +1108,42 @@ func esListen() {
 	}
 }
 
+// calculateNICFromTypeCode determines the Navigation Integrity Category (NIC) from
+// the ADS-B type code and subtype code. Returns 0 for unknown or invalid type codes.
+// Reference: DO-260B Table 2-74
+func calculateNICFromTypeCode(typeCode, subtypeCode int) int {
+	switch typeCode {
+	case 0, 8, 18, 22:
+		return 0
+	case 17:
+		return 1
+	case 16:
+		if subtypeCode == 1 {
+			return 3
+		}
+		return 2
+	case 15:
+		return 4
+	case 14:
+		return 5
+	case 13:
+		return 6
+	case 12:
+		return 7
+	case 11:
+		if subtypeCode == 1 {
+			return 9
+		}
+		return 8
+	case 10, 21:
+		return 10
+	case 9, 20:
+		return 11
+	default:
+		return 0
+	}
+}
+
 func parseDump1090Message(buf string) {
 	// Log the message to the message counter in any case.
 	var thisMsg msg
@@ -1307,38 +1343,7 @@ func parseDump1090Message(buf string) {
 
 	// Determine NIC (navigation integrity category) from type code and subtype code
 	if ((newTi.DF == 17) || (newTi.DF == 18)) && (newTi.TypeCode >= 5 && newTi.TypeCode <= 22) && (newTi.TypeCode != 19) {
-		nic := 0 // default for unknown or missing NIC
-		switch newTi.TypeCode {
-		case 0, 8, 18, 22:
-			nic = 0
-		case 17:
-			nic = 1
-		case 16:
-			if newTi.SubtypeCode == 1 {
-				nic = 3
-			} else {
-				nic = 2
-			}
-		case 15:
-			nic = 4
-		case 14:
-			nic = 5
-		case 13:
-			nic = 6
-		case 12:
-			nic = 7
-		case 11:
-			if newTi.SubtypeCode == 1 {
-				nic = 9
-			} else {
-				nic = 8
-			}
-		case 10, 21:
-			nic = 10
-		case 9, 20:
-			nic = 11
-		}
-		ti.NIC = nic
+		ti.NIC = calculateNICFromTypeCode(newTi.TypeCode, newTi.SubtypeCode)
 
 		if (ti.NACp < 7) && (ti.NACp < ti.NIC) {
 			ti.NACp = ti.NIC // initialize to NIC, since NIC is sent with every position report, and not all emitters report NACp.
