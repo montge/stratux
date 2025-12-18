@@ -1189,7 +1189,11 @@ func readMbTilesMetadata(fname string, db *sql.DB) map[string]string {
 	// determine extent of layer if not given.. Openlayers kinda needs this, or it can happen that it tries to do
 	// a billion request do down-scale high-res pngs that aren't even there (i.e. all 404s)
 	if _, ok := meta["bounds"]; !ok {
-		maxZoomInt, _ := strconv.ParseInt(meta["maxzoom"], 10, 32)
+		maxZoomInt, err := strconv.ParseInt(meta["maxzoom"], 10, 32)
+		if err != nil {
+			log.Printf("SQLite metadata error for %s: invalid maxzoom value", fname)
+			maxZoomInt = 0
+		}
 		rows, err = db.Query("SELECT min(tile_column), min(tile_row), max(tile_column), max(tile_row) FROM tiles WHERE zoom_level=?", maxZoomInt)
 		if err != nil {
 			log.Printf("SQLite read error %s: %s", fname, err.Error())
@@ -1286,11 +1290,23 @@ func handleTile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	idx--
-	x, _ := strconv.Atoi(parts[idx])
+	x, err := strconv.Atoi(parts[idx])
+	if err != nil {
+		http.Error(w, "Failed to parse x", 500)
+		return
+	}
 	idx--
-	z, _ := strconv.Atoi(parts[idx])
+	z, err := strconv.Atoi(parts[idx])
+	if err != nil {
+		http.Error(w, "Failed to parse z", 500)
+		return
+	}
 	idx--
-	file, _ := url.QueryUnescape(parts[idx])
+	file, err := url.QueryUnescape(parts[idx])
+	if err != nil {
+		http.Error(w, "Failed to parse file name", 500)
+		return
+	}
 	tileData, err := loadTile(file, z, x, y)
 	if err != nil {
 		http.Error(w, err.Error(), 500)

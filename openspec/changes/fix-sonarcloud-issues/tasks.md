@@ -121,3 +121,7 @@
 - [x] 17.7 managementinterface.go:615 - Added error handling in setSettings response
 - [x] 17.8 managementinterface.go:790 - Added error handling in handleClientsGetRequest
 - [x] 17.9 managementinterface.go:1239 - Added error handling in handleTilesets
+
+## 18. Strconv Error Handling
+- [x] 18.1 managementinterface.go:1192 - Added error handling for strconv.ParseInt in mbtiles metadata
+- [x] 18.2 managementinterface.go:1289,1291 - Added error handling for x, z, and file parsing in handleTile
