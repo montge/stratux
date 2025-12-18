@@ -9643,3 +9643,149 @@ func TestSanitizeLogString(t *testing.T) {
 		})
 	}
 }
+
+// TestApplySimpleBooleanSetting tests the applySimpleBooleanSetting helper function
+func TestApplySimpleBooleanSetting(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+
+	// Test cases for boolean settings
+	testCases := []struct {
+		name        string
+		key         string
+		val         bool
+		expectFound bool
+		checkField  func() bool
+	}{
+		{"DarkMode_true", "DarkMode", true, true, func() bool { return globalSettings.DarkMode }},
+		{"DarkMode_false", "DarkMode", false, true, func() bool { return !globalSettings.DarkMode }},
+		{"UAT_Enabled", "UAT_Enabled", true, true, func() bool { return globalSettings.UAT_Enabled }},
+		{"ES_Enabled", "ES_Enabled", true, true, func() bool { return globalSettings.ES_Enabled }},
+		{"OGN_Enabled", "OGN_Enabled", true, true, func() bool { return globalSettings.OGN_Enabled }},
+		{"AIS_Enabled", "AIS_Enabled", true, true, func() bool { return globalSettings.AIS_Enabled }},
+		{"APRS_Enabled", "APRS_Enabled", true, true, func() bool { return globalSettings.APRS_Enabled }},
+		{"Ping_Enabled", "Ping_Enabled", true, true, func() bool { return globalSettings.Ping_Enabled }},
+		{"Pong_Enabled", "Pong_Enabled", true, true, func() bool { return globalSettings.Pong_Enabled }},
+		{"OGNI2CTXEnabled", "OGNI2CTXEnabled", true, true, func() bool { return globalSettings.OGNI2CTXEnabled }},
+		{"GPS_Enabled", "GPS_Enabled", true, true, func() bool { return globalSettings.GPS_Enabled }},
+		{"DEBUG", "DEBUG", true, true, func() bool { return globalSettings.DEBUG }},
+		{"DisplayTrafficSource", "DisplayTrafficSource", true, true, func() bool { return globalSettings.DisplayTrafficSource }},
+		{"TraceLog", "TraceLog", true, true, func() bool { return globalSettings.TraceLog }},
+		{"AHRSLog", "AHRSLog", true, true, func() bool { return globalSettings.AHRSLog }},
+		{"EstimateBearinglessDist", "EstimateBearinglessDist", true, true, func() bool { return globalSettings.EstimateBearinglessDist }},
+		{"unknown_key", "UnknownKey", true, false, func() bool { return true }},
+		{"empty_key", "", true, false, func() bool { return true }},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset settings
+			globalSettings = settings{}
+
+			found := applySimpleBooleanSetting(tc.key, tc.val)
+
+			if found != tc.expectFound {
+				t.Errorf("applySimpleBooleanSetting(%q, %v) returned %v, expected %v", tc.key, tc.val, found, tc.expectFound)
+			}
+
+			if tc.expectFound && !tc.checkField() {
+				t.Errorf("applySimpleBooleanSetting(%q, %v) did not set field correctly", tc.key, tc.val)
+			}
+		})
+	}
+
+	// Restore original settings
+	globalSettings = origSettings
+}
+
+// TestApplyWiFiSetting tests the applyWiFiSetting helper function
+func TestApplyWiFiSetting(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+
+	testCases := []struct {
+		name        string
+		key         string
+		val         interface{}
+		expectFound bool
+	}{
+		{"WiFiCountry", "WiFiCountry", "US", true},
+		{"WiFiSSID", "WiFiSSID", "TestNetwork", true},
+		{"WiFiChannel", "WiFiChannel", float64(6), true},
+		{"WiFiSecurityEnabled", "WiFiSecurityEnabled", true, true},
+		{"WiFiPassphrase", "WiFiPassphrase", "password123", true},
+		{"WiFiIPAddress", "WiFiIPAddress", "192.168.10.1", true},
+		{"WiFiMode", "WiFiMode", float64(1), true},
+		{"WiFiDirectPin", "WiFiDirectPin", "1234", true},
+		{"WiFiClientNetworks", "WiFiClientNetworks", []interface{}{
+			map[string]interface{}{"SSID": "Net1", "Password": "Pass1"},
+		}, true},
+		{"WiFiInternetPassThroughEnabled", "WiFiInternetPassThroughEnabled", true, true},
+		{"unknown_key", "UnknownKey", "value", false},
+		{"non_wifi_key", "DarkMode", true, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset settings
+			globalSettings = settings{}
+
+			found := applyWiFiSetting(tc.key, tc.val)
+
+			if found != tc.expectFound {
+				t.Errorf("applyWiFiSetting(%q, %v) returned %v, expected %v", tc.key, tc.val, found, tc.expectFound)
+			}
+		})
+	}
+
+	// Restore original settings
+	globalSettings = origSettings
+}
+
+// TestApplyOGNSetting tests the applyOGNSetting helper function
+func TestApplyOGNSetting(t *testing.T) {
+	// Save original settings
+	origSettings := globalSettings
+
+	testCases := []struct {
+		name             string
+		key              string
+		val              interface{}
+		expectHandled    bool
+		expectReconfig   bool
+		checkField       func() bool
+	}{
+		{"OGNAddrType", "OGNAddrType", float64(2), true, true, func() bool { return globalSettings.OGNAddrType == 2 }},
+		{"OGNAddr", "OGNAddr", "ABCDEF", true, true, func() bool { return globalSettings.OGNAddr == "ABCDEF" }},
+		{"OGNAcftType", "OGNAcftType", float64(8), true, true, func() bool { return globalSettings.OGNAcftType == 8 }},
+		{"OGNPilot", "OGNPilot", "John Doe", true, true, func() bool { return globalSettings.OGNPilot == "John Doe" }},
+		{"OGNReg", "OGNReg", "N12345", true, true, func() bool { return globalSettings.OGNReg == "N12345" }},
+		{"OGNTxPower", "OGNTxPower", float64(10), true, true, func() bool { return globalSettings.OGNTxPower == 10 }},
+		{"unknown_key", "UnknownKey", "value", false, false, func() bool { return true }},
+		{"non_ogn_key", "DarkMode", true, false, false, func() bool { return true }},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset settings
+			globalSettings = settings{}
+
+			handled, reconfig := applyOGNSetting(tc.key, tc.val)
+
+			if handled != tc.expectHandled {
+				t.Errorf("applyOGNSetting(%q, %v) handled = %v, expected %v", tc.key, tc.val, handled, tc.expectHandled)
+			}
+
+			if reconfig != tc.expectReconfig {
+				t.Errorf("applyOGNSetting(%q, %v) reconfig = %v, expected %v", tc.key, tc.val, reconfig, tc.expectReconfig)
+			}
+
+			if tc.expectHandled && !tc.checkField() {
+				t.Errorf("applyOGNSetting(%q, %v) did not set field correctly", tc.key, tc.val)
+			}
+		})
+	}
+
+	// Restore original settings
+	globalSettings = origSettings
+}

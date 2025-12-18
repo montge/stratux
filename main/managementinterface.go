@@ -393,6 +393,104 @@ func handleRegionSet(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// applySimpleBooleanSetting applies a simple boolean setting that requires no side effects.
+// Returns true if the key was handled.
+func applySimpleBooleanSetting(key string, val bool) bool {
+	switch key {
+	case "DarkMode":
+		globalSettings.DarkMode = val
+	case "UAT_Enabled":
+		globalSettings.UAT_Enabled = val
+	case "ES_Enabled":
+		globalSettings.ES_Enabled = val
+	case "OGN_Enabled":
+		globalSettings.OGN_Enabled = val
+	case "AIS_Enabled":
+		globalSettings.AIS_Enabled = val
+	case "APRS_Enabled":
+		globalSettings.APRS_Enabled = val
+	case "Ping_Enabled":
+		globalSettings.Ping_Enabled = val
+	case "Pong_Enabled":
+		globalSettings.Pong_Enabled = val
+	case "OGNI2CTXEnabled":
+		globalSettings.OGNI2CTXEnabled = val
+	case "GPS_Enabled":
+		globalSettings.GPS_Enabled = val
+	case "DEBUG":
+		globalSettings.DEBUG = val
+	case "DisplayTrafficSource":
+		globalSettings.DisplayTrafficSource = val
+	case "TraceLog":
+		globalSettings.TraceLog = val
+	case "AHRSLog":
+		globalSettings.AHRSLog = val
+	case "EstimateBearinglessDist":
+		globalSettings.EstimateBearinglessDist = val
+	default:
+		return false
+	}
+	return true
+}
+
+// applyWiFiSetting applies WiFi-related settings.
+// Returns true if the key was handled.
+func applyWiFiSetting(key string, val interface{}) bool {
+	switch key {
+	case "WiFiCountry":
+		setWifiCountry(val.(string))
+	case "WiFiSSID":
+		setWifiSSID(val.(string))
+	case "WiFiChannel":
+		setWifiChannel(int(val.(float64)))
+	case "WiFiSecurityEnabled":
+		setWifiSecurityEnabled(val.(bool))
+	case "WiFiPassphrase":
+		setWifiPassphrase(val.(string))
+	case "WiFiIPAddress":
+		setWifiIPAddress(val.(string))
+	case "WiFiMode":
+		setWiFiMode(int(val.(float64)))
+	case "WiFiDirectPin":
+		setWifiDirectPin(val.(string))
+	case "WiFiClientNetworks":
+		var networks = make([]wifiClientNetwork, 0)
+		for _, rawNetwork := range val.([]interface{}) {
+			network := rawNetwork.(map[string]interface{})
+			networks = append(networks, wifiClientNetwork{network["SSID"].(string), network["Password"].(string)})
+		}
+		setWifiClientNetworks(networks)
+	case "WiFiInternetPassThroughEnabled":
+		setWifiInternetPassthroughEnabled(val.(bool))
+	default:
+		return false
+	}
+	return true
+}
+
+// applyOGNSetting applies OGN tracker-related settings.
+// Returns (handled, reconfigureTracker) - handled indicates if the key was processed,
+// reconfigureTracker indicates if the tracker needs to be reconfigured.
+func applyOGNSetting(key string, val interface{}) (bool, bool) {
+	switch key {
+	case "OGNAddrType":
+		globalSettings.OGNAddrType = int(val.(float64))
+	case "OGNAddr":
+		globalSettings.OGNAddr = val.(string)
+	case "OGNAcftType":
+		globalSettings.OGNAcftType = int(val.(float64))
+	case "OGNPilot":
+		globalSettings.OGNPilot = val.(string)
+	case "OGNReg":
+		globalSettings.OGNReg = val.(string)
+	case "OGNTxPower":
+		globalSettings.OGNTxPower = int(val.(float64))
+	default:
+		return false, false
+	}
+	return true, true
+}
+
 // AJAX call - /setSettings. receives via POST command, any/all stratux.conf data.
 func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
@@ -420,27 +518,29 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 				reconfigureFancontrol := false
 				for key, val := range msg {
 					// log.Printf("handleSettingsSetRequest:json: testing for key:%s of type %s\n", key, reflect.TypeOf(val))
+
+					// Try simple boolean settings first
+					if boolVal, ok := val.(bool); ok {
+						if applySimpleBooleanSetting(key, boolVal) {
+							continue
+						}
+					}
+
+					// Try WiFi settings
+					if applyWiFiSetting(key, val) {
+						continue
+					}
+
+					// Try OGN settings
+					if handled, reconfig := applyOGNSetting(key, val); handled {
+						if reconfig {
+							reconfigureTracker = true
+						}
+						continue
+					}
+
+					// Handle remaining settings with special logic
 					switch key {
-					case "DarkMode":
-						globalSettings.DarkMode = val.(bool)
-					case "UAT_Enabled":
-						globalSettings.UAT_Enabled = val.(bool)
-					case "ES_Enabled":
-						globalSettings.ES_Enabled = val.(bool)
-					case "OGN_Enabled":
-						globalSettings.OGN_Enabled = val.(bool)
-					case "AIS_Enabled":
-						globalSettings.AIS_Enabled = val.(bool)
-					case "APRS_Enabled":
-						globalSettings.APRS_Enabled = val.(bool)
-					case "Ping_Enabled":
-						globalSettings.Ping_Enabled = val.(bool)
-					case "Pong_Enabled":
-						globalSettings.Pong_Enabled = val.(bool)
-					case "OGNI2CTXEnabled":
-						globalSettings.OGNI2CTXEnabled = val.(bool)
-					case "GPS_Enabled":
-						globalSettings.GPS_Enabled = val.(bool)
 					case "IMU_Sensor_Enabled":
 						globalSettings.IMU_Sensor_Enabled = val.(bool)
 						if !globalSettings.IMU_Sensor_Enabled && globalStatus.IMUConnected {
@@ -453,19 +553,11 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 							myPressureReader.Close()
 							globalStatus.BMPConnected = false
 						}
-					case "DEBUG":
-						globalSettings.DEBUG = val.(bool)
-					case "DisplayTrafficSource":
-						globalSettings.DisplayTrafficSource = val.(bool)
 					case "ReplayLog":
 						v := val.(bool)
 						if v != globalSettings.ReplayLog { // Don't mark the files unless there is a change.
 							globalSettings.ReplayLog = v
 						}
-					case "TraceLog":
-						globalSettings.TraceLog = val.(bool)
-					case "AHRSLog":
-						globalSettings.AHRSLog = val.(bool)
 					case "PersistentLogging":
 						globalSettings.PersistentLogging = val.(bool)
 						setPersistentLogging(globalSettings.PersistentLogging)
@@ -476,7 +568,7 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 							globalStatus.IMUConnected = false // Force a restart of the IMU reader
 						}
 					case "Dump1090Gain":
-						globalSettings.Dump1090Gain = (val.(float64))
+						globalSettings.Dump1090Gain = val.(float64)
 					case "PPM":
 						globalSettings.PPM = int(val.(float64))
 					case "AltitudeOffset":
@@ -546,56 +638,9 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 							continue
 						}
 						globalSettings.StaticIps = ips
-					case "WiFiCountry":
-						setWifiCountry(val.(string))
-					case "WiFiSSID":
-						setWifiSSID(val.(string))
-					case "WiFiChannel":
-						setWifiChannel(int(val.(float64)))
-					case "WiFiSecurityEnabled":
-						setWifiSecurityEnabled(val.(bool))
-					case "WiFiPassphrase":
-						setWifiPassphrase(val.(string))
-					case "WiFiIPAddress":
-						setWifiIPAddress(val.(string))
-					case "WiFiMode":
-						setWiFiMode(int(val.(float64)))
-					case "WiFiDirectPin":
-						setWifiDirectPin(val.(string))
-					case "WiFiClientNetworks":
-						var networks = make([]wifiClientNetwork, 0)
-						for _, rawNetwork := range val.([]interface{}) {
-							network := rawNetwork.(map[string]interface{})
-							networks = append(networks, wifiClientNetwork{network["SSID"].(string), network["Password"].(string)})
-						}
-						setWifiClientNetworks(networks)
-					case "WiFiInternetPassThroughEnabled":
-						setWifiInternetPassthroughEnabled(val.(bool))
-					case "EstimateBearinglessDist":
-						globalSettings.EstimateBearinglessDist = val.(bool)
-
-					case "OGNAddrType":
-						globalSettings.OGNAddrType = int(val.(float64))
-						reconfigureTracker = true
-					case "OGNAddr":
-						globalSettings.OGNAddr = val.(string)
-						reconfigureTracker = true
-					case "OGNAcftType":
-						globalSettings.OGNAcftType = int(val.(float64))
-						reconfigureTracker = true
-					case "OGNPilot":
-						globalSettings.OGNPilot = val.(string)
-						reconfigureTracker = true
-					case "OGNReg":
-						globalSettings.OGNReg = val.(string)
-						reconfigureTracker = true
-					case "OGNTxPower":
-						globalSettings.OGNTxPower = int(val.(float64))
-						reconfigureTracker = true
 					case "PWMDutyMin":
 						globalSettings.PWMDutyMin = int(val.(float64))
 						reconfigureFancontrol = true
-
 					default:
 						log.Printf("handleSettingsSetRequest:json: unrecognized key:%s\n", key)
 					}

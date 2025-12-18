@@ -14,7 +14,7 @@
 ## 3. Critical Code Smells - Production Code
 - [x] 3.1 Fix gps.go - Reduce cognitive complexity by extracting processNMEAMessages()
 - [x] 3.2 Fix managementinterface.go - Define constant for "/mapdata/styles/" (done in previous session)
-- [ ] 3.3 Fix managementinterface.go:401 - Reduce switch branches from 48 to 30 (deferred - significant refactor)
+- [x] 3.3 Fix managementinterface.go - Reduce switch branches from 47 to 16 (extracted applySimpleBooleanSetting, applyWiFiSetting, applyOGNSetting helpers)
 
 ## 4. Major Code Smells - Production Code (Unused Parameters)
 - [x] 4.1 Fix managementinterface.go - handleRegionGet unused 'r'
@@ -163,21 +163,21 @@
 
 # Summary
 
-## Completed: 100 of 109 tasks (92%)
+## Completed: 101 of 109 tasks (93%)
 
 ### Key Improvements Made:
 1. **Reliability Issues Fixed**: Transaction rollback handling, void function usage, deprecated HTML elements, missing lang attributes, duplicate CSS
 2. **Cognitive Complexity Reduced**: Extracted helper functions (processNMEAMessages, decodeBase40Callsign, calculateNICFromTypeCode, determineUATMessageType, identifySatellite, recordGPSPerfStats)
-3. **Unused Parameters**: Fixed 19 unused parameters in production code, 3 in test mocks
-4. **FIXME Comments**: Converted 7 FIXME comments to descriptive notes
-5. **Magic Numbers**: Defined 11 constants for magic numbers in production code
-6. **Error Handling**: Added error handling for 12+ ignored error returns
-7. **Code Quality**: Fixed redundant boolean comparisons (13), type conversions (5), variable shadowing (2)
-8. **Logging**: Replaced 5 fmt.Print calls with log.Printf for consistency
-9. **Code Sync**: Added SYNC WARNING comments for GPS type enumeration between Go and JS
+3. **Switch Branch Reduction**: Reduced handleSettingsSetRequest switch from 47 to 16 branches by extracting applySimpleBooleanSetting, applyWiFiSetting, applyOGNSetting helpers
+4. **Unused Parameters**: Fixed 19 unused parameters in production code, 3 in test mocks
+5. **FIXME Comments**: Converted 7 FIXME comments to descriptive notes
+6. **Magic Numbers**: Defined 11 constants for magic numbers in production code
+7. **Error Handling**: Added error handling for 12+ ignored error returns
+8. **Code Quality**: Fixed redundant boolean comparisons (13), type conversions (5), variable shadowing (2)
+9. **Logging**: Replaced 5 fmt.Print calls with log.Printf for consistency
+10. **Code Sync**: Added SYNC WARNING comments for GPS type enumeration between Go and JS
 
 ### Remaining (Deferred):
-- 3.3: Reduce managementinterface.go switch branches (significant refactor)
 - 7.2, 7.3: Test code quality improvements (lower priority)
 - 11.4, 12.4-12.6: Additional TODO/FIXME comments (deferred)
 
