@@ -40,6 +40,34 @@ const (
 	SAT_TYPE_SBAS    = 10 // NMEA IDs 33-54
 )
 
+// identifySatellite returns the satellite type and identifier string for a given NMEA satellite number.
+// The NMEA satellite numbering follows standard conventions:
+//   - 1-32: GPS satellites (Gxx)
+//   - 33-64: SBAS satellites, PRN = sv+87 (Sxxx)
+//   - 65-96: GLONASS satellites, slot = sv-64 (Rxx)
+//   - 152-158: SBAS satellites (Sxxx)
+//   - 193-202: QZSS satellites, PRN = sv-192 (Qxx)
+//   - 301-336: Galileo satellites, PRN = sv-300 (Exx)
+//   - 401-463: BeiDou satellites, PRN = sv-400 (Bxx)
+func identifySatellite(sv int) (satType uint8, satStr string) {
+	if sv <= 32 {
+		return SAT_TYPE_GPS, fmt.Sprintf("G%d", sv)
+	} else if sv <= 64 {
+		return SAT_TYPE_SBAS, fmt.Sprintf("S%d", sv+87)
+	} else if sv <= 96 {
+		return SAT_TYPE_GLONASS, fmt.Sprintf("R%d", sv-64)
+	} else if sv <= 158 {
+		return SAT_TYPE_SBAS, fmt.Sprintf("S%d", sv)
+	} else if sv <= 202 {
+		return SAT_TYPE_QZSS, fmt.Sprintf("Q%d", sv-192)
+	} else if sv <= 336 {
+		return SAT_TYPE_GALILEO, fmt.Sprintf("E%d", sv-300)
+	} else if sv <= 463 {
+		return SAT_TYPE_BEIDOU, fmt.Sprintf("B%d", sv-400)
+	}
+	return SAT_TYPE_UNKNOWN, fmt.Sprintf("U%d", sv)
+}
+
 const (
 	BARO_TYPE_NONE         = 0 // No baro present
 	BARO_TYPE_BMP280       = 1 // Stratux AHRS module or similar internal baro
@@ -1452,8 +1480,6 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		}
 
 		// fields 3-14: satellites in solution
-		var svStr string
-		var svType uint8
 
 		// START OF PROTECTED BLOCK
 		mySituation.muSatellite.Lock()
@@ -1461,31 +1487,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		for _, svtxt := range x[3:15] {
 			sv, err := strconv.Atoi(svtxt)
 			if err == nil {
-				if sv <= 32 {
-					svType = SAT_TYPE_GPS
-					svStr = fmt.Sprintf("G%d", sv) // GPS 1-32
-				} else if sv <= 64 {
-					svType = SAT_TYPE_SBAS
-					svStr = fmt.Sprintf("S%d", sv+87) // SBAS 33-64, 33 = SBAS PRN 120
-				} else if sv <= 96 {
-					svType = SAT_TYPE_GLONASS
-					svStr = fmt.Sprintf("R%d", sv-64) // GLONASS 65-96
-				} else if sv <= 158 {
-					svType = SAT_TYPE_SBAS
-					svStr = fmt.Sprintf("S%d", sv) // SBAS 152-158
-				} else if sv <= 202 {
-					svType = SAT_TYPE_QZSS
-					svStr = fmt.Sprintf("Q%d", sv-192) // QZSS 193-202
-				} else if sv <= 336 {
-					svType = SAT_TYPE_GALILEO
-					svStr = fmt.Sprintf("E%d", sv-300) // GALILEO 301-336
-				} else if sv <= 463 {
-					svType = SAT_TYPE_BEIDOU
-					svStr = fmt.Sprintf("B%d", sv-400) // BEIDOU 401-463
-				} else {
-					svType = SAT_TYPE_UNKNOWN
-					svStr = fmt.Sprintf("U%d", sv)
-				}
+				svType, svStr := identifySatellite(sv)
 
 				var thisSatellite SatelliteInfo
 
@@ -1501,12 +1503,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 					} else {
 						thisSatellite.SatelliteNMEA = uint8(sv)
 					}
-					// Bounds checking: ensure type fits in uint8 range
-					if svType < 0 || svType > 255 {
-						thisSatellite.Type = 0 // Use 0 (unknown) if out of range
-					} else {
-						thisSatellite.Type = uint8(svType)
-					}
+					thisSatellite.Type = svType
 					//log.Printf("Creating new satellite %s from GSA message\n", svStr) // DEBUG
 				}
 				thisSatellite.InSolution = true
@@ -1636,8 +1633,6 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		logDbg("%s message [%d of %d] is %v fields long and describes %v satellites\n", x[0], msgIndex, msgNum, lenGSV, satsThisMsg)
 
 		var sv, elev, az, cno int
-		var svType uint8
-		var svStr string
 
 		for i := 0; i < satsThisMsg; i++ {
 
@@ -1646,31 +1641,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 				return false
 			}
 
-			if sv <= 32 {
-				svType = SAT_TYPE_GPS
-				svStr = fmt.Sprintf("G%d", sv) // GPS 1-32
-			} else if sv <= 64 {
-				svType = SAT_TYPE_SBAS
-				svStr = fmt.Sprintf("S%d", sv+87) // SBAS 33-64, 33 = SBAS PRN 120
-			} else if sv <= 96 {
-				svType = SAT_TYPE_GLONASS
-				svStr = fmt.Sprintf("R%d", sv-64) // GLONASS 65-96
-			} else if sv <= 158 {
-				svType = SAT_TYPE_SBAS
-				svStr = fmt.Sprintf("S%d", sv) // SBAS 152-158
-			} else if sv <= 202 {
-				svType = SAT_TYPE_QZSS
-				svStr = fmt.Sprintf("Q%d", sv-192) // QZSS 193-202
-			} else if sv <= 336 {
-				svType = SAT_TYPE_GALILEO
-				svStr = fmt.Sprintf("E%d", sv-300) // GALILEO 301-336
-			} else if sv <= 463 {
-				svType = SAT_TYPE_BEIDOU
-				svStr = fmt.Sprintf("B%d", sv-400) // BEIDOU 401-463
-			} else {
-				svType = SAT_TYPE_UNKNOWN
-				svStr = fmt.Sprintf("U%d", sv)
-			}
+			svType, svStr := identifySatellite(sv)
 
 			var thisSatellite SatelliteInfo
 
@@ -1689,12 +1660,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 				} else {
 					thisSatellite.SatelliteNMEA = uint8(sv)
 				}
-				// Bounds checking: ensure type fits in uint8 range
-				if svType < 0 || svType > 255 {
-					thisSatellite.Type = 0 // Use 0 (unknown) if out of range
-				} else {
-					thisSatellite.Type = uint8(svType)
-				}
+				thisSatellite.Type = svType
 				//log.Printf("Creating new satellite %s\n", svStr) // DEBUG
 			}
 			thisSatellite.TimeLastTracked = stratuxClock.Time

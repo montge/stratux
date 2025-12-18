@@ -47,6 +47,75 @@ func tearDown() {
 	// Currently no cleanup needed
 }
 
+// TestIdentifySatellite tests the satellite type identification helper function
+func TestIdentifySatellite(t *testing.T) {
+	testCases := []struct {
+		name         string
+		svNumber     int
+		expectedType uint8
+		expectedStr  string
+	}{
+		// GPS satellites (1-32)
+		{"GPS satellite 1", 1, SAT_TYPE_GPS, "G1"},
+		{"GPS satellite 16", 16, SAT_TYPE_GPS, "G16"},
+		{"GPS satellite 32", 32, SAT_TYPE_GPS, "G32"},
+
+		// SBAS satellites (33-64, PRN = sv+87)
+		{"SBAS satellite 33 (PRN 120)", 33, SAT_TYPE_SBAS, "S120"},
+		{"SBAS satellite 48 (PRN 135)", 48, SAT_TYPE_SBAS, "S135"},
+		{"SBAS satellite 64 (PRN 151)", 64, SAT_TYPE_SBAS, "S151"},
+
+		// GLONASS satellites (65-96, slot = sv-64)
+		{"GLONASS satellite 65 (slot 1)", 65, SAT_TYPE_GLONASS, "R1"},
+		{"GLONASS satellite 80 (slot 16)", 80, SAT_TYPE_GLONASS, "R16"},
+		{"GLONASS satellite 96 (slot 32)", 96, SAT_TYPE_GLONASS, "R32"},
+
+		// SBAS satellites (152-158)
+		{"SBAS satellite 152", 152, SAT_TYPE_SBAS, "S152"},
+		{"SBAS satellite 158", 158, SAT_TYPE_SBAS, "S158"},
+
+		// QZSS satellites (193-202, PRN = sv-192)
+		{"QZSS satellite 193 (PRN 1)", 193, SAT_TYPE_QZSS, "Q1"},
+		{"QZSS satellite 197 (PRN 5)", 197, SAT_TYPE_QZSS, "Q5"},
+		{"QZSS satellite 202 (PRN 10)", 202, SAT_TYPE_QZSS, "Q10"},
+
+		// Galileo satellites (301-336, PRN = sv-300)
+		{"Galileo satellite 301 (PRN 1)", 301, SAT_TYPE_GALILEO, "E1"},
+		{"Galileo satellite 320 (PRN 20)", 320, SAT_TYPE_GALILEO, "E20"},
+		{"Galileo satellite 336 (PRN 36)", 336, SAT_TYPE_GALILEO, "E36"},
+
+		// BeiDou satellites (401-463, PRN = sv-400)
+		{"BeiDou satellite 401 (PRN 1)", 401, SAT_TYPE_BEIDOU, "B1"},
+		{"BeiDou satellite 430 (PRN 30)", 430, SAT_TYPE_BEIDOU, "B30"},
+		{"BeiDou satellite 463 (PRN 63)", 463, SAT_TYPE_BEIDOU, "B63"},
+
+		// Unknown satellites (> 463)
+		{"Unknown satellite 464", 464, SAT_TYPE_UNKNOWN, "U464"},
+		{"Unknown satellite 500", 500, SAT_TYPE_UNKNOWN, "U500"},
+
+		// Edge cases
+		{"Boundary: GPS/SBAS (32)", 32, SAT_TYPE_GPS, "G32"},
+		{"Boundary: SBAS/GLONASS (64)", 64, SAT_TYPE_SBAS, "S151"},
+		{"Boundary: GLONASS/gap (96)", 96, SAT_TYPE_GLONASS, "R32"},
+		{"Gap: 97 (mapped to SBAS)", 97, SAT_TYPE_SBAS, "S97"},
+		{"Boundary: gap/SBAS (152)", 152, SAT_TYPE_SBAS, "S152"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			satType, satStr := identifySatellite(tc.svNumber)
+			if satType != tc.expectedType {
+				t.Errorf("identifySatellite(%d) type = %d, expected %d",
+					tc.svNumber, satType, tc.expectedType)
+			}
+			if satStr != tc.expectedStr {
+				t.Errorf("identifySatellite(%d) str = %q, expected %q",
+					tc.svNumber, satStr, tc.expectedStr)
+			}
+		})
+	}
+}
+
 // TestChksumUBX tests UBX checksum calculation
 func TestChksumUBX(t *testing.T) {
 	testCases := []struct {
