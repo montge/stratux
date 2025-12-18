@@ -1927,7 +1927,7 @@ func baroAltGuesser() {
 				// Check if this ti is potentially an outlier/invalid data..
 				estimatedDiff := float64(ti.Alt)*slope + intercept
 				if math.Abs(float64(ti.GnssDiffFromBaroAlt)-estimatedDiff) > 400 {
-					fmt.Printf("Ignoring %d, alt=%d for baro computation. Expected GnssDiff: %f, Received: %d \n", ti.Icao_addr, ti.Alt, estimatedDiff, ti.GnssDiffFromBaroAlt)
+					log.Printf("Ignoring %d, alt=%d for baro computation. Expected GnssDiff: %f, Received: %d", ti.Icao_addr, ti.Alt, estimatedDiff, ti.GnssDiffFromBaroAlt)
 					continue
 				}
 			}
@@ -2002,7 +2002,7 @@ func processNMEAMessages(line string) {
 		// Add back the $ prefix that was removed by Split
 		msg = "$" + msg
 		if !processNMEALine(msg) && globalSettings.DEBUG {
-			fmt.Printf("processNMEALine() exited early -- %s\n", msg)
+			log.Printf("processNMEALine() exited early -- %s", msg)
 		}
 	}
 }

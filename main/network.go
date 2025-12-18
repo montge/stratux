@@ -207,14 +207,14 @@ func serialOutWatcher() {
 func tcpNMEAOutListener() {
 	ln, err := net.Listen("tcp", ":2000")
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("tcpNMEAOutListener: error listening on port 2000: %s", err.Error())
 		return
 	}
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			fmt.Println(err)
+			log.Printf("tcpNMEAOutListener: error accepting connection: %s", err.Error())
 			continue
 		}
 		key := "TCP:" + conn.RemoteAddr().String()

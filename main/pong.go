@@ -275,9 +275,8 @@ func pongRunUpdateWithOutput() error {
 
 	if err := cmd.Wait(); err != nil {
 		return err
-	} else {
-		fmt.Printf("Update pong completed with success\n")
 	}
+	log.Printf("Update pong completed with success")
 	return nil
 }
 

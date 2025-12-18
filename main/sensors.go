@@ -51,7 +51,7 @@ func initI2CSensors() {
 		if err := recover(); err != nil {
 			// still want to update status in case external GPS delivers pressure data (OGN Tracker, SoftRF with BMP)
 			// This usually happens on X86, where there is no embd supported I2C
-			fmt.Println("Panic during i2c initialization!")
+			log.Printf("Panic during i2c initialization: %v", err)
 			go updateAHRSStatus()
 		}
 	}()
