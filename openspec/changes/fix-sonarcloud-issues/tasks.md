@@ -2,7 +2,7 @@
 
 ## 1. Configuration & Exclusions
 - [x] 1.1 Configure SonarCloud to exclude third-party directories (dump978/, web/maui/, test/metar-to-text/)
-- [ ] 1.2 Verify exclusion reduces issue count appropriately
+- [x] 1.2 Verify exclusion reduces issue count (third-party bugs marked CLOSED, only 0 open bugs remain)
 
 ## 2. Reliability Issues (Bugs) - HIGH PRIORITY
 - [x] 2.1 Fix datalog.go:439 - Add `defer tx.Rollback()` after `db.Begin()` error check
@@ -10,6 +10,7 @@
 - [x] 2.3 Fix web/plates/status.html - Remove deprecated `<tt>` element
 - [x] 2.4 Fix web/index.html - Add lang attribute to html element
 - [x] 2.5 Fix web/css/main.css - Remove duplicate border-bottom
+- [x] 2.6 Fix web/plates/js/map.js:221 - Remove unreachable code after switch default
 
 ## 3. Critical Code Smells - Production Code
 - [x] 3.1 Fix gps.go - Reduce cognitive complexity by extracting processNMEAMessages()
@@ -63,7 +64,7 @@
 - [x] 9.2 Fix scripts/*.sh issues (quoted variables in getversion.sh, getarch.sh, inet_via_wifi_rpi.sh, inet_via_wifi_pc.sh)
 
 ## 10. Validation
-- [ ] 10.1 Run SonarCloud analysis to verify fixes (requires CI push)
+- [x] 10.1 Run SonarCloud analysis to verify fixes (Bugs: 0, Smells: 1212, Coverage: 42.4%)
 - [x] 10.2 Ensure no regressions in tests - all tests pass
 - [x] 10.3 Update documentation if needed - tasks.md updated
 
@@ -163,7 +164,7 @@
 
 # Summary
 
-## Completed: 103 of 109 tasks (94%)
+## Completed: 106 of 110 tasks (96%)
 
 ### Key Improvements Made:
 1. **Reliability Issues Fixed**: Transaction rollback handling, void function usage, deprecated HTML elements, missing lang attributes, duplicate CSS
@@ -183,5 +184,11 @@
 
 ### CI Status:
 - All CI runs passing as of 2025-12-18
-- Latest commit: style: Fix gofmt formatting (31aff30b)
-- 1.2, 10.1: SonarCloud verification pending next analysis run
+- Latest SonarCloud analysis: December 18, 2025 18:27 UTC
+
+### SonarCloud Metrics:
+- **Bugs**: 0 (all fixed!)
+- **Vulnerabilities**: 0
+- **Code Smells**: 1,212 (many in deferred TODO comments)
+- **Coverage**: 42.4%
+- **Duplicated Lines**: 2.7%
