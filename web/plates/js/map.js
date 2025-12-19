@@ -217,8 +217,6 @@ function MapCtrl($rootScope, $scope, $state, $http, $interval, craftService) {
 			default:
 				return ['img/actype/undef.svg', true];
 		}
-
-		return ['img/actype/undef.svg', true];
 	}
 
 	// Converts from degrees to radians.
