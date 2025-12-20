@@ -421,7 +421,10 @@ Current web interface uses **AngularJS 1.3.0-rc.3** (2014) which is:
 | Phase 10 | 100% | Hardware Testing | N/A |
 | Phase 11 | N/A | AngularJS Upgrade | N/A |
 
-**Current Coverage**: 64.5% overall, **98.1% testable code** (as of December 2025)
+**Current Coverage**: 64.1% overall, **98.1% testable code** (as of December 19, 2025)
+
+**Recent Improvements (December 19, 2025)**:
+- SendJSON: 60% → 100% (added marshal error test)
 
 **Coverage Analysis**:
 - Total functions: 443
