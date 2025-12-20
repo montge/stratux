@@ -227,6 +227,13 @@
 - [x] Test speed at limits (traffic_test.go)
 - [x] Test timestamp edge cases (monotonic_test.go)
 
+### 7.11 Additional Coverage Improvements (December 2025)
+- [x] parseDownlinkReport: 99.5% → 100%
+  - Added TestParseDownlinkReportShortFrame for frames < 4 bytes
+- [x] processNMEALineLow: 88.3% → 90.1%
+  - Added TestProcessNMEALineLow_GGAParseErrors for malformed GGA sentences
+  - Tests invalid time, latitude, longitude, altitude, geoid fields
+
 ## 8. Phase 8: Code Deduplication (Future)
 
 ### 8.1 Identify Duplicate Test Patterns
