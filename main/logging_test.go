@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -2459,6 +2460,30 @@ func TestOpenLogFile_ErrorPaths(t *testing.T) {
 		}
 
 		if logFileHandle != nil {
+			logFileHandle.Close()
+			logFileHandle = nil
+		}
+	})
+
+	t.Run("handles_invalid_directory", func(t *testing.T) {
+		// Initialize global state needed by error handler
+		if systemErrsMutex == nil {
+			systemErrsMutex = &sync.Mutex{}
+		}
+		if systemErrs == nil {
+			systemErrs = make(map[string]string)
+		}
+
+		// Point to a non-existent directory
+		logDirf = "/nonexistent/path/that/does/not/exist"
+		logFileHandle = nil
+
+		// This should hit the error path in openLogFile
+		openLogFile()
+
+		// logFileHandle should remain nil since we couldn't open the file
+		if logFileHandle != nil {
+			t.Error("Expected logFileHandle to remain nil for invalid directory")
 			logFileHandle.Close()
 			logFileHandle = nil
 		}
