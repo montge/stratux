@@ -50,6 +50,23 @@ type SettingMessage struct {
 	Value   bool   `json:"state"`
 }
 
+// CORS header constants to avoid duplication
+const (
+	corsHeaderAllowMethod  = "Access-Control-Allow-Method"
+	corsHeaderAllowHeaders = "Access-Control-Allow-Headers"
+	corsHeaderAllowOrigin  = "Access-Control-Allow-Origin"
+	corsAllowedMethods     = "GET, POST, OPTIONS"
+	corsAllowedHeaders     = "Origin, X-Requested-With, Content-Type, Accept"
+	corsAllowedOrigin      = "*"
+)
+
+// setCORSHeaders sets standard CORS headers on the response
+func setCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set(corsHeaderAllowOrigin, corsAllowedOrigin)
+	w.Header().Set(corsHeaderAllowMethod, corsAllowedMethods)
+	w.Header().Set(corsHeaderAllowHeaders, corsAllowedHeaders)
+}
+
 type MbTileConnectionCacheEntry struct {
 	Path     string
 	Conn     *sql.DB
@@ -352,8 +369,8 @@ func handleRegionGet(w http.ResponseWriter, _ *http.Request) {
 func handleRegionSet(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setJSONHeadersWithNoCache(w)
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	w.Header().Set(corsHeaderAllowMethod, corsAllowedMethods)
+	w.Header().Set(corsHeaderAllowHeaders, corsAllowedHeaders)
 	if r.Method == "POST" {
 		// raw, _ := httputil.DumpRequest(r, true)
 		// log.Printf("handleRegionSet:raw: %s\n", raw)
@@ -623,8 +640,8 @@ var settingHandlers = map[string]settingHandler{
 func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setJSONHeadersWithNoCache(w)
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	w.Header().Set(corsHeaderAllowMethod, corsAllowedMethods)
+	w.Header().Set(corsHeaderAllowHeaders, corsAllowedHeaders)
 
 	// for an OPTION method request, we return header without processing.
 	// this insures we are recognized as supporting cross-domain AJAX REST calls
@@ -734,8 +751,8 @@ func handleRestartRequest(_ http.ResponseWriter, _ *http.Request) {
 
 func handleRebootRequest(w http.ResponseWriter, r *http.Request) {
 	setJSONHeadersWithNoCache(w)
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	w.Header().Set(corsHeaderAllowMethod, corsAllowedMethods)
+	w.Header().Set(corsHeaderAllowHeaders, corsAllowedHeaders)
 	go delayReboot()
 }
 
@@ -743,9 +760,7 @@ func handleOrientAHRS(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// For an OPTION method request, we return header without processing.
 	// This ensures we are recognized as supporting cross-domain AJAX REST calls.
@@ -785,9 +800,7 @@ func handleCageAHRS(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// For an OPTION method request, we return header without processing.
 	// This ensures we are recognized as supporting cross-domain AJAX REST calls.
@@ -800,9 +813,7 @@ func handleCalibrateAHRS(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// For an OPTION method request, we return header without processing.
 	// This ensures we are recognized as supporting cross-domain AJAX REST calls.
@@ -815,9 +826,7 @@ func handleResetGMeter(w http.ResponseWriter, r *http.Request) {
 	// define header in support of cross-domain AJAX
 	setNoCache(w)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	setCORSHeaders(w)
 
 	// For an OPTION method request, we return header without processing.
 	// This ensures we are recognized as supporting cross-domain AJAX REST calls.
@@ -1023,7 +1032,7 @@ func setNoCache(w http.ResponseWriter) {
 }
 
 func setJSONHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set(corsHeaderAllowOrigin, corsAllowedOrigin)
 	w.Header().Set("Content-Type", "application/json")
 }
 
