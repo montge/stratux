@@ -427,6 +427,7 @@ Current web interface uses **AngularJS 1.3.0-rc.3** (2014) which is:
 - SendJSON: 60% → 100% (added marshal error test)
 - handlePongUpdatePostRequest: 72.7% → 81.8% (added missing file test)
 - handleTile: 79.3% → 86.2% (added x/z/file parse error tests)
+- openLogFile: 90.9% → 100% (added invalid directory error test)
 
 **Coverage Analysis**:
 - Total functions: 443
