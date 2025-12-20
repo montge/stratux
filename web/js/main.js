@@ -1,41 +1,41 @@
 // application constants
-var URL_HOST_BASE           = window.location.hostname + (window.location.port ? ':' + window.location.port : '');
-var URL_HOST_PROTOCOL       = window.location.protocol + "//";
+const URL_HOST_BASE           = window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+const URL_HOST_PROTOCOL       = window.location.protocol + "//";
 
-var URL_AHRS_CAGE           = URL_HOST_PROTOCOL + URL_HOST_BASE + "/cageAHRS";
-var URL_AHRS_CAL            = URL_HOST_PROTOCOL + URL_HOST_BASE + "/calibrateAHRS";
-var URL_AHRS_ORIENT         = URL_HOST_PROTOCOL + URL_HOST_BASE + "/orientAHRS";
-var URL_DELETEAHRSLOGFILES  = URL_HOST_PROTOCOL + URL_HOST_BASE + "/deleteahrslogfiles";
-var URL_DELETELOGFILE       = URL_HOST_PROTOCOL + URL_HOST_BASE + "/deletelogfile";
-var URL_DEV_TOGGLE_GET      = URL_HOST_PROTOCOL + URL_HOST_BASE + "/develmodetoggle";
-var URL_DOWNLOADAHRSLOGFILES = URL_HOST_PROTOCOL + URL_HOST_BASE + "/downloadahrslogs";
-var URL_DOWNLOADDB          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/downloaddb";
-var URL_DOWNLOADLOGFILE     = URL_HOST_PROTOCOL + URL_HOST_BASE + "/downloadlog";
-var URL_GMETER_RESET        = URL_HOST_PROTOCOL + URL_HOST_BASE + "/resetGMeter";
-var URL_REBOOT              = URL_HOST_PROTOCOL + URL_HOST_BASE + "/reboot";
-var URL_RESTARTAPP          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/restart";
-var URL_SATELLITES_GET      = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getSatellites";
-var URL_SETTINGS_GET        = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getSettings";
-var URL_SETTINGS_SET        = URL_HOST_PROTOCOL + URL_HOST_BASE + "/setSettings";
-var URL_SHUTDOWN            = URL_HOST_PROTOCOL + URL_HOST_BASE + "/shutdown";
-var URL_STATUS_GET          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getStatus";
-var URL_REGION_GET          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getRegion";
-var URL_REGION_SET          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/setRegion";
-var URL_TOWERS_GET          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getTowers";
-var URL_UPDATE_UPLOAD       = URL_HOST_PROTOCOL + URL_HOST_BASE + "/updateUpload";
-var URL_UPDATE_PONG         = URL_HOST_PROTOCOL + URL_HOST_BASE + "/updatePong";
-var URL_GET_SITUATION       = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getSituation";
-var URL_GET_TILESETS        = URL_HOST_PROTOCOL + URL_HOST_BASE + "/tiles/tilesets";
-var URL_GET_TILE            = URL_HOST_PROTOCOL + URL_HOST_BASE + "/tiles";
-var URL_GET_STYLE           = URL_HOST_PROTOCOL + URL_HOST_BASE + "/mapdata/styles"
+const URL_AHRS_CAGE           = URL_HOST_PROTOCOL + URL_HOST_BASE + "/cageAHRS";
+const URL_AHRS_CAL            = URL_HOST_PROTOCOL + URL_HOST_BASE + "/calibrateAHRS";
+const URL_AHRS_ORIENT         = URL_HOST_PROTOCOL + URL_HOST_BASE + "/orientAHRS";
+const URL_DELETEAHRSLOGFILES  = URL_HOST_PROTOCOL + URL_HOST_BASE + "/deleteahrslogfiles";
+const URL_DELETELOGFILE       = URL_HOST_PROTOCOL + URL_HOST_BASE + "/deletelogfile";
+const URL_DEV_TOGGLE_GET      = URL_HOST_PROTOCOL + URL_HOST_BASE + "/develmodetoggle";
+const URL_DOWNLOADAHRSLOGFILES = URL_HOST_PROTOCOL + URL_HOST_BASE + "/downloadahrslogs";
+const URL_DOWNLOADDB          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/downloaddb";
+const URL_DOWNLOADLOGFILE     = URL_HOST_PROTOCOL + URL_HOST_BASE + "/downloadlog";
+const URL_GMETER_RESET        = URL_HOST_PROTOCOL + URL_HOST_BASE + "/resetGMeter";
+const URL_REBOOT              = URL_HOST_PROTOCOL + URL_HOST_BASE + "/reboot";
+const URL_RESTARTAPP          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/restart";
+const URL_SATELLITES_GET      = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getSatellites";
+const URL_SETTINGS_GET        = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getSettings";
+const URL_SETTINGS_SET        = URL_HOST_PROTOCOL + URL_HOST_BASE + "/setSettings";
+const URL_SHUTDOWN            = URL_HOST_PROTOCOL + URL_HOST_BASE + "/shutdown";
+const URL_STATUS_GET          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getStatus";
+const URL_REGION_GET          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getRegion";
+const URL_REGION_SET          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/setRegion";
+const URL_TOWERS_GET          = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getTowers";
+const URL_UPDATE_UPLOAD       = URL_HOST_PROTOCOL + URL_HOST_BASE + "/updateUpload";
+const URL_UPDATE_PONG         = URL_HOST_PROTOCOL + URL_HOST_BASE + "/updatePong";
+const URL_GET_SITUATION       = URL_HOST_PROTOCOL + URL_HOST_BASE + "/getSituation";
+const URL_GET_TILESETS        = URL_HOST_PROTOCOL + URL_HOST_BASE + "/tiles/tilesets";
+const URL_GET_TILE            = URL_HOST_PROTOCOL + URL_HOST_BASE + "/tiles";
+const URL_GET_STYLE           = URL_HOST_PROTOCOL + URL_HOST_BASE + "/mapdata/styles"
 
 
-var URL_DEVELOPER_WS        = "ws://" + URL_HOST_BASE + "/developer";
-var URL_GPS_WS              = "ws://" + URL_HOST_BASE + "/situation";
-var URL_STATUS_WS           = "ws://" + URL_HOST_BASE + "/status";
-var URL_TRAFFIC_WS          = "ws://" + URL_HOST_BASE + "/traffic";
-var URL_WEATHER_WS          = "ws://" + URL_HOST_BASE + "/weather";
-var URL_RADAR_WS            = "ws://" + URL_HOST_BASE + "/radar";
+const URL_DEVELOPER_WS        = "ws://" + URL_HOST_BASE + "/developer";
+const URL_GPS_WS              = "ws://" + URL_HOST_BASE + "/situation";
+const URL_STATUS_WS           = "ws://" + URL_HOST_BASE + "/status";
+const URL_TRAFFIC_WS          = "ws://" + URL_HOST_BASE + "/traffic";
+const URL_WEATHER_WS          = "ws://" + URL_HOST_BASE + "/weather";
+const URL_RADAR_WS            = "ws://" + URL_HOST_BASE + "/radar";
 
 // define the module with dependency on mobile-angular-ui
 //var app = angular.module('stratux', ['ngRoute', 'mobile-angular-ui', 'mobile-angular-ui.gestures', 'appControllers']);

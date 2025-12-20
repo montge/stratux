@@ -825,8 +825,8 @@ angular.module('appControllers')
 			require: 'ngModel',
 			link: function(scope, element, attr, ctrl) {
 				function ipListValidation(value) {
-					var r = "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
-					var valid = (new RegExp(r, "g")).test(value);
+					const r = "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
+					const valid = (new RegExp(r, "g")).test(value);
 					ctrl.$setValidity('ipAddr', valid);
 					if (valid) {
 						return value;
@@ -843,8 +843,8 @@ angular.module('appControllers')
 			require: 'ngModel',
 			link: function(scope, element, attr, ctrl) {
 				function gLimitsValidation(value) {
-					var r = "[-+]?[0-9]*\\.?[0-9]+";
-					var valid = (new RegExp("^(" + r + "( " + r + ")*|)$", "g")).test(value);
+					const r = "[-+]?[0-9]*\\.?[0-9]+";
+					const valid = (new RegExp("^(" + r + "( " + r + ")*|)$", "g")).test(value);
 					ctrl.$setValidity('gLimits', valid);
 					if (valid) {
 						return value;
@@ -861,8 +861,8 @@ angular.module('appControllers')
 			require: 'ngModel',
 			link: function(scope, element, attr, ctrl) {
 				function pilotnameValidation(value) {
-					var r = "^[0-9a-zA-Z_]*$";
-					var valid = new RegExp(r).test(value);
+					const r = "^[0-9a-zA-Z_]*$";
+					const valid = new RegExp(r).test(value);
 					ctrl.$setValidity('pilotname', valid);
 					if (valid)
 						return value;
@@ -877,8 +877,8 @@ angular.module('appControllers')
 			require: 'ngModel',
 			link: function(scope, element, attr, ctrl) {
 				function ognregValidation(value) {
-					var r = "^[0-9a-zA-Z_-]*$";
-					var valid = new RegExp(r).test(value);
+					const r = "^[0-9a-zA-Z_-]*$";
+					const valid = new RegExp(r).test(value);
 					ctrl.$setValidity('ognreg', valid);
 					if (valid)
 						return value;

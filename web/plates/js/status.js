@@ -3,6 +3,7 @@ StatusCtrl.$inject = ['$rootScope', '$scope', '$state', '$http', '$interval', 'c
 
 // create our controller function with all necessary logic
 function StatusCtrl($rootScope, $scope, $state, $http, $interval, craftService) {
+	let settings; // Used in checkForRegion and setHardwareVisibility callbacks
 
 	$scope.$parent.helppage = 'plates/status-help.html';
 
@@ -191,7 +192,7 @@ function StatusCtrl($rootScope, $scope, $state, $http, $interval, craftService) 
 
 	function setRegion(val) {
 		// Simple POST request example (note: response is asynchronous)
-		var jsonData = {};
+		const jsonData = {};
 		jsonData["Region"] = val;
 		$http.post(URL_REGION_SET, angular.toJson(jsonData)).
 		then(function (response) {
