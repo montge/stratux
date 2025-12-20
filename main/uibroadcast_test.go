@@ -238,6 +238,27 @@ func TestSendJSON(t *testing.T) {
 		}
 		t.Log("Successfully sent nil JSON object")
 	})
+
+	t.Run("send_json_marshal_error", func(t *testing.T) {
+		// Create broadcaster without writer goroutine for deterministic testing
+		b := &uibroadcaster{
+			sockets:    make([]*websocket.Conn, 0),
+			sockets_mu: &sync.Mutex{},
+			messages:   make(chan []byte, 1024),
+		}
+
+		// Create an unmarshalable value (channel cannot be JSON marshaled)
+		unmarshalable := make(chan int)
+
+		// Should not panic, but should log error and not send message
+		b.SendJSON(unmarshalable)
+
+		// Verify no message was sent (marshal failed)
+		if len(b.messages) != 0 {
+			t.Errorf("Expected 0 messages in channel after marshal error, got %d", len(b.messages))
+		}
+		t.Log("Successfully handled JSON marshal error (no message sent)")
+	})
 }
 
 // TestAddSocket tests the AddSocket function
