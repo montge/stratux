@@ -8293,3 +8293,111 @@ func TestCalculateNavRateEdgeCases(t *testing.T) {
 		}
 	})
 }
+
+// TestProcessNMEALineLow_GGAParseErrors tests error handling for malformed GGA sentences
+// to improve coverage of processNMEALineLow (targeting lines 1239-1290)
+func TestProcessNMEALineLow_GGAParseErrors(t *testing.T) {
+	// Initialize stratuxClock if needed
+	if stratuxClock == nil {
+		stratuxClock = NewMonotonic()
+		time.Sleep(10 * time.Millisecond)
+	}
+	// Initialize required mutexes
+	if mySituation.muGPS == nil {
+		mySituation.muGPS = &sync.Mutex{}
+	}
+	if mySituation.muGPSPerformance == nil {
+		mySituation.muGPSPerformance = &sync.Mutex{}
+	}
+	if mySituation.muSatellite == nil {
+		mySituation.muSatellite = &sync.Mutex{}
+	}
+	if mySituation.muBaro == nil {
+		mySituation.muBaro = &sync.Mutex{}
+	}
+	if mySituation.muAttitude == nil {
+		mySituation.muAttitude = &sync.Mutex{}
+	}
+
+	tests := []struct {
+		name     string
+		sentence string
+		desc     string
+	}{
+		{
+			// Triggers line 1239-1241: Time hour field can't parse ("XX" instead of "12")
+			name:     "invalid_time_hour",
+			sentence: "$GPGGA,XX3519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*5A",
+			desc:     "Invalid hour in time field should return false",
+		},
+		{
+			// Triggers line 1239-1241: Time minute field can't parse
+			name:     "invalid_time_minute",
+			sentence: "$GPGGA,12XX19.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*5F",
+			desc:     "Invalid minute in time field should return false",
+		},
+		{
+			// Triggers line 1239-1241: Time seconds field can't parse
+			name:     "invalid_time_seconds",
+			sentence: "$GPGGA,1235XX.X,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*39",
+			desc:     "Invalid seconds in time field should return false",
+		},
+		{
+			// Triggers line 1247-1249: Latitude field too short (< 4 chars)
+			name:     "short_latitude_field",
+			sentence: "$GPGGA,123519.0,48,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*4B",
+			desc:     "Latitude field shorter than 4 chars should return false",
+		},
+		{
+			// Triggers line 1253-1255: Latitude degree field can't parse
+			name:     "invalid_latitude_degree",
+			sentence: "$GPGGA,123519.0,XX07.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*55",
+			desc:     "Invalid latitude degree should return false",
+		},
+		{
+			// Triggers line 1253-1255: Latitude minute field can't parse
+			name:     "invalid_latitude_minute",
+			sentence: "$GPGGA,123519.0,48XX.XXX,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*3D",
+			desc:     "Invalid latitude minute should return false",
+		},
+		{
+			// Triggers line 1263-1265: Longitude field too short (< 5 chars)
+			name:     "short_longitude_field",
+			sentence: "$GPGGA,123519.0,4807.038,N,011,E,1,08,0.9,545.4,M,46.9,M,,*45",
+			desc:     "Longitude field shorter than 5 chars should return false",
+		},
+		{
+			// Triggers line 1268-1270: Longitude degree field can't parse
+			name:     "invalid_longitude_degree",
+			sentence: "$GPGGA,123519.0,4807.038,N,XXX31.000,E,1,08,0.9,545.4,M,46.9,M,,*31",
+			desc:     "Invalid longitude degree should return false",
+		},
+		{
+			// Triggers line 1268-1270: Longitude minute field can't parse
+			name:     "invalid_longitude_minute",
+			sentence: "$GPGGA,123519.0,4807.038,N,011XX.XXX,E,1,08,0.9,545.4,M,46.9,M,,*33",
+			desc:     "Invalid longitude minute should return false",
+		},
+		{
+			// Triggers line 1279-1281: Altitude field can't parse
+			name:     "invalid_altitude",
+			sentence: "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,XXX.X,M,46.9,M,,*59",
+			desc:     "Invalid altitude should return false",
+		},
+		{
+			// Triggers line 1288-1290: Geoid separation field can't parse
+			name:     "invalid_geoid_separation",
+			sentence: "$GPGGA,123519.0,4807.038,N,01131.000,E,1,08,0.9,545.4,M,XX.X,M,,*3A",
+			desc:     "Invalid geoid separation should return false",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := processNMEALineLow(tc.sentence, false)
+			if result {
+				t.Errorf("%s: expected false for malformed sentence", tc.desc)
+			}
+		})
+	}
+}
