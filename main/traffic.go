@@ -480,13 +480,23 @@ func computeTrafficPriority(ti *TrafficInfo) int32 {
 	return int32((altDiff/3.33 + ti.Distance) / 10000.0)
 }
 
+// Distance estimation tuning factors by altitude class.
 // Used to tune to our radios. We compare our estimate to real values for ADS-B Traffic.
 // If we tend to estimate too high, we reduce this value, otherwise we increase it.
 // We also try to correct for different transponder transmit power, by assuming that aircraft that fly high are bigger aircraft
 // and have a stronger transponder. Low aircraft are small aircraft with weak transmission power.
 // This is only a wild guess, but seems to help a bit. To do so, we use different estimatedDistFactors for different
 // altitude buckets: <5000ft, 5000-10000ft, >10000ft
-var estimatedDistFactors [3]float64 = [3]float64{2500.0, 2800.0, 3000.0}
+const (
+	// estimatedDistFactorLow is the distance factor for aircraft below 5000ft (small aircraft, weak transponder)
+	estimatedDistFactorLow = 2500.0
+	// estimatedDistFactorMid is the distance factor for aircraft between 5000-10000ft
+	estimatedDistFactorMid = 2800.0
+	// estimatedDistFactorHigh is the distance factor for aircraft above 10000ft (large aircraft, strong transponder)
+	estimatedDistFactorHigh = 3000.0
+)
+
+var estimatedDistFactors = [3]float64{estimatedDistFactorLow, estimatedDistFactorMid, estimatedDistFactorHigh}
 
 func estimateDistance(ti *TrafficInfo) {
 	if ti.Last_source != TRAFFIC_SOURCE_1090ES {

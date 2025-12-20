@@ -72,7 +72,7 @@ func makeFlarmPFLAUString(ti TrafficInfo) (msg string) {
 	if len(ti.Tail) > 0 {
 		idstr += "!" + ti.Tail
 	}
-	// TODO: we are always airbourne for now
+	// Note: Ground/airborne status always set to airborne (1) since we don't track this state
 	if alarmLevel > 0 {
 		msg = fmt.Sprintf("$PFLAU,%d,1,%d,1,%d,%d,%d,%d,%d,%s", len(traffic), gpsStatus, alarmLevel, int32(bearing), alarmType, relativeVertical, int32(math.Abs(dist)), idstr)
 	} else {
@@ -83,7 +83,8 @@ func makeFlarmPFLAUString(ti TrafficInfo) (msg string) {
 	return
 }
 
-// TODO: only very simplistic implementation
+// computeAlarmLevel determines FLARM alarm level based on proximity.
+// Uses simplified thresholds: Level 3 (<0.5NM, <500ft), Level 2 (<1NM, <1000ft), else Level 0.
 func computeAlarmLevel(dist float64, relativeVertical int32) (alarmLevel uint8) {
 	if (dist < 926) && (relativeVertical < 152) && (relativeVertical > -152) { // 926 m = 0.5 NM; 152m = 500'
 		alarmLevel = 3
@@ -233,7 +234,7 @@ func makeFlarmPFLAAString(ti TrafficInfo) (msg string, valid bool, alarmLevel ui
 		log.Printf("FLARM - ICAO target %X (%s) is %.1f meters away at %.1f degrees\n", ti.Icao_addr, ti.Tail, dist, bearing)
 	}
 
-	// TODO: Estimate distance for bearingless / distanceless Mode S (1090) aircraft targets
+	// Note: Distance estimation for bearingless Mode S targets is handled by estimateDistance() in traffic.go
 
 	//if distN > 200000 || distN < -200000 || distE > 200000 || distE < -200000 {
 	//	msg = ""
@@ -455,9 +456,9 @@ func makeAHRSLevilReport() {
 	// Values if invalid
 	roll := int16(0)
 	pitch := int16(0)
-	hdg := int16(mySituation.GPSTrueCourse) // TODO: not really correct, but XCSoar doesn't accept empty string
+	hdg := int16(mySituation.GPSTrueCourse) // Note: Uses GPS course as fallback since XCSoar requires a value
 	slip_skid := int16(0)
-	yaw_rate := int16(mySituation.GPSTurnRate) // TODO: not really correct, but XCSoar doesn't accept empty string
+	yaw_rate := int16(mySituation.GPSTurnRate) // Note: Uses GPS turn rate as fallback since XCSoar requires a value
 	g := int16(0)
 	if !isAHRSInvalidValue(mySituation.AHRSRoll) {
 		roll = common.RoundToInt16(mySituation.AHRSRoll * 10)

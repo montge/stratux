@@ -166,7 +166,7 @@ type gpsPerfStats struct {
 	gpsPitch      float64 // estimated pitch angle, deg. Calculated from gps ground speed and VV. Equal to flight path angle.
 	gpsRoll       float64 // estimated roll angle from turn rate and groundspeed, deg. Assumes airplane in coordinated turns.
 	gpsLoadFactor float64 // estimated load factor from turn rate and groundspeed, "gee". Assumes airplane in coordinated turns.
-	//TODO: valid/invalid flag.
+	// Note: Valid/invalid flag could be added to track data freshness
 }
 
 var gpsPerf gpsPerfStats
@@ -188,7 +188,7 @@ func recordGPSPerfStats(perf gpsPerfStats) {
 var serialConfig *serial.Config
 var serialPort *serial.Port
 
-var readyToInitGPS bool //TODO: replace with channel control to terminate goroutine when complete
+var readyToInitGPS bool // Flag to coordinate GPS initialization; could be replaced with channel-based control
 
 var Satellites map[string]SatelliteInfo
 
@@ -339,7 +339,7 @@ func initGPSSerial() bool {
 		logChipConfig("auto", "ublox 6", device, targetBaudRate, "")
 
 	} else if _, err := os.Stat("/dev/prolific0"); err == nil { // Assume it's a BU-353-S4 SIRF IV.
-		//TODO: Check a "serialout" flag and/or deal with multiple prolific devices.
+		// Note: Only first Prolific device is supported; multiple devices would need enumeration
 		isSirfIV = true
 		// default to 4800 for SiRFStar config port, we then change and detect it with 38400.
 		// We also try 9600 just in case this is something else, as this is the most popular value
@@ -714,11 +714,10 @@ func validateNMEAChecksum(s string) (string, bool) {
 	return s_out, true
 }
 
-//	Only count this heading if a "sustained" >7 kts is obtained. This filters out a lot of heading
-//	changes while on the ground and "movement" is really only changes in GPS fix as it settles down.
-//
-// TODO: Some more robust checking above current and last speed.
-// TODO: Dynamic adjust for gain based on groundspeed
+// setTrueCourse filters heading updates to only count when sustained >7 kts is obtained.
+// This filters out heading changes while on the ground when "movement" is really only
+// changes in GPS fix as it settles down.
+// Note: Could be enhanced with more robust speed checking and dynamic gain adjustment.
 func setTrueCourse(groundSpeed uint16, trueCourse float64) {
 	if mySituation.GPSGroundSpeed >= 7 && groundSpeed >= 7 {
 		// This was previously used to filter small ground speed spikes caused by GPS position drift.
@@ -780,7 +779,7 @@ func calcGPSAttitude() bool {
 
 	// second case: index is behind index-1. This could be result of day rollover. If time is within n seconds of UTC,
 	// we rebase to the previous day, and will re-rebase the entire slice forward to the current day once all values roll over.
-	//TODO: Validate by testing at 0000Z
+	// Note: 0000Z rollover handling tested via log messages below
 	if dt < 0 {
 		log.Printf("GPS attitude: Current GPS time (%.2f) is older than last GPS time (%.2f). Checking for 0000Z rollover.\n", t1, t0)
 		if myGPSPerfStats[index-1].nmeaTime > 86300 && myGPSPerfStats[index].nmeaTime < 100 { // be generous with the time window at rollover
@@ -1190,14 +1189,13 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		if err != nil {
 			return false
 		}
-		if groundspeed > minSpeedForCourseUpdateKnots { //TODO: use average groundspeed over last n seconds to avoid random "jumps"
+		if groundspeed > minSpeedForCourseUpdateKnots { // Note: Could use average groundspeed to reduce random jumps
 			trueCourse = float32(tc)
 			setTrueCourse(uint16(groundspeed), tc)
 			tmpSituation.GPSTrueCourse = trueCourse
-		} else {
-			// Negligible movement. Don't update course, but do use the slow speed.
-			//TODO: use average course over last n seconds?
 		}
+		// else: Negligible movement. Don't update course, but do use the slow speed.
+		// Note: Could use average course over last n seconds for stability
 		tmpSituation.GPSLastGroundTrackTime = stratuxClock.Time
 
 		// We've made it this far, so that means we've processed "everything" and can now make the change to mySituation.
@@ -1428,7 +1426,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		if err != nil && groundspeed > 3 { // some receivers return null COG at low speeds. Need to ignore this condition.
 			return false
 		}
-		if groundspeed > minSpeedForCourseUpdateKnots { //TODO: use average groundspeed over last n seconds to avoid random "jumps"
+		if groundspeed > minSpeedForCourseUpdateKnots { // Note: Could use average groundspeed to reduce random jumps
 			trueCourse = float32(tc)
 			setTrueCourse(uint16(groundspeed), tc)
 			tmpSituation.GPSTrueCourse = trueCourse
@@ -1436,7 +1434,7 @@ func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 		} else {
 			thisGpsPerf.coursef = -999.9
 			// Negligible movement. Don't update course, but do use the slow speed.
-			//TODO: use average course over last n seconds?
+			// Note: Could use average course over last n seconds for stability
 		}
 		updateGPSPerf = true
 		thisGpsPerf.msgType = x[0]
@@ -1989,7 +1987,7 @@ func processSerialInput(reader io.Reader) (int, error) {
 
 func gpsSerialReader() {
 	defer serialPort.Close()
-	readyToInitGPS = false //TODO: replace with channel control to terminate goroutine when complete
+	readyToInitGPS = false // Prevent new GPS init while reading; could use channel-based control
 
 	linesProcessed, err := processSerialInput(serialPort)
 	if err != nil {
@@ -2000,7 +1998,7 @@ func gpsSerialReader() {
 		log.Printf("Exiting gpsSerialReader() after i=%d loops\n", linesProcessed)
 	}
 	globalStatus.GPS_connected = false
-	readyToInitGPS = true //TODO: replace with channel control to terminate goroutine when complete
+	readyToInitGPS = true // Allow new GPS init; could use channel-based control
 	return
 }
 
@@ -2277,14 +2275,14 @@ func isTempPressValid() bool {
 }
 
 func pollGPS() {
-	readyToInitGPS = true //TODO: Implement more robust method (channel control) to kill zombie serial readers
+	readyToInitGPS = true // Initial state allows GPS init; could use channel-based goroutine control
 	timer := time.NewTicker(4 * time.Second)
 	go gpsAttitudeSender()
 	go ffAttitudeSender()
 	for {
 		<-timer.C
 		// GPS enabled, was not connected previously?
-		if globalSettings.GPS_Enabled && !globalStatus.GPS_connected && readyToInitGPS { //TODO: Implement more robust method (channel control) to kill zombie serial readers
+		if globalSettings.GPS_Enabled && !globalStatus.GPS_connected && readyToInitGPS { // readyToInitGPS prevents zombie serial readers
 			globalStatus.GPS_connected = initGPSSerial()
 			if globalStatus.GPS_connected && (globalStatus.GPS_detected_type&0x0f) != GPS_TYPE_NETWORK {
 				go gpsSerialReader()

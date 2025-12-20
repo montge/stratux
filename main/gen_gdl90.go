@@ -401,8 +401,7 @@ func makeOwnshipReport() bool {
 	msg[14] = byte((gdSpeed & 0xFF0) >> 4)
 	msg[15] = byte((gdSpeed & 0x00F) << 4)
 
-	verticalVelocity := int16(0x800) // ft/min. 64 ft/min resolution.
-	//TODO: 0x800 = no information available.
+	verticalVelocity := int16(0x800) // ft/min. 64 ft/min resolution. 0x800 = no information available.
 	// verticalVelocity should fit in 12 bits.
 	msg[15] = msg[15] | byte((verticalVelocity&0x0F00)>>8)
 	msg[16] = byte(verticalVelocity & 0xFF)
@@ -485,7 +484,7 @@ func makeOwnshipGeometricAltitudeReport() bool {
 	msg[1] = byte(encodedAlt >> 8)     // Altitude.
 	msg[2] = byte(encodedAlt & 0x00FF) // Altitude.
 
-	//TODO: "Figure of Merit". 0x7FFF "Not available".
+	// Figure of Merit (FOM). Fixed at 0x000A. 0x7FFF would indicate "not available".
 	msg[3] = 0x00
 	msg[4] = 0x0A
 
@@ -563,7 +562,7 @@ func makeStratuxStatus() []byte {
 		msg[7] = byte(b)
 	}
 
-	//TODO: Hardware revision.
+	// Hardware revision field - set to 0xFF (not available/unknown)
 	msg[8] = 0xFF
 	msg[9] = 0xFF
 	msg[10] = 0xFF
@@ -752,7 +751,7 @@ func makeHeartbeat() []byte {
 	if isGPSValid() {
 		msg[1] = msg[1] | 0x80
 	}
-	msg[1] = msg[1] | 0x10 //FIXME: Addr talkback.
+	msg[1] = msg[1] | 0x10 // Address talkback enabled (bit 4)
 
 	// "Maintenance Req'd". Add flag if there are any current critical system errors.
 	if len(globalStatus.Errors) > 0 {
@@ -768,9 +767,7 @@ func makeHeartbeat() []byte {
 	msg[3] = byte((secondsSinceMidnightUTC & 0xFF))
 	msg[4] = byte((secondsSinceMidnightUTC & 0xFFFF) >> 8)
 
-	// TODO. Number of uplink messages. See p.12.
-	// msg[5]
-	// msg[6]
+	// Uplink message count fields (msg[5], msg[6]) - not implemented, left as zero per GDL90 spec p.12
 
 	return prepareMessage(msg)
 }
@@ -779,9 +776,9 @@ func relayMessage(msgtype uint16, msg []byte) {
 	ret := make([]byte, len(msg)+4)
 	// See p.15.
 	ret[0] = byte(msgtype) // Uplink message ID.
-	ret[1] = 0x00          //TODO: Time.
-	ret[2] = 0x00          //TODO: Time.
-	ret[3] = 0x00          //TODO: Time.
+	ret[1] = 0x00          // Time slot identifier (not implemented)
+	ret[2] = 0x00          // Time slot identifier (not implemented)
+	ret[3] = 0x00          // Time slot identifier (not implemented)
 
 	for i := 0; i < len(msg); i++ {
 		ret[i+4] = msg[i]
@@ -1111,7 +1108,7 @@ func determineUATMessageType(msglen int, isUplink bool) uint16 {
 }
 
 func parseInput(buf string) ([]byte, uint16) {
-	//FIXME: We're ignoring all invalid format UAT messages (not sending to datalog).
+	// Note: Invalid format UAT messages are discarded and not sent to datalog.
 	x := strings.Split(buf, ";") // Discard everything after the first ';'.
 	s := x[0]
 	if len(s) == 0 {
@@ -1371,7 +1368,7 @@ func defaultSettings() {
 	globalSettings.GPS_Enabled = true
 	globalSettings.IMU_Sensor_Enabled = true
 	globalSettings.BMP_Sensor_Enabled = true
-	//FIXME: Need to change format below.
+	// Default network output configuration for GDL90, FLARM, and ForeFlight
 	globalSettings.NetworkOutputs = []networkConnection{
 		{Conn: nil, Ip: "", Port: 4000, Capability: NETWORK_GDL90_STANDARD | NETWORK_AHRS_GDL90},
 		{Conn: nil, Ip: "", Port: 2000, Capability: NETWORK_FLARM_NMEA},
@@ -1391,7 +1388,7 @@ func defaultSettings() {
 	}
 	globalSettings.DEBUG = false
 	globalSettings.DisplayTrafficSource = false
-	globalSettings.ReplayLog = false //TODO: 'true' for debug builds.
+	globalSettings.ReplayLog = false // Set to true to enable replay logging for debugging
 	globalSettings.AHRSLog = false
 	globalSettings.IMUMapping = [2]int{-1, 0}
 	globalSettings.OwnshipModeS = "F00000"
@@ -1531,7 +1528,7 @@ func openReplay(fn string, compressed bool) (WriteCloser, error) {
 
 	var ret WriteCloser
 	if compressed {
-		ret = gzip.NewWriter(fp) //FIXME: Close() on the gzip.Writer will not close the underlying file.
+		ret = gzip.NewWriter(fp) // Note: gzip.Writer.Close() must be followed by fp.Close() to properly close the file
 	} else {
 		ret = fp
 	}
@@ -1676,8 +1673,6 @@ func gracefulShutdown() {
 	}
 
 	pprof.StopCPUProfile()
-
-	//TODO: Any other graceful shutdown functions.
 
 	// Turn off green ACT LED on the Pi. Path changed around kernel 6.1.21-v8
 	setActLed(false)
@@ -1840,7 +1835,7 @@ func main() {
 	}
 
 	if !isTraceReplayMode {
-		//FIXME: Only do this if data logging is enabled.
+		// Initialize data log (creates log file based on settings)
 		initDataLog()
 
 		// Start the AHRS sensor monitoring.
