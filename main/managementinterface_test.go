@@ -6342,6 +6342,67 @@ func TestHandleTile(t *testing.T) {
 	}
 }
 
+// TestHandleTile_ParseErrorPaths tests specific parse error paths for full coverage
+func TestHandleTile_ParseErrorPaths(t *testing.T) {
+	t.Run("parse_x_error", func(t *testing.T) {
+		// URI where x coordinate is not a number
+		// /tiles/file/z/x/y.png -> parts = ["", "tiles", "file", "5", "abc", "10.png"]
+		req := httptest.NewRequest("GET", "/tiles/test.mbtiles/5/abc/10.png", nil)
+		req.RequestURI = "/tiles/test.mbtiles/5/abc/10.png"
+		w := httptest.NewRecorder()
+
+		handleTile(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 500 for x parse error, got %d", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(string(body), "Failed to parse x") {
+			t.Errorf("Expected 'Failed to parse x' in body, got: %s", string(body))
+		}
+	})
+
+	t.Run("parse_z_error", func(t *testing.T) {
+		// URI where z coordinate is not a number
+		// /tiles/file/z/x/y.png -> parts = ["", "tiles", "file", "abc", "5", "10.png"]
+		req := httptest.NewRequest("GET", "/tiles/test.mbtiles/abc/5/10.png", nil)
+		req.RequestURI = "/tiles/test.mbtiles/abc/5/10.png"
+		w := httptest.NewRecorder()
+
+		handleTile(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 500 for z parse error, got %d", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(string(body), "Failed to parse z") {
+			t.Errorf("Expected 'Failed to parse z' in body, got: %s", string(body))
+		}
+	})
+
+	t.Run("parse_file_error", func(t *testing.T) {
+		// URI with percent-encoded sequence that is invalid
+		// %ZZ is not a valid percent encoding
+		// Create a valid request first, then set invalid RequestURI
+		req := httptest.NewRequest("GET", "/tiles/test.mbtiles/5/10/15.png", nil)
+		req.RequestURI = "/tiles/test%ZZfile.mbtiles/5/10/15.png"
+		w := httptest.NewRecorder()
+
+		handleTile(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 500 for file parse error, got %d", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if !strings.Contains(string(body), "Failed to parse file") {
+			t.Errorf("Expected 'Failed to parse file' in body, got: %s", string(body))
+		}
+	})
+}
+
 // TestHandleTile_WithDatabase tests handleTile with actual mbtiles database
 func TestHandleTile_WithDatabase(t *testing.T) {
 	mapdataDir := STRATUX_HOME + "/mapdata"
@@ -8799,6 +8860,34 @@ func TestHandlePongUpdatePostRequest_InvalidForm(t *testing.T) {
 	// Function should handle the error gracefully
 	resp := w.Result()
 	t.Logf("Status code for invalid pong update: %d", resp.StatusCode)
+}
+
+// TestHandlePongUpdatePostRequest_MissingFile tests error when file field is missing
+func TestHandlePongUpdatePostRequest_MissingFile(t *testing.T) {
+	// Mock pongSetUpdateMode
+	originalPongSetUpdateMode := pongSetUpdateMode
+	defer func() { pongSetUpdateMode = originalPongSetUpdateMode }()
+	pongSetUpdateMode = func() {}
+
+	// Create valid multipart form but with wrong field name
+	var buf bytes.Buffer
+	boundary := "----TestPongBoundary"
+
+	buf.WriteString("--" + boundary + "\r\n")
+	buf.WriteString("Content-Disposition: form-data; name=\"wrong_field_name\"; filename=\"test.zip\"\r\n")
+	buf.WriteString("Content-Type: application/zip\r\n\r\n")
+	buf.WriteString("fake zip content")
+	buf.WriteString("\r\n--" + boundary + "--\r\n")
+
+	req := httptest.NewRequest("POST", "/updatePong", &buf)
+	req.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
+	w := httptest.NewRecorder()
+
+	handlePongUpdatePostRequest(w, req)
+
+	// Function should handle the missing file gracefully
+	resp := w.Result()
+	t.Logf("Status code for missing pong_update_file field: %d", resp.StatusCode)
 }
 
 // =============================================================================
