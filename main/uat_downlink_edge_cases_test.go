@@ -2292,3 +2292,56 @@ func TestParseDownlinkReport_DisplayTrafficSourceWithPrefixedLongTail(t *testing
 		t.Error("Traffic not found for prefixed long tail test")
 	}
 }
+
+// TestParseDownlinkReportShortFrame tests that frames shorter than 4 bytes are rejected
+func TestParseDownlinkReportShortFrame(t *testing.T) {
+	resetUATDownlinkState()
+
+	tests := []struct {
+		name    string
+		hexStr  string
+		desc    string
+	}{
+		{
+			name:   "empty_frame",
+			hexStr: "+",  // Empty after prefix
+			desc:   "Empty frame should be rejected",
+		},
+		{
+			name:   "one_byte_frame",
+			hexStr: "+AB",  // Only 1 byte after hex decode
+			desc:   "1-byte frame should be rejected",
+		},
+		{
+			name:   "two_byte_frame",
+			hexStr: "+ABCD",  // Only 2 bytes after hex decode
+			desc:   "2-byte frame should be rejected",
+		},
+		{
+			name:   "three_byte_frame",
+			hexStr: "+ABCDEF",  // Only 3 bytes after hex decode
+			desc:   "3-byte frame should be rejected",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Clear traffic before each test
+			trafficMutex.Lock()
+			traffic = make(map[uint32]TrafficInfo)
+			trafficMutex.Unlock()
+
+			// This should return early without panicking
+			parseDownlinkReport(tc.hexStr, 500)
+
+			// Verify no traffic was added
+			trafficMutex.Lock()
+			trafficCount := len(traffic)
+			trafficMutex.Unlock()
+
+			if trafficCount != 0 {
+				t.Errorf("%s: expected no traffic to be added, but got %d entries", tc.desc, trafficCount)
+			}
+		})
+	}
+}
