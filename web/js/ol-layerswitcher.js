@@ -283,15 +283,12 @@ class LayerSwitcher extends Control {
                 !l.get('combine') &&
                 !LayerSwitcher.isBaseGroup(l));
         }).reverse();
-        // console.log(groups.map(g => g.get('title')));
         groups.forEach(function (grp) {
             // TODO Can we use getLayersArray, is it public in the esm build?
             const descendantVisibility = grp.getLayersArray().map(function (l) {
                 const state = l.getVisible();
-                // console.log('>', l.get('title'), state);
                 return state;
             });
-            // console.log(descendantVisibility);
             if (descendantVisibility.every(function (v) {
                 return v === true;
             })) {
@@ -311,7 +308,6 @@ class LayerSwitcher extends Control {
         });
     }
     static setChildVisibility(map) {
-        // console.log('setChildVisibility');
         const groups = LayerSwitcher.getGroupsAndLayers(map, function (l) {
             return (l instanceof LayerGroup &&
                 !l.get('combine') &&
@@ -319,7 +315,6 @@ class LayerSwitcher extends Control {
         });
         groups.forEach(function (grp) {
             const group = grp;
-            // console.log(group.get('title'));
             const groupVisible = group.getVisible();
             const groupIndeterminate = group.get('indeterminate');
             group
@@ -383,7 +378,6 @@ class LayerSwitcher extends Control {
      * @protected
      */
     static setVisible_(map, lyr, visible, groupSelectStyle) {
-        // console.log(lyr.get('title'), visible, groupSelectStyle);
         lyr.setVisible(visible);
         if (visible && lyr.get('type') === 'base') {
             // Hide all other base layers regardless of grouping

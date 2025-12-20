@@ -135,7 +135,6 @@ app.controller('MainCtrl', function ($scope, $http) {
 
     $scope.updateTheme = function(darkMode) {
         if(darkMode != $scope.DarkMode) {
-            // console.log("Updating theme, use dark mode?", darkMode);
             $scope.DarkMode = darkMode;
 
             if($scope.DarkMode) {

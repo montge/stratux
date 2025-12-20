@@ -398,7 +398,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			}
 		}
 		if (dirty) {
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	});
@@ -410,7 +409,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			var newsettings = {
 				"PPM": settings["PPM"]
 			};
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	};
@@ -422,7 +420,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			var newsettings = {
 				"Dump1090Gain": settings["Dump1090Gain"]
 			};
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	};
@@ -445,7 +442,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			var newsettings = {
 				"Baud": settings["Baud"]
 			};
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	};
@@ -459,14 +455,11 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			var newsettings = {
 				"WatchList": settings["WatchList"]
 			};
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	};
 	$scope.pongUpdateRun = function () {
-		// console.log($scope.pongUpdateForm);
 		const curFiles = inputfile.files;
-		// console.log(curFiles);
 	};
 	$scope.updatemodes = function () {
 		if ($scope.OwnshipModeS !== settings["OwnshipModeS"]) {
@@ -474,7 +467,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			var newsettings = {
 				"OwnshipModeS": $scope.OwnshipModeS.toUpperCase()
 			};
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	};
@@ -484,7 +476,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			var newsettings = {
 				"StaticIps": $scope.StaticIps === undefined? "" : $scope.StaticIps.join(' ')
 			};
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	};
@@ -495,7 +486,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			var newsettings = {
 				"AltitudeOffset": settings["AltitudeOffset"]
 			};
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	};
@@ -506,7 +496,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			var newsettings = {
 				"GLimits": settings["GLimits"]
 			};
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 		}
 	};
@@ -543,8 +532,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 	$scope.setPongUploadFile = function (files) {
 		$scope.pong_update_files = files;
 		$scope.$apply();
-		// console.log("setPongUploadFile");
-		// console.log($scope.pong_update_files);
 	};
 
 	$scope.resetUploadFile = function () {
@@ -601,8 +588,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 			alert ("file does not appear to be an update");
 			return;
 		}
-		// console.log("Pong update file");
-		// console.log(filename);
 		fd.append("pong_update_file", file);
 		$scope.uploading_pong_update = true;
 		$scope.$apply();
@@ -625,13 +610,10 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 	};
 
 	$scope.setOrientation = function(action) {
-		// console.log("sending " + action + " message.");
 		$http.post(URL_AHRS_ORIENT, action).
 		then(function (response) {
-			// console.log("sent " + action + " message.");
 		}, function(response) {
 			// failure: cancel the calibration
-			// console.log(response.data);
 			$scope.Orientation_Failure_Message = response.data;
 			$scope.Ui.turnOff('modalCalibrateDone');
 			$scope.Ui.turnOn("modalCalibrateFailed");
@@ -693,7 +675,6 @@ function SettingsCtrl($rootScope, $scope, $state, $location, $window, $http) {
 				"WiFiInternetPassThroughEnabled": $scope.WiFiInternetPassThroughEnabled
 			};
 
-			// console.log(angular.toJson(newsettings));
 			setSettings(angular.toJson(newsettings));
 			$scope.Ui.turnOn("modalSuccessWiFi");
 		} else {
