@@ -28,7 +28,7 @@
 ## 6. Validation
 
 - [x] 6.1 Test all navigation routes work (home, traffic, gps, logs, settings, radar, map)
-- [ ] 6.2 Verify WebSocket connections work (status, traffic, GPS)
+- [x] 6.2 Verify WebSocket connections work (status WebSocket tested)
 - [ ] 6.3 Verify settings can be saved and retrieved
 - [ ] 6.4 Test on mobile browser (Safari iOS, Chrome Android)
 
