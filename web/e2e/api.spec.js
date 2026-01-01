@@ -24,6 +24,32 @@ test.describe('REST API Endpoints', () => {
     const data = await response.json();
     // Settings should have various configuration options
     expect(typeof data).toBe('object');
+    expect(data).toHaveProperty('UAT_Enabled');
+  });
+
+  test('setSettings can update and persist settings', async ({ request }) => {
+    // Get current settings
+    const getResponse = await request.get('/getSettings');
+    expect(getResponse.ok()).toBeTruthy();
+    const originalSettings = await getResponse.json();
+
+    // Toggle a safe setting (DarkMode) to test save/retrieve
+    const testValue = !originalSettings.DarkMode;
+    const updateResponse = await request.post('/setSettings', {
+      data: { DarkMode: testValue }
+    });
+    expect(updateResponse.ok()).toBeTruthy();
+
+    // Verify the setting was saved
+    const verifyResponse = await request.get('/getSettings');
+    expect(verifyResponse.ok()).toBeTruthy();
+    const newSettings = await verifyResponse.json();
+    expect(newSettings.DarkMode).toBe(testValue);
+
+    // Restore original setting
+    await request.post('/setSettings', {
+      data: { DarkMode: originalSettings.DarkMode }
+    });
   });
 
   test('getSituation returns valid JSON', async ({ request }) => {
