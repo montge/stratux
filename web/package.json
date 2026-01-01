@@ -11,7 +11,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:device": "STRATUX_URL=http://10.0.1.53 playwright test",
-    "test:e2e:mock": "PORT=9090 node e2e/mock-server.js & sleep 2 && STRATUX_URL=http://localhost:9090 playwright test; kill %1"
+    "test:e2e:mock": "node e2e/mock-server.js & sleep 2 && STRATUX_URL=http://localhost:9090 playwright test; kill %1"
   },
   "keywords": [
     "stratux",

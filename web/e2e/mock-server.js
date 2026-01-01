@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 9090;
 const WEB_ROOT = path.join(__dirname, '..');
 
 // Mock data
