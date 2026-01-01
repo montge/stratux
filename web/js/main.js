@@ -46,7 +46,9 @@ let TRAFFIC_MAX_AGE_SECONDS = 59;
 let TRAFFIC_AIS_MAX_AGE_SECONDS = 60*15;
 let TARGET_TYPE_AIS = 5;
 
-app.config(function ($stateProvider, $urlRouterProvider) {
+app.config(function ($stateProvider, $urlRouterProvider, $locationProvider) {
+	// Use '#/' prefix instead of '#!/' for backward compatibility with existing links
+	$locationProvider.hashPrefix('');
 	$stateProvider
 		.state('home', {
 			url: '/',
