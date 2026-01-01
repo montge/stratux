@@ -1,12 +1,12 @@
-<div class="col-sm-12">
+<div class="col-sm-12" ng-cloak>
 	<div class="text-center">
-		<a ng-click="VersionClick()" class="btn btn-hidden"><strong>Version: <span><code>{{Version}} ({{Build}})</code></span></strong></a>
+		<a ng-click="VersionClick()" class="btn btn-hidden"><strong>Version: <span><code ng-bind="Version + ' (' + Build + ')'"></code></span></strong></a>
 	</div>
 	<div class="panel panel-default">
 		<div class="panel-heading">
 			<span class="panel_label">Status</span>
-			<span ng-show="ConnectState == 'Connected'" class="label label-success">{{ConnectState}}</span>
-			<span ng-hide="ConnectState == 'Connected'" class="label label-danger">{{ConnectState}}</span>
+			<span ng-show="ConnectState == 'Connected'" class="label label-success" ng-bind="ConnectState"></span>
+			<span ng-hide="ConnectState == 'Connected'" class="label label-danger" ng-bind="ConnectState"></span>
 			<span ng-show="DeveloperMode == true" class="label label-warning">Developer Mode</span>
 		</div>
 		<div class="panel-body">
