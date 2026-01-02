@@ -2298,28 +2298,28 @@ func TestParseDownlinkReportShortFrame(t *testing.T) {
 	resetUATDownlinkState()
 
 	tests := []struct {
-		name    string
-		hexStr  string
-		desc    string
+		name   string
+		hexStr string
+		desc   string
 	}{
 		{
 			name:   "empty_frame",
-			hexStr: "+",  // Empty after prefix
+			hexStr: "+", // Empty after prefix
 			desc:   "Empty frame should be rejected",
 		},
 		{
 			name:   "one_byte_frame",
-			hexStr: "+AB",  // Only 1 byte after hex decode
+			hexStr: "+AB", // Only 1 byte after hex decode
 			desc:   "1-byte frame should be rejected",
 		},
 		{
 			name:   "two_byte_frame",
-			hexStr: "+ABCD",  // Only 2 bytes after hex decode
+			hexStr: "+ABCD", // Only 2 bytes after hex decode
 			desc:   "2-byte frame should be rejected",
 		},
 		{
 			name:   "three_byte_frame",
-			hexStr: "+ABCDEF",  // Only 3 bytes after hex decode
+			hexStr: "+ABCDEF", // Only 3 bytes after hex decode
 			desc:   "3-byte frame should be rejected",
 		},
 	}
