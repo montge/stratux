@@ -4,9 +4,8 @@ function AHRSRenderer(locationId) {
 
     this.locationId = locationId;
     this.canvas = document.getElementById(this.locationId);
-    this.resize();
 
-    // State variables
+    // Initialize state variables that may be accessed even if SVG fails
     this.pitch = 0;
     this.roll = 0;
     this.heading = 0;
@@ -14,7 +13,32 @@ function AHRSRenderer(locationId) {
     this.altitude = 0;
     this.messages = [];
 
-    var display = SVG(this.locationId).viewbox(-200, -200, 400, 400).group();
+    // Check if element exists before initializing SVG
+    if (!this.canvas) {
+        console.warn('AHRSRenderer: element #' + locationId + ' not found, deferring initialization');
+        this.initDeferred = true;
+        return;
+    }
+
+    // Check if SVG library is available and element is ready
+    var svgElement;
+    try {
+        svgElement = SVG(this.locationId);
+    } catch(e) {
+        console.warn('AHRSRenderer: SVG initialization failed:', e.message);
+        this.initDeferred = true;
+        return;
+    }
+
+    if (!svgElement) {
+        console.warn('AHRSRenderer: SVG() returned null for #' + locationId);
+        this.initDeferred = true;
+        return;
+    }
+
+    this.resize();
+
+    var display = svgElement.viewbox(-200, -200, 400, 400).group();
 
     this.ai = display.group().addClass('ai');
 
@@ -98,6 +122,7 @@ AHRSRenderer.prototype = {
     constructor: AHRSRenderer,
 
     resize: function () {
+        if (this.initDeferred || !this.canvas) return;
         var canvasWidth = this.canvas.parentElement.offsetWidth - 12;
 
         if (canvasWidth !== this.width) {
@@ -110,6 +135,7 @@ AHRSRenderer.prototype = {
     },
 
     update: function (pitch, roll, heading, slipSkid) {
+        if (this.initDeferred) return;
         this.pitch = pitch;
         this.roll = roll;
         this.heading = heading;
@@ -147,12 +173,14 @@ AHRSRenderer.prototype = {
     },
 
     turn_on: function () {
+        if (this.initDeferred) return;
         this.err.hide();
         this.ai.show();
         this.update(this.pitch, this.roll, this.heading, this.slipSkid);
     },
 
     turn_off: function () {
+        if (this.initDeferred) return;
         this.update(this.pitch, this.roll, this.heading, this.slipSkid);
         this.ai.hide();
         this.err.show();
@@ -174,6 +202,29 @@ function GMeterRenderer(locationId, nlim, plim, resetCallback) {
 
     this.locationId = locationId;
     this.canvas = document.getElementById(this.locationId);
+
+    // Check if element exists before initializing SVG
+    if (!this.canvas) {
+        console.warn('GMeterRenderer: element #' + locationId + ' not found');
+        this.initDeferred = true;
+        return;
+    }
+
+    var svgElement;
+    try {
+        svgElement = SVG(this.locationId);
+    } catch(e) {
+        console.warn('GMeterRenderer: SVG init failed:', e.message);
+        this.initDeferred = true;
+        return;
+    }
+
+    if (!svgElement) {
+        console.warn('GMeterRenderer: SVG() returned null for #' + locationId);
+        this.initDeferred = true;
+        return;
+    }
+
     this.resize();
 
     // State variables
@@ -182,7 +233,7 @@ function GMeterRenderer(locationId, nlim, plim, resetCallback) {
     this.max = 1;
 
     // Draw the G Meter using the svg.js library
-    var gMeter = SVG(this.locationId).viewbox(-200, -200, 400, 400).group().addClass('gMeter');
+    var gMeter = svgElement.viewbox(-200, -200, 400, 400).group().addClass('gMeter');
 
     var el, card = gMeter.group().addClass('card');
     card.circle(390).cx(0).cy(0);
@@ -245,6 +296,7 @@ GMeterRenderer.prototype = {
     constructor: GMeterRenderer,
 
     resize: function () {
+        if (this.initDeferred || !this.canvas) return;
         var canvasWidth = this.canvas.parentElement.offsetWidth - 12;
 
         if (canvasWidth !== this.width) {
@@ -257,6 +309,7 @@ GMeterRenderer.prototype = {
     },
 
     update: function (g, gmin, gmax) {
+        if (this.initDeferred) return;
         this.g = g;
         this.min = gmin;
         this.max = gmax;

@@ -1,10 +1,10 @@
-<div class="col-sm-12" ng-cloak>
+<div class="col-sm-12">
 	<div class="col-sm-6">
 		<div class="panel panel-default">
 			<div class="panel-heading">
 				<span ng-click="hideClick()" ng-keydown="$event.keyCode === 13 && hideClick()" tabindex="0" role="button" class="panel_label">AHRS</span>
-				<span ng-show="ConnectState == 'Connected'" class="label label-success" ng-bind="ConnectState"></span>
-				<span ng-hide="ConnectState == 'Connected'" class="label label-danger" ng-bind="ConnectState"></span>
+				<span ng-show="ConnectState == 'Connected'" class="label label-success">{{ConnectState}}</span>
+				<span ng-hide="ConnectState == 'Connected'" class="label label-danger">{{ConnectState}}</span>
 			</div>
 			<div class="panel-body">
 				<div class="row">
@@ -36,10 +36,10 @@
 							<strong class="col-xs-3 text-center">P-Alt</strong>
 						</div>
 						<div class="row">
-							<span class="col-xs-3 text-center"><span ng-bind="ahrs_heading"></span>&deg;</span>
-							<span class="col-xs-3 text-center"><span ng-bind="ahrs_pitch"></span>&deg;</span>
-							<span class="col-xs-3 text-center"><span ng-bind="ahrs_roll"></span>&deg;</span>
-							<span class="col-xs-3 text-center"><span ng-bind="ahrs_alt"></span>'</span>
+							<span class="col-xs-3 text-center">{{ahrs_heading}}&deg;</span>
+							<span class="col-xs-3 text-center">{{ahrs_pitch}}&deg;</span>
+							<span class="col-xs-3 text-center">{{ahrs_roll}}&deg;</span>
+							<span class="col-xs-3 text-center">{{ahrs_alt}}'</span>
 						</div>
 						<div class="row">
 							<strong class="col-xs-3 text-center">Mag Hdg</strong>
@@ -48,10 +48,10 @@
 							<strong class="col-xs-3 text-center">G Load</strong>
 						</div>
 						<div class="row">
-							<span class="col-xs-3 text-center"><span ng-bind="ahrs_heading_mag"></span>&deg;</span>
-							<span class="col-xs-3 text-center"><span ng-bind="ahrs_slip_skid"></span>&deg;</span>
-							<span class="col-xs-3 text-center"><span ng-bind="ahrs_turn_rate"></span> min</span>
-							<span class="col-xs-3 text-center"><span ng-bind="ahrs_gload"></span>G</span>
+							<span class="col-xs-3 text-center">{{ahrs_heading_mag}}&deg;</span>
+							<span class="col-xs-3 text-center">{{ahrs_slip_skid}}&deg;</span>
+							<span class="col-xs-3 text-center">{{ahrs_turn_rate}} min</span>
+							<span class="col-xs-3 text-center">{{ahrs_gload}}G</span>
 						</div>
 					</div>
 				</div>
@@ -81,13 +81,13 @@
         			<strong class="col-xs-6 text-center">Track:</strong>
     			</div>
 				<div class="row">
-					<span class="col-xs-6 text-center"><span ng-bind="gps_lat"></span>, <span ng-bind="gps_lon"></span> &plusmn; <span ng-bind="gps_horizontal_accuracy"></span> m <br>
+					<span class="col-xs-6 text-center">{{gps_lat}}, {{gps_lon}} &plusmn; {{gps_horizontal_accuracy}} m <br>
 						<b>Altitude MSL:</b> <br>
-						<span ng-bind="gps_alt"></span> &plusmn; <span ng-bind="gps_vertical_accuracy"></span> ft  @ <span ng-bind="gps_vert_speed"></span> ft/min <br>
+						{{gps_alt}} &plusmn; {{gps_vertical_accuracy}} ft  @ {{gps_vert_speed}} ft/min <br>
 						<b>Height WGS-84 ellipsoid:</b> <br>
-						<span ng-bind="gps_height_above_ellipsoid"></span> ft
+						{{ gps_height_above_ellipsoid }} ft
 					</span>
-					<span class="col-xs-6 text-center"><span ng-bind="gps_track"></span>&deg; @ <span ng-bind="gps_speed"></span> KTS</span>
+					<span class="col-xs-6 text-center">{{gps_track}}&deg; @ {{gps_speed}} KTS</span>
 				</div>
 			</div>
 		</div>
@@ -110,11 +110,11 @@
 
 				<div class="row" ng-repeat="satellite in data_list | orderBy: 'SatelliteNMEA'">
 					<div class="separator"></div>
-					<span class="col-xs-3"><span ng-bind="satellite.SatelliteID"></span><span ng-show="satellite.InSolution">&nbsp;&#x2705;</span></span>
-					<!--<span class="col-xs-2 text-right" ng-bind="satellite.SatelliteNMEA"></span>-->
-					<span class="col-xs-3 text-right"><span ng-bind="satellite.Elevation < -5 ? '---' : satellite.Elevation"></span>&deg;</span>
-					<span class="col-xs-3 text-right"><span ng-bind="satellite.Azimuth < 0 ? '---' : satellite.Azimuth"></span>&deg;</span>
-					<span class="col-xs-3 text-right"><span ng-bind="satellite.Signal < 1 ? '---' : satellite.Signal"></span><span style="font-size:50%">&nbsp;dB-Hz</span></span>
+					<span class="col-xs-3">{{satellite.SatelliteID}}<span ng-show="satellite.InSolution">&nbsp;&#x2705;</span></span>
+					<!--<span class="col-xs-2 text-right">{{satellite.SatelliteNMEA}}</span>-->
+					<span class="col-xs-3 text-right">{{satellite.Elevation < -5 ? "---" : satellite.Elevation}}&deg;</span>
+					<span class="col-xs-3 text-right">{{satellite.Azimuth < 0 ? "---" : satellite.Azimuth}}&deg;</span>
+					<span class="col-xs-3 text-right">{{satellite.Signal < 1 ? "---" : satellite.Signal}}<span style="font-size:50%">&nbsp;dB-Hz</span></span>
 				</div>
 			</div>
 
@@ -122,11 +122,11 @@
 			<div class="panel-footer">
 				<div class="row">
 					<label class="col-xs-6">GPS solution:</label>
-					<span class="col-xs-6"><span ng-bind="SolutionText"></span> @ <span ng-bind="GPS_PositionSampleRate"></span> Hz</span>
+					<span class="col-xs-6">{{SolutionText}} @ {{ GPS_PositionSampleRate }} Hz</span>
 				</div>
 				<div class="row">
 					<label class="col-xs-6">Summary:</label>
-					<span class="col-xs-6"><span ng-bind="Satellites"></span> in solution; <span ng-bind="GPS_satellites_seen"></span> seen; <span ng-bind="GPS_satellites_tracked"></span> tracked</span>
+					<span class="col-xs-6">{{Satellites}} in solution; {{GPS_satellites_seen}} seen; {{GPS_satellites_tracked}} tracked</span>
 				</div>
 			</div>
 		</div>
