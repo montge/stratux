@@ -1073,13 +1073,13 @@ func handleroPartitionRebuild(w http.ResponseWriter, r *http.Request) {
 
 // https://gist.github.com/alexisrobert/982674.
 // Copyright (c) 2010-2014 Alexis ROBERT <alexis.robert@gmail.com>.
-const dirlisting_tpl = `<?xml version="1.0" encoding="iso-8859-1"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+const dirlisting_tpl = `<!DOCTYPE html>
+<html lang="en">
 <!-- Modified from lighttpd directory listing -->
 <head>
+<meta charset="utf-8">
 <title>Index of {{.Name}}</title>
-<style type="text/css">
+<style>
 a, a:active {text-decoration: none; color: blue;}
 a:visited {color: #48468F;}
 a:hover, a:focus {text-decoration: underline; color: red;}
@@ -1097,7 +1097,7 @@ div.foot { font: 90% monospace; color: #787878; padding-top: 4px;}
 <body>
 <h2>Index of {{.Name}}</h2>
 <div class="list">
-<table summary="Directory Listing" cellpadding="0" cellspacing="0">
+<table>
 <thead><tr><th class="n">Name</th><th>Last Modified</th><th>Size (bytes)</th><th class="dl">Options</th></tr></thead>
 <tbody>
 {{range .Children_files}}
