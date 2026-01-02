@@ -688,13 +688,36 @@ function RadarRenderer(locationId, $scope, $http) {
 
 	this.locationId = locationId;
 	this.canvas = document.getElementById(this.locationId);
+
+	// Check if element exists before initializing SVG
+	if (!this.canvas) {
+		console.warn('RadarRenderer: element #' + locationId + ' not found, deferring initialization');
+		this.initDeferred = true;
+		return;
+	}
+
+	var svgElement;
+	try {
+		svgElement = SVG(this.locationId);
+	} catch(e) {
+		console.warn('RadarRenderer: SVG init failed:', e.message);
+		this.initDeferred = true;
+		return;
+	}
+
+	if (!svgElement) {
+		console.warn('RadarRenderer: SVG() returned null for #' + locationId);
+		this.initDeferred = true;
+		return;
+	}
+
 	this.resize();
 
 	AltDiffThreshold = 20;
 	DisplayRadius = 10;
 
 	// Draw the radar using the svg.js library
-	var radarAll = SVG(this.locationId).viewbox(-201, -201, 402, 302).group().addClass('radar');
+	var radarAll = svgElement.viewbox(-201, -201, 402, 302).group().addClass('radar');
 	var background = radarAll.rect(402, 402).radius(5).x(-201).y(-201).addClass('blackRect');
 	var card = radarAll.group().addClass('card');
 	card.circle(400).cx(0).cy(0).addClass('circle');
@@ -883,6 +906,7 @@ RadarRenderer.prototype = {
 	constructor: RadarRenderer,
 
 	resize: function() {
+		if (this.initDeferred || !this.canvas) return;
 		var canvasWidth = this.canvas.parentElement.offsetWidth - 12;
 
 		if (canvasWidth !== this.width) {
@@ -895,6 +919,7 @@ RadarRenderer.prototype = {
 	},
 
 	update: function() {
+		if (this.initDeferred) return;
 		if (BaroAltitude !== OldBaroAltitude) {
 			this.fl.text('FL' + Math.round(BaroAltitude / 100));  // just update text
 			OldBaroAltitude = BaroAltitude;
