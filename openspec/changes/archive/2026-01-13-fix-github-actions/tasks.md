@@ -43,11 +43,11 @@
 - [x] 7.2 Use built-in caching from `actions/setup-go@v5` (enabled by default)
 - [x] 7.3 Verify "Cannot open: File exists" warnings are eliminated
 
-## 8. Consolidate Workflow Duplication (Future)
+## 8. Consolidate Workflow Duplication
 
-- [ ] 8.1 Create reusable composite action for Go build setup
-- [ ] 8.2 Update all workflows to use the composite action
-- [ ] 8.3 Remove duplicated dependency installation steps
+- [x] 8.1 Create reusable composite action for Go build setup
+- [x] 8.2 Update all workflows to use the composite action
+- [x] 8.3 Remove duplicated dependency installation steps
 
 ## 9. Verification
 

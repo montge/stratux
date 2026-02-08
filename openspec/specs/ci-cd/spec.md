@@ -1,5 +1,8 @@
-## ADDED Requirements
+# ci-cd Specification
 
+## Purpose
+TBD - created by archiving change fix-github-actions. Update Purpose after archive.
+## Requirements
 ### Requirement: Reusable Build Setup Action
 The CI/CD system SHALL provide a reusable composite action for consistent build environment setup.
 
@@ -25,8 +28,6 @@ The CI system SHALL report test coverage to SonarCloud for quality tracking.
 #### Scenario: Coverage format
 - **WHEN** coverage is generated
 - **THEN** it SHALL be in the format expected by SonarCloud (Go coverage profile)
-
-## MODIFIED Requirements
 
 ### Requirement: Nightly Build Reliability
 The nightly build workflow SHALL produce US and EU region Debian packages reliably.
@@ -54,8 +55,3 @@ The CI workflow SHALL run web UI tests and report coverage.
 - **WHEN** web UI tests complete (pass or fail)
 - **THEN** coverage artifacts SHALL be uploaded if they exist
 
-## REMOVED Requirements
-
-### Requirement: System Go Package Dependency
-**Reason**: System packages provide outdated Go versions
-**Migration**: Use `actions/setup-go@v5` with `go-version-file: 'go.mod'`
