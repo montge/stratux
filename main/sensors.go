@@ -215,6 +215,8 @@ func initIMU() (ok bool) {
 }
 
 // sensorAttitudeSender sends attitude data over WebSocket.
+// sensorAttitudeSender has high cognitive complexity (~27). Refactoring is planned but
+// deferred to avoid behavioral risk.
 // Note: This could potentially be consolidated with managementinterface.go
 // websocket handlers in a future refactoring effort.
 func sensorAttitudeSender() {

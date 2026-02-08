@@ -586,65 +586,30 @@ func isDataLogReady() bool {
 	return dataLogReadyToWrite
 }
 
-func logSituation() {
+// logToDataLog sends a data row to the datalog channel if logging is active.
+func logToDataLog(tbl string, data interface{}) {
 	if globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "mySituation", data: mySituation}
+		dataLogChan <- DataLogRow{tbl: tbl, data: data}
 	}
 }
 
-func logStatus() {
-	if globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "status", data: globalStatus}
+// logToDataLogDebug sends a data row only when DEBUG mode is also enabled.
+func logToDataLogDebug(tbl string, data interface{}) {
+	if globalSettings.DEBUG {
+		logToDataLog(tbl, data)
 	}
 }
 
-func logSettings() {
-	if globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "settings", data: globalSettings}
-	}
-}
-
-func logTraffic(ti TrafficInfo) {
-	if globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "traffic", data: ti}
-	}
-}
-
-func logMsg(m msg) {
-	if globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "messages", data: m}
-	}
-}
-
-func logESMsg(m esmsg) {
-	if globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "es_messages", data: m}
-	}
-}
-
-func logGPSAttitude(gpsPerf gpsPerfStats) {
-	if globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "gps_attitude", data: gpsPerf}
-	}
-}
-
-func logDump1090TermMessage(m Dump1090TermMessage) {
-	if globalSettings.DEBUG && globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "dump1090_terminal", data: m}
-	}
-}
-
-func logPongTermMessage(m PongTermMessage) {
-	if globalSettings.DEBUG && globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "pong_update", data: m}
-	}
-}
-
-func logAISTermMessage(m AISTermMessage) {
-	if globalSettings.DEBUG && globalSettings.ReplayLog && isDataLogReady() {
-		dataLogChan <- DataLogRow{tbl: "ais_message", data: m}
-	}
-}
+func logSituation()                              { logToDataLog("mySituation", mySituation) }
+func logStatus()                                 { logToDataLog("status", globalStatus) }
+func logSettings()                               { logToDataLog("settings", globalSettings) }
+func logTraffic(ti TrafficInfo)                   { logToDataLog("traffic", ti) }
+func logMsg(m msg)                               { logToDataLog("messages", m) }
+func logESMsg(m esmsg)                           { logToDataLog("es_messages", m) }
+func logGPSAttitude(gpsPerf gpsPerfStats)        { logToDataLog("gps_attitude", gpsPerf) }
+func logDump1090TermMessage(m Dump1090TermMessage) { logToDataLogDebug("dump1090_terminal", m) }
+func logPongTermMessage(m PongTermMessage)       { logToDataLogDebug("pong_update", m) }
+func logAISTermMessage(m AISTermMessage)         { logToDataLogDebug("ais_message", m) }
 
 func initDataLog() {
 	//log.Printf("dataLogStarted = %t. dataLogReadyToWrite = %t\n", dataLogStarted, dataLogReadyToWrite) //REMOVE -- DEBUG

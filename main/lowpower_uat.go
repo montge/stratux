@@ -131,16 +131,16 @@ func processRadioMessage(msg []byte) {
 	msg = msg[5:]
 
 	var toRelay string
-	var rs_errors int
+	var rsErrors int
 	switch len(msg) {
 	case 552:
 		to := make([]byte, 552)
-		C.correct_uplink_frame((*C.uint8_t)(unsafe.Pointer(&msg[0])), (*C.uint8_t)(unsafe.Pointer(&to[0])), (*C.int)(unsafe.Pointer(&rs_errors)))
+		C.correct_uplink_frame((*C.uint8_t)(unsafe.Pointer(&msg[0])), (*C.uint8_t)(unsafe.Pointer(&to[0])), (*C.int)(unsafe.Pointer(&rsErrors)))
 		toRelay = fmt.Sprintf("+%s;ss=%d;", hex.EncodeToString(to[:432]), rssiDump978)
 	case 48:
 		to := make([]byte, 48)
 		copy(to, msg)
-		i := int(C.correct_adsb_frame((*C.uint8_t)(unsafe.Pointer(&to[0])), (*C.int)(unsafe.Pointer(&rs_errors))))
+		i := int(C.correct_adsb_frame((*C.uint8_t)(unsafe.Pointer(&to[0])), (*C.int)(unsafe.Pointer(&rsErrors))))
 		if i == 1 {
 			// Short ADS-B frame.
 			toRelay = fmt.Sprintf("-%s;ss=%d;", hex.EncodeToString(to[:18]), rssiDump978)
@@ -152,7 +152,7 @@ func processRadioMessage(msg []byte) {
 		log.Printf("processRadioMessage(): unhandled message size %d\n", len(msg))
 	}
 
-	if len(toRelay) > 0 && rs_errors != 9999 {
+	if len(toRelay) > 0 && rsErrors != 9999 {
 		o, msgtype := parseInput(toRelay)
 		if o != nil && msgtype != 0 {
 			relayMessage(msgtype, o)

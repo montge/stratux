@@ -314,6 +314,8 @@ func isOwnshipTrafficInfo(ti TrafficInfo) (isOwnshipInfo bool, shouldIgnore bool
 	return
 }
 
+// sendTrafficUpdates has high cognitive complexity (~26). Refactoring is planned but
+// deferred to avoid behavioral risk.
 func sendTrafficUpdates() {
 	trafficMutex.Lock()
 	defer trafficMutex.Unlock()
@@ -757,6 +759,8 @@ func decodeBase40Callsign(frame []byte, startIndex int) string {
 // parseDownlinkReport decodes a UAT downlink message to extract identity, state vector, and mode status data.
 // Decoded data is used to update a TrafficInfo object, keyed to the 24-bit ICAO code contained in the
 // downlink message.
+// parseDownlinkReport has high cognitive complexity (~47). Refactoring is planned but
+// deferred to avoid behavioral risk.
 // Inputs are a checksum-verified hex string corresponding to the 18 or 34-byte UAT
 // message, and an int representing UAT signal amplitude (0-1000).
 func parseDownlinkReport(s string, signalLevel int) {
@@ -1172,6 +1176,8 @@ func calculateNICFromTypeCode(typeCode, subtypeCode int) int {
 	}
 }
 
+// parseDump1090Message has high cognitive complexity (~55). Refactoring into smaller
+// message-type handlers is planned but deferred to avoid behavioral risk.
 func parseDump1090Message(buf string) {
 	// Log the message to the message counter in any case.
 	var thisMsg msg

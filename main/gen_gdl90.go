@@ -50,7 +50,7 @@ const (
 	logDir                = "/var/log/"
 	dataLogFile           = "stratux.sqlite"
 	//FlightBox: log to /root.
-	logDir_FB           = "/root/"
+	logDirFB           = "/root/"
 	maxDatagramSize     = 8192
 	maxUserMsgQueueSize = 25000 // About 10MB per port per connected client.
 
@@ -127,7 +127,7 @@ var stratuxBuild string
 var stratuxVersion string
 var ManagementAddr = 0
 
-var product_name_map = map[int]string{
+var productNameMap = map[int]string{
 	0:   "METAR",
 	1:   "TAF",
 	2:   "SIGMET",
@@ -1204,17 +1204,17 @@ func parseInput(buf string) ([]byte, uint16) {
 	return frame, msgtype
 }
 
-func getProductNameFromId(product_id int) string {
-	name, present := product_name_map[product_id]
+func getProductNameFromId(productID int) string {
+	name, present := productNameMap[productID]
 	if present {
 		return name
 	}
 
-	if product_id == 600 || (product_id >= 2000 && product_id <= 2005) {
+	if productID == 600 || (productID >= 2000 && productID <= 2005) {
 		return "Custom/Test"
 	}
 
-	return fmt.Sprintf("Unknown (%d)", product_id)
+	return fmt.Sprintf("Unknown (%d)", productID)
 }
 
 type settings struct {
@@ -1713,6 +1713,8 @@ func isX86DebugMode() bool {
 	return runtime.GOARCH == "i386" || runtime.GOARCH == "amd64"
 }
 
+// main has high cognitive complexity (~24). Refactoring is planned but deferred to
+// avoid behavioral risk.
 func main() {
 	// Catch signals for graceful shutdown.
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -1754,7 +1756,7 @@ func main() {
 	//FlightBox: detect via presence of /etc/FlightBox file.
 	if _, err := os.Stat("/etc/FlightBox"); !os.IsNotExist(err) {
 		globalStatus.HardwareBuild = "FlightBox"
-		logDirf = logDir_FB
+		logDirf = logDirFB
 	} else { // if not using the FlightBox config, use "normal" log file locations
 		logDirf = logDir
 	}

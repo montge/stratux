@@ -162,6 +162,8 @@ func importOgnStatusMessage(msg OgnMessage) {
 	}
 }
 
+// importOgnTrafficMessage has high cognitive complexity (~26). Refactoring is planned
+// but deferred to avoid behavioral risk.
 func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) {
 	var ti TrafficInfo
 	addressBytes, _ := hex.DecodeString(msg.Addr)

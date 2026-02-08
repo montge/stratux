@@ -1390,7 +1390,7 @@ func TestReadSettings_ReadError(t *testing.T) {
 	t.Log("readSettings handled file read error gracefully")
 }
 
-// TestGetProductNameFromId_KnownProducts tests known product IDs from product_name_map
+// TestGetProductNameFromId_KnownProducts tests known product IDs from productNameMap
 func TestGetProductNameFromId_KnownProducts(t *testing.T) {
 	testCases := []struct {
 		productID int

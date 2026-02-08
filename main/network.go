@@ -108,14 +108,11 @@ func getDHCPLeases() (map[string]string, error) {
 	}
 
 	iplines = strings.Split(string(dat3), "\n")
-	block_ip2 := ""
 	for _, ipline := range iplines {
 		spacedip := strings.Split(ipline, " ")
 		if len(spacedip) == 2 {
-			// The ip is in block_ip2
-			block_ip2 = spacedip[0]
-			// the hostname is here
-			ret[block_ip2] = spacedip[1]
+			ip := spacedip[0]
+			ret[ip] = spacedip[1]
 		}
 	}
 
@@ -143,61 +140,59 @@ func serialOutWatcher() {
 	}
 
 	for {
-		select {
-		case <-serialTicker.C:
-			for _, serialDev := range serialDevs {
-				if _, err := os.Stat(serialDev); !os.IsNotExist(err) { // Check if the device file exists.
-					var config serialConnection
+		<-serialTicker.C
+		for _, serialDev := range serialDevs {
+			if _, err := os.Stat(serialDev); !os.IsNotExist(err) { // Check if the device file exists.
+				var config serialConnection
 
-					// Master is globalSettings.SerialOutputs. Once we connect to one, it will be copied to the active connections map
-					if val, ok := globalSettings.SerialOutputs[serialDev]; !ok {
-						proto := uint8(NETWORK_GDL90_STANDARD)
-						if strings.Contains(serialDev, "_nmea") {
-							proto = NETWORK_FLARM_NMEA
-						}
-						if globalSettings.SerialOutputs == nil {
-							globalSettings.SerialOutputs = make(map[string]serialConnection)
-						}
-						globalSettings.SerialOutputs[serialDev] = serialConnection{DeviceString: serialDev, Baud: 38400, Capability: proto, Queue: NewMessageQueue(1024)}
-						log.Printf("detected new serial output, setting up now: %s. Default baudrate 38400.\n", serialDev)
-						config = globalSettings.SerialOutputs[serialDev]
-
-						saveSettings()
-					} else {
-						config = val
-						if config.Capability == 0 {
-							config.Capability = NETWORK_GDL90_STANDARD // Fix old serial conns that didn't have protocol set
-						}
+				// Master is globalSettings.SerialOutputs. Once we connect to one, it will be copied to the active connections map
+				if val, ok := globalSettings.SerialOutputs[serialDev]; !ok {
+					proto := uint8(NETWORK_GDL90_STANDARD)
+					if strings.Contains(serialDev, "_nmea") {
+						proto = NETWORK_FLARM_NMEA
 					}
-
-					netMutex.Lock()
-
-					needsConnect := true
-					if activeConn, ok := clientConnections[serialDev]; ok {
-						if !activeConn.IsSleeping() {
-							needsConnect = false
-						} else {
-							go activeConn.Close() // expired/unplugged? async because it might lock..
-							delete(clientConnections, serialDev)
-						}
+					if globalSettings.SerialOutputs == nil {
+						globalSettings.SerialOutputs = make(map[string]serialConnection)
 					}
+					globalSettings.SerialOutputs[serialDev] = serialConnection{DeviceString: serialDev, Baud: 38400, Capability: proto, Queue: NewMessageQueue(1024)}
+					log.Printf("detected new serial output, setting up now: %s. Default baudrate 38400.\n", serialDev)
+					config = globalSettings.SerialOutputs[serialDev]
 
-					if needsConnect {
-						cfg := &serial.Config{Name: config.DeviceString, Baud: config.Baud}
-						p, err := serial.OpenPort(cfg)
-						if err != nil {
-							log.Printf("serialout port (%s) err: %s\n", config.DeviceString, err.Error())
-						} else {
-							log.Printf("opened serialout: Name: %s, Baud: %d\n", config.DeviceString, config.Baud)
-							// Save the serial port connection.
-							tmp := config
-							tmp.serialPort = p
-							clientConnections[serialDev] = &tmp
-							go connectionWriter(&tmp)
-						}
+					saveSettings()
+				} else {
+					config = val
+					if config.Capability == 0 {
+						config.Capability = NETWORK_GDL90_STANDARD // Fix old serial conns that didn't have protocol set
 					}
-					netMutex.Unlock()
 				}
+
+				netMutex.Lock()
+
+				needsConnect := true
+				if activeConn, ok := clientConnections[serialDev]; ok {
+					if !activeConn.IsSleeping() {
+						needsConnect = false
+					} else {
+						go activeConn.Close() // expired/unplugged? async because it might lock..
+						delete(clientConnections, serialDev)
+					}
+				}
+
+				if needsConnect {
+					cfg := &serial.Config{Name: config.DeviceString, Baud: config.Baud}
+					p, err := serial.OpenPort(cfg)
+					if err != nil {
+						log.Printf("serialout port (%s) err: %s\n", config.DeviceString, err.Error())
+					} else {
+						log.Printf("opened serialout: Name: %s, Baud: %d\n", config.DeviceString, config.Baud)
+						// Save the serial port connection.
+						tmp := config
+						tmp.serialPort = p
+						clientConnections[serialDev] = &tmp
+						go connectionWriter(&tmp)
+					}
+				}
+				netMutex.Unlock()
 			}
 		}
 	}
@@ -494,10 +489,9 @@ func connectionWriter(connection connection) {
 
 			// Try to send around 1kb of data per packet to reduce IOPS when queue is full
 			msg := collectMessages(connection)
-			if msg == nil || len(msg) == 0 {
+			if len(msg) == 0 {
 				break // Wait for next time that the DataAvailable channel has more for us
 			}
-			//fmt.Printf("Sending message bytes %d\n", len(msg))
 			written := 0
 			for written < len(msg) {
 				writtenNow, err := connection.Writer().Write(msg)
@@ -510,7 +504,6 @@ func connectionWriter(connection connection) {
 			totalNetworkMessagesSent++
 			globalStatus.NetworkDataMessagesSent++
 			globalStatus.NetworkDataBytesSent += uint64(written)
-			//time.Sleep(532 * time.Millisecond)
 		}
 	}
 }
@@ -549,10 +542,8 @@ func sendNetFLARM(msg string, maxAge time.Duration, priority int32) {
 func monitorDHCPLeases() {
 	timer := time.NewTicker(30 * time.Second)
 	for {
-		select {
-		case <-timer.C:
-			refreshConnectedClients()
-		}
+		<-timer.C
+		refreshConnectedClients()
 	}
 }
 

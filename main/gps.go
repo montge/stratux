@@ -270,6 +270,8 @@ func logChipConfig(line1 string, chip string, device string, baudrate int, appen
 	logInf(msg, chip, device, baudrate)
 }
 
+// initGPSSerial has high cognitive complexity (~27). Refactoring is planned but deferred
+// to avoid behavioral risk.
 func initGPSSerial() bool {
 	var device string
 	var targetBaudRate int = 115200
@@ -730,6 +732,8 @@ func setTrueCourse(groundSpeed uint16, trueCourse float64) {
 /*
 calcGPSAttitude estimates turn rate, pitch, and roll based on recent GPS groundspeed, track, and altitude / vertical speed.
 
+Cognitive complexity: ~39. Refactoring is planned but deferred to avoid behavioral risk.
+
 Method uses stored performance statistics from myGPSPerfStats[]. Ideally, calculation is based on most recent 1.5 seconds of data,
 assuming 10 Hz sampling frequency. Lower frequency sample rates will increase calculation window for smoother response, at the
 cost of slightly increased lag.
@@ -1128,6 +1132,8 @@ func processNMEALine(l string) (sentenceUsed bool) {
 	return processNMEALineLow(l, false)
 }
 
+// processNMEALineLow has high cognitive complexity (~110). Refactoring into smaller
+// sentence-type handlers is planned but deferred to avoid behavioral risk.
 func processNMEALineLow(l string, fakeGpsTimeToCurr bool) (sentenceUsed bool) {
 	mySituation.muGPS.Lock()
 	TraceLog.Record(CONTEXT_NMEA, []byte(l))
