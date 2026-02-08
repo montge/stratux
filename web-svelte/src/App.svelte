@@ -5,6 +5,8 @@
   import Traffic from './routes/Traffic.svelte';
   import Towers from './routes/Towers.svelte';
   import GPS from './routes/GPS.svelte';
+  import Weather from './routes/Weather.svelte';
+  import Radar from './routes/Radar.svelte';
   import Placeholder from './routes/Placeholder.svelte';
 
   // Route definitions
@@ -12,9 +14,9 @@
     '/': Status,
     '/traffic': Traffic,
     '/towers': Towers,
-    '/weather': Placeholder,
+    '/weather': Weather,
     '/gps': GPS,
-    '/radar': Placeholder,
+    '/radar': Radar,
     '/map': Placeholder,
     '/logs': Placeholder,
     '/settings': Placeholder,
