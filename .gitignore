@@ -73,3 +73,24 @@ coverage/
 # SonarCloud/SonarQube working directories
 .scannerwork/
 .sonar/
+
+# Build artifacts
+build_arm64/
+build_output/
+main/main
+main/main.test
+*.tar.gz
+*.zip
+
+# Coverage HTML reports
+main/*.html
+
+# Test results and reports
+test-results/
+web/test-results/
+web/playwright-report/
+
+# Documentation artifacts (generated)
+main/LOGGING_TEST_COVERAGE.md
+main/TESTING-OVERLAYCTL.md
+main/test-overlayctl-with-sudo.sh
