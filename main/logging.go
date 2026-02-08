@@ -110,14 +110,12 @@ func clearDebugLogFile() {
 		if err != nil {
 			log.Printf("Could not seek to the beginning of the logfile\n")
 			return
-		} else {
-			err2 := logFileHandle.Truncate(0)
-			if err2 != nil {
-				log.Printf("Could not truncate the logfile\n")
-				return
-			}
-			log.Printf("Logfile truncated\n")
 		}
+		if err := logFileHandle.Truncate(0); err != nil {
+			log.Printf("Could not truncate the logfile\n")
+			return
+		}
+		log.Printf("Logfile truncated\n")
 	}
 }
 

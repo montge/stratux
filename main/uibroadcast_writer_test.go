@@ -54,9 +54,9 @@ func TestWriter(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Verify socket is still in the list
-		b.sockets_mu.Lock()
+		b.socketsMu.Lock()
 		sockCount := len(b.sockets)
-		b.sockets_mu.Unlock()
+		b.socketsMu.Unlock()
 
 		if sockCount != 1 {
 			t.Errorf("Expected 1 socket remaining, got %d", sockCount)
@@ -105,9 +105,9 @@ func TestWriter(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Verify all sockets were added
-		b.sockets_mu.Lock()
+		b.socketsMu.Lock()
 		sockCount := len(b.sockets)
-		b.sockets_mu.Unlock()
+		b.socketsMu.Unlock()
 
 		if sockCount != numSockets {
 			t.Errorf("Expected %d sockets, got %d", numSockets, sockCount)
@@ -153,9 +153,9 @@ func TestWriter(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Verify socket was removed
-		b.sockets_mu.Lock()
+		b.socketsMu.Lock()
 		sockCount := len(b.sockets)
-		b.sockets_mu.Unlock()
+		b.socketsMu.Unlock()
 
 		if sockCount != 0 {
 			t.Errorf("Expected 0 sockets remaining (failed socket removed), got %d", sockCount)
@@ -204,9 +204,9 @@ func TestWriter(t *testing.T) {
 		time.Sleep(150 * time.Millisecond)
 
 		// Verify socket is still connected
-		b.sockets_mu.Lock()
+		b.socketsMu.Lock()
 		sockCount := len(b.sockets)
-		b.sockets_mu.Unlock()
+		b.socketsMu.Unlock()
 
 		if sockCount != 1 {
 			t.Errorf("Expected 1 socket, got %d", sockCount)
@@ -226,9 +226,9 @@ func TestWriter(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Verify no sockets
-		b.sockets_mu.Lock()
+		b.socketsMu.Lock()
 		sockCount := len(b.sockets)
-		b.sockets_mu.Unlock()
+		b.socketsMu.Unlock()
 
 		if sockCount != 0 {
 			t.Errorf("Expected 0 sockets, got %d", sockCount)
@@ -295,9 +295,9 @@ func TestWriter(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Verify only good sockets remain
-		b.sockets_mu.Lock()
+		b.socketsMu.Lock()
 		sockCount := len(b.sockets)
-		b.sockets_mu.Unlock()
+		b.socketsMu.Unlock()
 
 		if sockCount != goodSockets {
 			t.Errorf("Expected %d sockets remaining, got %d", goodSockets, sockCount)
@@ -338,9 +338,9 @@ func TestWriter(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Verify socket is still connected
-		b.sockets_mu.Lock()
+		b.socketsMu.Lock()
 		sockCount := len(b.sockets)
-		b.sockets_mu.Unlock()
+		b.socketsMu.Unlock()
 
 		if sockCount != 1 {
 			t.Errorf("Expected 1 socket, got %d", sockCount)

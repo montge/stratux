@@ -322,29 +322,63 @@
   - managementinterface.go: handleUpdatePostRequest() - added error checking for os.Rename()
 - [x] Reviewed goroutine patterns - recover() used appropriately in critical paths
 
-### 9.3 Critical Cognitive Complexity (Deferred)
-These functions exceed SonarCloud's complexity threshold of 15:
-- [ ] traffic.go:1074 - sendTrafficUpdates (complexity: 96)
-- [ ] sdr.go:811 - sdrWatcher (complexity: 77)
-- [ ] gen_gdl90.go:1705 - heartBeatSender (complexity: 44)
-- [ ] pong.go:294 - pingWatcher (complexity: 38)
-- [ ] gps.go:1084 - processNMEALineLow (complexity: 332)
-- [ ] gen_gdl90.go:309/501 - makeOwnshipReport variants (complexity: 26-31)
-- [ ] sdr.go:74/197 - SDR functions (complexity: 21-30)
-- [ ] gps.go:225/1991 - GPS functions (complexity: 17-28)
-- [ ] ogn.go:69 - parseAprsMessage (complexity: 21)
-- [ ] test/replay.go - replay functions (complexity: 17-18)
+### 9.3 Critical Cognitive Complexity (Documented, Deferred)
+These functions exceed SonarCloud's complexity threshold of 15.
+Complexity comments added to source code (February 2026):
+- [x] gps.go - processNMEALineLow (~110) - comment added, refactoring deferred
+- [x] traffic.go - parseDump1090Message (~55) - comment added, refactoring deferred
+- [x] traffic.go - parseDownlinkReport (~47) - comment added, refactoring deferred
+- [x] gps.go - calcGPSAttitude (~39) - comment added, refactoring deferred
+- [x] sdr.go - sdrWatcher (~32) - comment added, refactoring deferred
+- [x] gps.go - initGPSSerial (~27) - comment added, refactoring deferred
+- [x] sensors.go - sensorAttitudeSender (~27) - comment added, refactoring deferred
+- [x] ogn.go - importOgnTrafficMessage (~26) - comment added, refactoring deferred
+- [x] traffic.go - sendTrafficUpdates (~26) - comment added, refactoring deferred
+- [x] gen_gdl90.go - main (~24) - comment added, refactoring deferred
+- [ ] Remaining high-complexity functions (heartBeatSender ~44, pingWatcher ~38, etc.)
 **Note**: Reducing complexity requires major refactoring. Prioritize after coverage target is met.
 
-### 9.4 Maintainability Issues (569 total)
-- [ ] Review and categorize 569 maintainability issues
-- [ ] Address high-impact issues first
-- [ ] Create separate work items for major refactoring
+### 9.4 Maintainability Issues (569 total) - Triaged (February 2026)
 
-### 9.5 Code Duplication (3.1%)
-- [ ] Identify duplicated code blocks
-- [ ] Extract common functionality into shared utilities
-- [ ] Target reduction to < 2% duplication
+**Quick wins fixed (no behavior changes):**
+- [x] Naming convention fixes: snake_case → camelCase in managementinterface.go,
+  gen_gdl90.go, lowpower_uat.go, uibroadcast.go (sockets_mu → socketsMu)
+- [x] Boolean simplification: `!= true` → `!`, `!= false` → direct use (ping.go, pong.go)
+- [x] Redundant nil initialization: `var x Type = nil` → `var x Type` (ping.go, pong.go)
+- [x] Redundant nil/len checks: `x == nil || len(x) == 0` → `len(x) == 0` (messagequeue.go)
+- [x] Short variable declarations: `var x = make(...)` → `x := make(...)` (sdr.go, managementinterface.go, ais.go)
+- [x] Simplified if/else: removed unnecessary else after return (logging.go)
+- [x] Increment operators: `+= 1` → `++` (ping.go)
+- [x] Removed bare returns and unnecessary continue (ping.go, pong.go)
+- [x] Removed commented-out debug code and unused variables (network.go)
+- [x] Simplified single-case select statements (network.go)
+
+**Medium effort (deferred):**
+- [ ] MavlinkTrafficMessageFormat struct fields use snake_case (ping.go) - internal struct,
+  matches external MavLink protocol field names; renaming could reduce readability
+- [ ] uatparse.go uses snake_case throughout - recommend full-file refactoring as separate work item
+- [ ] ping.go/pong.go networkRepeater/serialReader duplication - nearly identical functions
+  with different device-specific variables; extract common helper requires callback pattern
+
+**Large effort (deferred):**
+- [ ] Cognitive complexity refactoring for top functions (see 9.3)
+- [ ] Full uatparse.go naming convention overhaul
+- [ ] Dockerfile best practices (WORKDIR, cache cleanup)
+
+### 9.5 Code Duplication (3.1% → target <2%)
+
+**Duplication reduced (February 2026):**
+- [x] Extracted `logToDataLog()`/`logToDataLogDebug()` helpers, consolidating 10
+  nearly-identical log functions into one-liners (datalog.go)
+- [x] Extracted `setTextHeadersWithNoCache()` helper, consolidating 4 occurrences (managementinterface.go)
+- [x] Replaced 3 manual CORS header blocks with `setCORSHeaders()` (managementinterface.go)
+- [x] Extracted `logTrafficImport()` helper, consolidating 3 identical 7-line debug
+  JSON logging blocks across ogn.go, ais.go, cot-in.go into traffic.go
+
+**Remaining duplication (deferred):**
+- [ ] ping.go/pong.go: ~60 lines of near-identical code in networkRepeater, serialReader,
+  Kill, Shutdown functions. Extraction requires callback/interface pattern.
+- [ ] Target: Continue reducing toward <2% in future iterations
 
 ### 9.6 Security Hotspots (49 total)
 - [x] Review security hotspots (January 2026)

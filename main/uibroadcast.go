@@ -21,14 +21,14 @@ import (
 
 type uibroadcaster struct {
 	sockets    []*websocket.Conn
-	sockets_mu *sync.Mutex
+	socketsMu *sync.Mutex
 	messages   chan []byte
 }
 
 func NewUIBroadcaster() *uibroadcaster {
 	ret := &uibroadcaster{
 		sockets:    make([]*websocket.Conn, 0),
-		sockets_mu: &sync.Mutex{},
+		socketsMu: &sync.Mutex{},
 		messages:   make(chan []byte, 1024),
 	}
 	go ret.writer()
@@ -51,9 +51,9 @@ func (u *uibroadcaster) SendJSON(i interface{}) {
 }
 
 func (u *uibroadcaster) AddSocket(sock *websocket.Conn) {
-	u.sockets_mu.Lock()
+	u.socketsMu.Lock()
 	u.sockets = append(u.sockets, sock)
-	u.sockets_mu.Unlock()
+	u.socketsMu.Unlock()
 }
 
 func (u *uibroadcaster) writer() {
@@ -61,7 +61,7 @@ func (u *uibroadcaster) writer() {
 		msg := <-u.messages
 		// Send to all.
 		p := make([]*websocket.Conn, 0) // Keep a list of the writeable sockets.
-		u.sockets_mu.Lock()
+		u.socketsMu.Lock()
 		for _, sock := range u.sockets {
 			err := sock.SetWriteDeadline(time.Now().Add(time.Second))
 			_, err2 := sock.Write(msg)
@@ -70,6 +70,6 @@ func (u *uibroadcaster) writer() {
 			}
 		}
 		u.sockets = p // Save the list of writeable sockets.
-		u.sockets_mu.Unlock()
+		u.socketsMu.Unlock()
 	}
 }

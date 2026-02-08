@@ -131,7 +131,7 @@ func pingNetworkRepeater() {
 			for scanStderr.Scan() {
 				m := Dump1090TermMessage{Text: scanStderr.Text(), Source: "stderr"}
 				logDump1090TermMessage(m)
-				if shutdownES != true {
+				if !shutdownES {
 					shutdownES = true
 				}
 			}
@@ -144,7 +144,7 @@ func pingNetworkRepeater() {
 	}
 }
 
-var dump1090Connection net.Conn = nil
+var dump1090Connection net.Conn
 var connectionError error
 
 func pingNetworkConnection() {
@@ -218,7 +218,6 @@ func pingSerialReader() {
 	}
 	globalStatus.Ping_connected = false
 	log.Printf("Exiting Ping serial reader")
-	return
 }
 
 func pingShutdown() {
@@ -238,7 +237,7 @@ func pingKill() {
 	// Send signal to shutdown to pingWatcher().
 	shutdownPing = true
 	// Spin until device has been de-initialized.
-	for globalStatus.Ping_connected != false {
+	for globalStatus.Ping_connected {
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -382,7 +381,7 @@ func mavLinkFormat(x []byte) {
 		} else {
 			signalLevelSimulated -= 5
 		}
-		ti.ReceivedMsgs += 1
+		ti.ReceivedMsgs++
 		ti.Icao_addr = mavLink.ICAO_address
 		ti.OnGround = false
 		ti.Addr_type = 0
@@ -441,7 +440,7 @@ func mavLinkFormat(x []byte) {
 			signalLevelSimulated -= 5
 		}
 		ti.Vvel = int16(float32(mavLink.ver_velocity) * 60.0 / 10.0 / 3.048)
-		var callsignLen = 0
+		callsignLen := 0
 		for a, b := range mavLink.callsign {
 			if b == ' ' || b == '\u0000' {
 				break
@@ -508,16 +507,14 @@ func pingUSBSerialReader() {
 						mavLinkFrameLastIndex = 0
 					}
 					mavLinkFrame[mavLinkFrameLastIndex] = b
-					mavLinkFrameLastIndex += 1
+					mavLinkFrameLastIndex++
 				}
 			} else {
 				mavLinkFrame[mavLinkFrameLastIndex] = b
-				mavLinkFrameLastIndex += 1
+				mavLinkFrameLastIndex++
 			}
 		}
-		continue
 	}
 	globalStatus.Ping_connected = false
 	log.Printf("Exiting PingUSB serial reader")
-	return
 }

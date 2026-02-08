@@ -12,7 +12,6 @@
 package main
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"hash/fnv"
 	"log"
@@ -133,12 +132,5 @@ func processCotMessage(msg string) {
 	registerTrafficUpdate(ti)
 	seenTraffic[key] = true
 
-	if globalSettings.DEBUG {
-		txt, err := json.Marshal(ti)
-		if err != nil {
-			log.Printf("Error marshaling COT traffic for debug: %s", err.Error())
-		} else {
-			log.Printf("COT traffic imported: %s", string(txt))
-		}
-	}
+	logTrafficImport("COT", ti)
 }

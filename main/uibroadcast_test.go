@@ -20,8 +20,8 @@ func TestNewUIBroadcaster(t *testing.T) {
 			t.Error("Expected sockets slice to be initialized")
 		}
 
-		if b.sockets_mu == nil {
-			t.Error("Expected sockets_mu to be initialized")
+		if b.socketsMu == nil {
+			t.Error("Expected socketsMu to be initialized")
 		}
 
 		if b.messages == nil {
@@ -43,7 +43,7 @@ func TestSend(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: &sync.Mutex{},
+			socketsMu: &sync.Mutex{},
 			messages:   make(chan []byte, 1024),
 		}
 
@@ -77,7 +77,7 @@ func TestSend(t *testing.T) {
 		// Create broadcaster with nil messages channel
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: nil,
+			socketsMu: nil,
 			messages:   nil, // Nil channel
 		}
 
@@ -92,7 +92,7 @@ func TestSend(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: &sync.Mutex{},
+			socketsMu: &sync.Mutex{},
 			messages:   make(chan []byte, 1024),
 		}
 
@@ -125,7 +125,7 @@ func TestSend(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: &sync.Mutex{},
+			socketsMu: &sync.Mutex{},
 			messages:   make(chan []byte, 1024),
 		}
 
@@ -148,7 +148,7 @@ func TestSend(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: &sync.Mutex{},
+			socketsMu: &sync.Mutex{},
 			messages:   make(chan []byte, 1024),
 		}
 
@@ -179,7 +179,7 @@ func TestSendJSON(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: &sync.Mutex{},
+			socketsMu: &sync.Mutex{},
 			messages:   make(chan []byte, 1024),
 		}
 
@@ -219,7 +219,7 @@ func TestSendJSON(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: &sync.Mutex{},
+			socketsMu: &sync.Mutex{},
 			messages:   make(chan []byte, 1024),
 		}
 
@@ -243,7 +243,7 @@ func TestSendJSON(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: &sync.Mutex{},
+			socketsMu: &sync.Mutex{},
 			messages:   make(chan []byte, 1024),
 		}
 
@@ -294,7 +294,7 @@ func TestSend_EdgeCases(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
 			sockets:    make([]*websocket.Conn, 0),
-			sockets_mu: &sync.Mutex{},
+			socketsMu: &sync.Mutex{},
 			messages:   make(chan []byte, 1024),
 		}
 
