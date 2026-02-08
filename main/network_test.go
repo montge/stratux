@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/tarm/serial"
+	"golang.org/x/net/websocket"
 )
 
 // TestOnConnectionClosed_NetworkConnection tests removing a network (UDP) connection
@@ -4927,4 +4928,110 @@ func TestConcurrentOnConnectionClosed(t *testing.T) {
 	}
 
 	t.Log("Concurrent onConnectionClosed test passed")
+}
+
+// TestProcessNetworkOutput tests the extracted single-iteration function
+// that forwards GDL90 messages to the WebSocket broadcaster.
+func TestProcessNetworkOutput(t *testing.T) {
+	initStratuxClock()
+
+	t.Run("sends message to broadcaster", func(t *testing.T) {
+		// Create a broadcaster with a buffered message channel so we can
+		// inspect what was sent without needing a WebSocket consumer.
+		oldGdl90Update := gdl90Update
+		gdl90Update = &uibroadcaster{
+			sockets:   make([]*websocket.Conn, 0),
+			socketsMu: &sync.Mutex{},
+			messages:  make(chan []byte, 16),
+		}
+		defer func() { gdl90Update = oldGdl90Update }()
+
+		testMsg := []byte{0x7E, 0x00, 0x01, 0x02, 0x7E}
+		processNetworkOutput(testMsg)
+
+		// SendJSON marshals the byte slice as JSON, so read from the channel
+		select {
+		case msg := <-gdl90Update.messages:
+			if len(msg) == 0 {
+				t.Error("Expected non-empty message from broadcaster")
+			}
+		case <-time.After(time.Second):
+			t.Error("Expected message on broadcaster channel, got timeout")
+		}
+	})
+
+	t.Run("handles empty message", func(t *testing.T) {
+		oldGdl90Update := gdl90Update
+		gdl90Update = &uibroadcaster{
+			sockets:   make([]*websocket.Conn, 0),
+			socketsMu: &sync.Mutex{},
+			messages:  make(chan []byte, 16),
+		}
+		defer func() { gdl90Update = oldGdl90Update }()
+
+		processNetworkOutput([]byte{})
+
+		select {
+		case msg := <-gdl90Update.messages:
+			if len(msg) == 0 {
+				t.Error("Expected JSON-marshaled empty slice, got empty message")
+			}
+		case <-time.After(time.Second):
+			t.Error("Expected message on broadcaster channel, got timeout")
+		}
+	})
+
+	t.Run("handles nil message", func(t *testing.T) {
+		oldGdl90Update := gdl90Update
+		gdl90Update = &uibroadcaster{
+			sockets:   make([]*websocket.Conn, 0),
+			socketsMu: &sync.Mutex{},
+			messages:  make(chan []byte, 16),
+		}
+		defer func() { gdl90Update = oldGdl90Update }()
+
+		processNetworkOutput(nil)
+
+		select {
+		case msg := <-gdl90Update.messages:
+			// json.Marshal(nil) produces "null"
+			if string(msg) != "null" {
+				t.Errorf("Expected 'null' JSON for nil input, got %q", string(msg))
+			}
+		case <-time.After(time.Second):
+			t.Error("Expected message on broadcaster channel, got timeout")
+		}
+	})
+}
+
+// TestNetworkOutWatcher_ForwardsMessage tests that networkOutWatcher reads from
+// networkGDL90Chan and forwards to the gdl90Update broadcaster.
+func TestNetworkOutWatcher_ForwardsMessage(t *testing.T) {
+	initStratuxClock()
+
+	oldGdl90Update := gdl90Update
+	gdl90Update = &uibroadcaster{
+		sockets:   make([]*websocket.Conn, 0),
+		socketsMu: &sync.Mutex{},
+		messages:  make(chan []byte, 16),
+	}
+	defer func() { gdl90Update = oldGdl90Update }()
+
+	oldChan := networkGDL90Chan
+	networkGDL90Chan = make(chan []byte, 16)
+	defer func() { networkGDL90Chan = oldChan }()
+
+	go networkOutWatcher()
+
+	testMsg := []byte{0x7E, 0x01, 0x02, 0x7E}
+	networkGDL90Chan <- testMsg
+
+	select {
+	case msg := <-gdl90Update.messages:
+		if len(msg) == 0 {
+			t.Error("Expected non-empty message from broadcaster")
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("Expected message on broadcaster channel, got timeout")
+	}
 }
