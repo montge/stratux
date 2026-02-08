@@ -339,14 +339,7 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 	registerTrafficUpdate(ti)
 	seenTraffic[key] = true
 
-	if globalSettings.DEBUG {
-		txt, err := json.Marshal(ti)
-		if err != nil {
-			log.Printf("Error marshaling OGN traffic for debug: %s", err.Error())
-		} else {
-			log.Printf("OGN traffic imported: %s", string(txt))
-		}
-	}
+	logTrafficImport("OGN", ti)
 }
 
 var ognTailNumberCache = make(map[string]string)

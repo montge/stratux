@@ -587,6 +587,18 @@ func registerTrafficUpdate(ti TrafficInfo) {
 	trafficUpdate.SendJSON(ti)
 }
 
+// logTrafficImport logs traffic info as JSON when DEBUG mode is enabled.
+func logTrafficImport(source string, ti TrafficInfo) {
+	if globalSettings.DEBUG {
+		txt, err := json.Marshal(ti)
+		if err != nil {
+			log.Printf("Error marshaling %s traffic for debug: %s", source, err.Error())
+		} else {
+			log.Printf("%s traffic imported: %s", source, string(txt))
+		}
+	}
+}
+
 func isTrafficAlertable(ti TrafficInfo) bool {
 	// Set alert bit if possible and traffic is within some threshold
 	// TODO: Could be more intelligent, taking into account headings etc.
