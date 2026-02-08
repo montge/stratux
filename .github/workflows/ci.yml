@@ -21,23 +21,8 @@ jobs:
       with:
         fetch-depth: 0  # Full history for SonarCloud analysis
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: 'go.mod'
-
-    - name: Install build dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc make libusb-1.0-0-dev wget
-        cd /tmp
-        wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr0_2.0.2-2_arm64.deb
-        sudo dpkg -i librtlsdr0_2.0.2-2_arm64.deb
-        wget https://github.com/stratux/rtlsdr/releases/download/v1.0/librtlsdr-dev_2.0.2-2_arm64.deb
-        sudo dpkg -i librtlsdr-dev_2.0.2-2_arm64.deb
-
-    # Note: actions/setup-go@v5 has built-in caching enabled by default
-    # No need for explicit actions/cache step
+    - name: Setup Stratux build environment
+      uses: ./.github/actions/setup-stratux-build
 
     - name: Download dependencies
       run: go mod download
