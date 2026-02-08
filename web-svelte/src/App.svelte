@@ -7,6 +7,8 @@
   import GPS from './routes/GPS.svelte';
   import Weather from './routes/Weather.svelte';
   import Radar from './routes/Radar.svelte';
+  import Logs from './routes/Logs.svelte';
+  import Developer from './routes/Developer.svelte';
   import Placeholder from './routes/Placeholder.svelte';
 
   // Route definitions
@@ -18,9 +20,9 @@
     '/gps': GPS,
     '/radar': Radar,
     '/map': Placeholder,
-    '/logs': Placeholder,
+    '/logs': Logs,
     '/settings': Placeholder,
-    '/developer': Placeholder,
+    '/developer': Developer,
     '*': Placeholder
   };
 </script>
