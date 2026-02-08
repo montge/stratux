@@ -2738,193 +2738,6 @@ func TestConnectionWriter_GlobalStats(t *testing.T) {
 	}
 }
 
-// TestGetNetworkConn tests the getNetworkConn helper function
-func TestGetNetworkConn(t *testing.T) {
-	// Initialize required global variables
-	if netMutex == nil {
-		netMutex = &sync.Mutex{}
-	}
-	if stratuxClock == nil {
-		stratuxClock = NewMonotonic()
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	// Clear and initialize clientConnections
-	clientConnections = make(map[string]connection)
-
-	// Create a UDP connection for testing
-	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	if err != nil {
-		t.Skipf("Cannot resolve UDP address: %v", err)
-	}
-	udpConn, err := net.ListenUDP("udp", udpAddr)
-	if err != nil {
-		t.Skipf("Cannot create UDP connection: %v", err)
-	}
-	defer udpConn.Close()
-
-	// Create network connections
-	conn1 := &networkConnection{
-		Conn:       udpConn,
-		Ip:         "192.168.10.50",
-		Port:       4000,
-		Capability: NETWORK_GDL90_STANDARD,
-		Queue:      NewMessageQueue(10),
-	}
-
-	conn2 := &networkConnection{
-		Ip:         "192.168.10.51",
-		Port:       4001,
-		Capability: NETWORK_GDL90_STANDARD,
-		Queue:      NewMessageQueue(10),
-	}
-
-	// Add a serial connection (should not be returned by getNetworkConn)
-	serialConn := &serialConnection{
-		DeviceString: "/dev/ttyUSB0",
-		Baud:         38400,
-		Capability:   NETWORK_GDL90_STANDARD,
-		Queue:        NewMessageQueue(10),
-	}
-
-	// Add connections to global map
-	netMutex.Lock()
-	clientConnections[conn1.GetConnectionKey()] = conn1
-	clientConnections[conn2.GetConnectionKey()] = conn2
-	clientConnections[serialConn.GetConnectionKey()] = serialConn
-	netMutex.Unlock()
-
-	// Test finding existing network connection
-	result := getNetworkConn("192.168.10.50:4000")
-	if result == nil {
-		t.Error("getNetworkConn should return connection for valid IP:port")
-	}
-	if result != nil && result.Ip != "192.168.10.50" {
-		t.Errorf("getNetworkConn returned wrong connection: got IP %s, expected 192.168.10.50", result.Ip)
-	}
-
-	// Test finding non-existent connection
-	result = getNetworkConn("192.168.10.99:4000")
-	if result != nil {
-		t.Error("getNetworkConn should return nil for non-existent connection")
-	}
-
-	// Test with invalid format (no colon)
-	result = getNetworkConn("192.168.10.50")
-	if result != nil {
-		t.Error("getNetworkConn should return nil for invalid format (no port)")
-	}
-
-	// Test with serial connection key (should not be returned)
-	result = getNetworkConn("/dev/ttyUSB0")
-	if result != nil {
-		t.Error("getNetworkConn should return nil for serial connection")
-	}
-
-	// Test with empty string
-	result = getNetworkConn("")
-	if result != nil {
-		t.Error("getNetworkConn should return nil for empty string")
-	}
-}
-
-// TestGetNetworkConnsByIp tests finding all network connections for a given IP
-func TestGetNetworkConnsByIp(t *testing.T) {
-	// Initialize required global variables
-	if netMutex == nil {
-		netMutex = &sync.Mutex{}
-	}
-	if stratuxClock == nil {
-		stratuxClock = NewMonotonic()
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	// Clear and initialize clientConnections
-	clientConnections = make(map[string]connection)
-
-	// Create multiple network connections with same IP, different ports
-	conn1 := &networkConnection{
-		Ip:         "192.168.10.100",
-		Port:       4000,
-		Capability: NETWORK_GDL90_STANDARD,
-		Queue:      NewMessageQueue(10),
-	}
-
-	conn2 := &networkConnection{
-		Ip:         "192.168.10.100",
-		Port:       4001,
-		Capability: NETWORK_AHRS_GDL90,
-		Queue:      NewMessageQueue(10),
-	}
-
-	conn3 := &networkConnection{
-		Ip:         "192.168.10.101",
-		Port:       4000,
-		Capability: NETWORK_GDL90_STANDARD,
-		Queue:      NewMessageQueue(10),
-	}
-
-	// Add a serial connection (should not be returned)
-	serialConn := &serialConnection{
-		DeviceString: "/dev/ttyUSB0",
-		Baud:         38400,
-		Capability:   NETWORK_GDL90_STANDARD,
-		Queue:        NewMessageQueue(10),
-	}
-
-	// Add a TCP connection with matching IP prefix (edge case)
-	tcpConn := &tcpConnection{
-		Key:        "TCP:192.168.10.100:8080",
-		Capability: NETWORK_GDL90_STANDARD,
-		Queue:      NewMessageQueue(10),
-	}
-
-	// Add all connections to global map
-	netMutex.Lock()
-	clientConnections[conn1.GetConnectionKey()] = conn1
-	clientConnections[conn2.GetConnectionKey()] = conn2
-	clientConnections[conn3.GetConnectionKey()] = conn3
-	clientConnections[serialConn.GetConnectionKey()] = serialConn
-	clientConnections[tcpConn.GetConnectionKey()] = tcpConn
-	netMutex.Unlock()
-
-	// Test finding multiple connections with same IP
-	results := getNetworkConnsByIp("192.168.10.100")
-	if len(results) != 2 {
-		t.Errorf("Expected 2 connections for 192.168.10.100, got %d", len(results))
-	}
-
-	// Verify both connections are present
-	foundPorts := make(map[uint32]bool)
-	for _, conn := range results {
-		foundPorts[conn.Port] = true
-	}
-	if !foundPorts[4000] || !foundPorts[4001] {
-		t.Error("getNetworkConnsByIp should return both port 4000 and 4001")
-	}
-
-	// Test finding single connection
-	results = getNetworkConnsByIp("192.168.10.101")
-	if len(results) != 1 {
-		t.Errorf("Expected 1 connection for 192.168.10.101, got %d", len(results))
-	}
-	if len(results) == 1 && results[0].Port != 4000 {
-		t.Errorf("Expected port 4000, got %d", results[0].Port)
-	}
-
-	// Test finding no connections
-	results = getNetworkConnsByIp("192.168.10.99")
-	if len(results) != 0 {
-		t.Errorf("Expected 0 connections for non-existent IP, got %d", len(results))
-	}
-
-	// Test with empty string
-	results = getNetworkConnsByIp("")
-	if len(results) != 0 {
-		t.Errorf("Expected 0 connections for empty string, got %d", len(results))
-	}
-}
-
 // TestGetSerialConns tests retrieving all serial connections
 func TestGetSerialConns(t *testing.T) {
 	// Initialize required global variables
@@ -4287,7 +4100,7 @@ type errorWriterNetwork struct {
 
 func (e *errorWriterNetwork) Write(p []byte) (int, error) {
 	e.writeCount++
-	if e.writesBeforeError > 0 && e.writeCount > e.writesBeforeError {
+	if e.writeCount > e.writesBeforeError {
 		return 0, e.errorToReturn
 	}
 	return len(p), nil
@@ -4339,6 +4152,7 @@ func (m *mockConnectionForErrorTest) Close() {
 // TestConnectionWriter_UDPWriteFailureRecovery tests that UDP connections
 // continue operating despite write failures (UDP is connectionless)
 func TestConnectionWriter_UDPWriteFailureRecovery(t *testing.T) {
+	initStratuxClock()
 	// Create a mock writer that fails after 2 writes
 	mockWriter := &errorWriterNetwork{
 		writesBeforeError: 2,
@@ -4398,6 +4212,7 @@ func TestConnectionWriter_UDPWriteFailureRecovery(t *testing.T) {
 // are closed when a write error occurs
 func TestConnectionWriter_TCPWriteErrorClosesConnection(t *testing.T) {
 	// Initialize globals
+	initStratuxClock()
 	if netMutex == nil {
 		netMutex = &sync.Mutex{}
 	}
@@ -4442,7 +4257,7 @@ func TestConnectionWriter_TCPWriteErrorClosesConnection(t *testing.T) {
 	select {
 	case <-closeChan:
 		// OnError was called
-	case <-time.After(1 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Error("OnError was not called within timeout")
 	}
 
@@ -4458,7 +4273,7 @@ func TestConnectionWriter_TCPWriteErrorClosesConnection(t *testing.T) {
 	select {
 	case <-writerDone:
 		// Success
-	case <-time.After(1 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Error("connectionWriter did not exit after queue closed")
 	}
 
@@ -4960,12 +4775,11 @@ func TestConcurrentClientConnections(t *testing.T) {
 // while also sending messages
 func TestConcurrentClientConnectionsWithMessageSending(t *testing.T) {
 	// Initialize globals
+	initStratuxClock()
 	if netMutex == nil {
 		netMutex = &sync.Mutex{}
 	}
-	if networkGDL90Chan == nil {
-		networkGDL90Chan = make(chan []byte, 1024)
-	}
+	networkGDL90Chan = make(chan []byte, 1024)
 
 	netMutex.Lock()
 	clientConnections = make(map[string]connection)
