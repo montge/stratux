@@ -9,6 +9,8 @@
   import Radar from './routes/Radar.svelte';
   import Logs from './routes/Logs.svelte';
   import Developer from './routes/Developer.svelte';
+  import Settings from './routes/Settings.svelte';
+  import MapPage from './routes/Map.svelte';
   import Placeholder from './routes/Placeholder.svelte';
 
   // Route definitions
@@ -19,9 +21,9 @@
     '/weather': Weather,
     '/gps': GPS,
     '/radar': Radar,
-    '/map': Placeholder,
+    '/map': MapPage,
     '/logs': Logs,
-    '/settings': Placeholder,
+    '/settings': Settings,
     '/developer': Developer,
     '*': Placeholder
   };
