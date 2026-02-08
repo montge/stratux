@@ -4928,4 +4928,3 @@ func TestConcurrentOnConnectionClosed(t *testing.T) {
 
 	t.Log("Concurrent onConnectionClosed test passed")
 }
-
