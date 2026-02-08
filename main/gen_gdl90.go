@@ -1495,8 +1495,16 @@ func saveSettings() {
 	}
 	defer fd.Close()
 	jsonSettings, _ := json.MarshalIndent(&globalSettings, "", "  ")
-	fd.Write(jsonSettings)
-	fd.Sync()
+	_, err = fd.Write(jsonSettings)
+	if err != nil {
+		addSingleSystemErrorf("save-settings", "failed to write settings to %s: %s", configLocation, err.Error())
+		return
+	}
+	err = fd.Sync()
+	if err != nil {
+		addSingleSystemErrorf("save-settings", "failed to sync settings file %s: %s", configLocation, err.Error())
+		return
+	}
 	log.Printf("wrote settings.\n")
 }
 

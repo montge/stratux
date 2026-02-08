@@ -228,16 +228,18 @@ func writeTemplate(tplFile string, outFile string, settings NetworkTemplateParam
 	}
 
 	outputFile, err := os.Create(outFile)
-	defer outputFile.Close()
 	if err != nil {
 		log.Printf("Network Settings: Unable to open output file %s: %s", outFile, err)
 		return
 	}
+	defer outputFile.Close()
 
 	err = configTemplate.Execute(outputFile, settings)
 	if err != nil {
 		log.Printf("Network Settings: Unable to execute template substitution %s: %s", outFile, err)
 		return
 	}
-	outputFile.Sync()
+	if err = outputFile.Sync(); err != nil {
+		log.Printf("Network Settings: Failed to sync output file %s: %s", outFile, err)
+	}
 }

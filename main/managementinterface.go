@@ -987,7 +987,10 @@ func handleUpdatePostRequest(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 
-	os.Rename(temp_filename, upload_filename)
+	if err := os.Rename(temp_filename, upload_filename); err != nil {
+		log.Printf("Update failed: could not rename %s to %s: %s\n", temp_filename, upload_filename, err.Error())
+		return
+	}
 	log.Printf("%s uploaded %s for update.\n", r.RemoteAddr, upload_filename)
 	overlayctl("disable")
 	// Successful update upload. Now reboot.
