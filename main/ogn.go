@@ -162,6 +162,8 @@ func importOgnStatusMessage(msg OgnMessage) {
 	}
 }
 
+// importOgnTrafficMessage has high cognitive complexity (~26). Refactoring is planned
+// but deferred to avoid behavioral risk.
 func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) {
 	var ti TrafficInfo
 	addressBytes, _ := hex.DecodeString(msg.Addr)
@@ -337,14 +339,7 @@ func importOgnTrafficMessage(msg OgnMessage, data string, fakeCurrentTime bool) 
 	registerTrafficUpdate(ti)
 	seenTraffic[key] = true
 
-	if globalSettings.DEBUG {
-		txt, err := json.Marshal(ti)
-		if err != nil {
-			log.Printf("Error marshaling OGN traffic for debug: %s", err.Error())
-		} else {
-			log.Printf("OGN traffic imported: %s", string(txt))
-		}
-	}
+	logTrafficImport("OGN", ti)
 }
 
 var ognTailNumberCache = make(map[string]string)

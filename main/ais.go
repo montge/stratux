@@ -11,7 +11,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -104,8 +103,8 @@ func parseAisMessage(data string) {
 func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 	var ti TrafficInfo
 
-	var header *ais.Header = msg.Packet.GetHeader()
-	var key = header.UserID
+	header := msg.Packet.GetHeader()
+	key := header.UserID
 
 	trafficMutex.Lock()
 	defer trafficMutex.Unlock()
@@ -186,20 +185,20 @@ func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 		// we also have a proper course over ground so we take that over heading.
 		// Otherwise Track will be heading so boats will orient correctly
 		if positionReport.Sog > 0.0 && positionReport.Sog < 102.3 {
-			var cog float32 = 0.0
+			cog := float32(0)
 			if positionReport.Cog != 360 {
 				cog = float32(positionReport.Cog)
 			}
 			ti.Track = cog
 		} else {
-			var heading float32 = 0.0
+			heading := float32(0)
 			if positionReport.TrueHeading != 511 {
 				heading = float32(positionReport.TrueHeading)
 			}
 			ti.Track = heading
 		}
 
-		var rot float32 = 0.0
+		rot := float32(0)
 		if positionReport.RateOfTurn != -128 {
 			rot = float32(positionReport.RateOfTurn)
 		}
@@ -229,12 +228,5 @@ func importAISTrafficMessage(msg *aisnmea.VdmPacket) {
 	registerTrafficUpdate(ti) // Sends this one to the web interface
 	seenTraffic[key] = true
 
-	if globalSettings.DEBUG {
-		txt, err := json.Marshal(ti)
-		if err != nil {
-			log.Printf("Error marshaling AIS traffic for debug: %s", err.Error())
-		} else {
-			log.Printf("AIS traffic imported: %s", string(txt))
-		}
-	}
+	logTrafficImport("AIS", ti)
 }

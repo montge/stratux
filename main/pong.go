@@ -133,7 +133,7 @@ func pongNetworkRepeater() {
 			for scanStderr.Scan() {
 				m := Dump1090TermMessage{Text: scanStderr.Text(), Source: "stderr"}
 				logDump1090TermMessage(m)
-				if shutdownES != true {
+				if !shutdownES {
 					shutdownES = true
 				}
 			}
@@ -142,7 +142,7 @@ func pongNetworkRepeater() {
 	}
 }
 
-var dump1090ConnectionPong net.Conn = nil
+var dump1090ConnectionPong net.Conn
 var connectionErrorPong error
 
 func pongNetworkConnection() {
@@ -225,7 +225,6 @@ func pongSerialReader() {
 	}
 	globalStatus.Pong_connected = false
 	log.Printf("Exiting Pong serial reader")
-	return
 }
 
 func pongShutdown() {
@@ -284,7 +283,7 @@ func pongKill() {
 	// Send signal to shutdown to pongWatcher().
 	shutdownPong = true
 	// Spin until device has been de-initialized.
-	for globalStatus.Pong_connected != false {
+	for globalStatus.Pong_connected {
 		time.Sleep(1 * time.Second)
 	}
 }

@@ -47,7 +47,7 @@ func (queue *MessageQueue) Put(prio int32, maxAge time.Duration, data interface{
 	timeout := stratuxClock.GetTime().Add(maxAge)
 	entry := QueueEntry{prio, timeout, data}
 
-	if queue.entries == nil || len(queue.entries) == 0 {
+	if len(queue.entries) == 0 {
 		queue.entries = make([]QueueEntry, 1)
 		queue.entries[0] = QueueEntry{prio, timeout, data}
 	} else {

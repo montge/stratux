@@ -167,7 +167,7 @@ func (e *ES) read() {
 func (u *UAT) read() {
 	defer u.wg.Done()
 	log.Println("Entered UAT read() ...")
-	var buffer = make([]uint8, rtl.DefaultBufLength)
+	buffer := make([]uint8, rtl.DefaultBufLength)
 
 	for {
 		select {
@@ -807,7 +807,8 @@ var shutdownUAT bool
 var shutdownOGN bool
 var shutdownAIS bool
 
-// Watch for config/device changes.
+// sdrWatcher has high cognitive complexity (~32). Refactoring is planned but deferred
+// to avoid behavioral risk.
 func sdrWatcher() {
 	prevCount := 0
 	prevUATEnabled := false
