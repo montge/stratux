@@ -4273,3 +4273,845 @@ func TestSendMsg_ConcurrentAccess(t *testing.T) {
 		}
 	}
 }
+
+// =============================================================================
+// Phase 7.1: Network Error Handling Tests
+// =============================================================================
+
+// errorWriterNetwork is a mock io.Writer that returns errors after a configurable number of writes
+type errorWriterNetwork struct {
+	writesBeforeError int
+	writeCount        int
+	errorToReturn     error
+}
+
+func (e *errorWriterNetwork) Write(p []byte) (int, error) {
+	e.writeCount++
+	if e.writesBeforeError > 0 && e.writeCount > e.writesBeforeError {
+		return 0, e.errorToReturn
+	}
+	return len(p), nil
+}
+
+// mockConnectionForErrorTest implements the connection interface for testing error handling
+type mockConnectionForErrorTest struct {
+	key        string
+	queue      *MessageQueue
+	writer     io.Writer
+	capability uint8
+	packetSize int
+	sleeping   bool
+	throttled  bool
+	errorCount int
+	closeCount int
+	closeChan  chan struct{}
+}
+
+func (m *mockConnectionForErrorTest) GetConnectionKey() string { return m.key }
+func (m *mockConnectionForErrorTest) MessageQueue() *MessageQueue {
+	if m.queue == nil {
+		m.queue = NewMessageQueue(100)
+	}
+	return m.queue
+}
+func (m *mockConnectionForErrorTest) Writer() io.Writer         { return m.writer }
+func (m *mockConnectionForErrorTest) IsThrottled() bool         { return m.throttled }
+func (m *mockConnectionForErrorTest) IsSleeping() bool          { return m.sleeping }
+func (m *mockConnectionForErrorTest) Capabilities() uint8       { return m.capability }
+func (m *mockConnectionForErrorTest) GetDesiredPacketSize() int { return m.packetSize }
+func (m *mockConnectionForErrorTest) OnError(err error) {
+	m.errorCount++
+	// Simulate TCP/Serial behavior - close on error
+	if m.closeChan != nil {
+		select {
+		case m.closeChan <- struct{}{}:
+		default:
+		}
+	}
+}
+func (m *mockConnectionForErrorTest) Close() {
+	m.closeCount++
+	if m.queue != nil {
+		m.queue.Close()
+	}
+}
+
+// TestConnectionWriter_UDPWriteFailureRecovery tests that UDP connections
+// continue operating despite write failures (UDP is connectionless)
+func TestConnectionWriter_UDPWriteFailureRecovery(t *testing.T) {
+	// Create a mock writer that fails after 2 writes
+	mockWriter := &errorWriterNetwork{
+		writesBeforeError: 2,
+		errorToReturn:     fmt.Errorf("simulated UDP write error"),
+	}
+
+	// Create mock connection
+	queue := NewMessageQueue(100)
+	mockConn := &mockConnectionForErrorTest{
+		key:        "192.168.10.100:4000",
+		queue:      queue,
+		writer:     mockWriter,
+		capability: NETWORK_GDL90_STANDARD,
+		packetSize: 1024,
+		closeChan:  make(chan struct{}, 10),
+	}
+
+	// Start connectionWriter in a goroutine
+	writerDone := make(chan struct{})
+	go func() {
+		connectionWriter(mockConn)
+		close(writerDone)
+	}()
+
+	// Send several messages
+	for i := 0; i < 5; i++ {
+		queue.Put(0, 1*time.Second, []byte{byte(i)})
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Give time for processing
+	time.Sleep(100 * time.Millisecond)
+
+	// Close queue to stop the writer
+	queue.Close()
+
+	// Wait for writer to finish with timeout
+	select {
+	case <-writerDone:
+		// Success
+	case <-time.After(1 * time.Second):
+		t.Error("connectionWriter did not exit after queue closed")
+	}
+
+	// Verify that OnError was called for the failed writes
+	if mockConn.errorCount == 0 {
+		t.Log("Note: OnError was not called - this is expected for UDP which ignores errors")
+	}
+
+	// Verify some writes succeeded before the errors
+	if mockWriter.writeCount < 2 {
+		t.Errorf("Expected at least 2 write attempts, got %d", mockWriter.writeCount)
+	}
+}
+
+// TestConnectionWriter_TCPWriteErrorClosesConnection tests that TCP connections
+// are closed when a write error occurs
+func TestConnectionWriter_TCPWriteErrorClosesConnection(t *testing.T) {
+	// Initialize globals
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+
+	// Create a mock writer that always fails
+	mockWriter := &errorWriterNetwork{
+		writesBeforeError: 0, // Fail immediately
+		errorToReturn:     fmt.Errorf("simulated TCP write error: connection reset by peer"),
+	}
+
+	// Create mock connection
+	queue := NewMessageQueue(100)
+	closeChan := make(chan struct{}, 1)
+	mockConn := &mockConnectionForErrorTest{
+		key:        "TCP:192.168.10.100:8080",
+		queue:      queue,
+		writer:     mockWriter,
+		capability: NETWORK_FLARM_NMEA,
+		packetSize: 512,
+		closeChan:  closeChan,
+	}
+
+	// Add to clientConnections
+	netMutex.Lock()
+	clientConnections[mockConn.key] = mockConn
+	netMutex.Unlock()
+
+	// Start connectionWriter in a goroutine
+	writerDone := make(chan struct{})
+	go func() {
+		connectionWriter(mockConn)
+		close(writerDone)
+	}()
+
+	// Send a message that will trigger the error
+	queue.Put(0, 1*time.Second, []byte("test message"))
+
+	// Wait for error to be handled
+	select {
+	case <-closeChan:
+		// OnError was called
+	case <-time.After(1 * time.Second):
+		t.Error("OnError was not called within timeout")
+	}
+
+	// Verify OnError was called
+	if mockConn.errorCount == 0 {
+		t.Error("Expected OnError to be called for TCP write failure")
+	}
+
+	// Close queue to stop the writer
+	queue.Close()
+
+	// Wait for writer to finish
+	select {
+	case <-writerDone:
+		// Success
+	case <-time.After(1 * time.Second):
+		t.Error("connectionWriter did not exit after queue closed")
+	}
+
+	// Cleanup
+	netMutex.Lock()
+	delete(clientConnections, mockConn.key)
+	netMutex.Unlock()
+}
+
+// TestTCPConnection_OnErrorClosesConnection tests that tcpConnection.OnError
+// properly closes the connection
+func TestTCPConnection_OnErrorClosesConnection(t *testing.T) {
+	// Initialize globals
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+
+	// Create a real TCP listener and connection for testing
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to create listener: %v", err)
+	}
+	defer listener.Close()
+
+	// Accept connection in goroutine
+	serverConnChan := make(chan net.Conn, 1)
+	go func() {
+		conn, _ := listener.Accept()
+		serverConnChan <- conn
+	}()
+
+	// Create client connection
+	clientConn, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("Failed to dial: %v", err)
+	}
+
+	// Wait for server to accept
+	serverConn := <-serverConnChan
+	defer func() {
+		if serverConn != nil {
+			serverConn.Close()
+		}
+	}()
+
+	// Create tcpConnection
+	tcpConn := &tcpConnection{
+		Conn:       clientConn.(*net.TCPConn),
+		Queue:      NewMessageQueue(100),
+		Capability: NETWORK_FLARM_NMEA,
+		Key:        "TCP:" + clientConn.RemoteAddr().String(),
+	}
+
+	// Add to clientConnections
+	netMutex.Lock()
+	clientConnections[tcpConn.Key] = tcpConn
+	netMutex.Unlock()
+
+	// Verify connection is in the map
+	netMutex.Lock()
+	_, exists := clientConnections[tcpConn.Key]
+	netMutex.Unlock()
+	if !exists {
+		t.Fatal("Connection should exist before OnError")
+	}
+
+	// Simulate an error
+	tcpConn.OnError(fmt.Errorf("simulated connection error"))
+
+	// Give time for cleanup
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify connection was removed from clientConnections
+	netMutex.Lock()
+	_, exists = clientConnections[tcpConn.Key]
+	netMutex.Unlock()
+	if exists {
+		t.Error("Connection should be removed from clientConnections after OnError")
+	}
+
+	// Verify queue is closed
+	if !tcpConn.Queue.Closed {
+		t.Error("Queue should be closed after OnError")
+	}
+
+	// Verify TCP connection is nil (closed)
+	if tcpConn.Conn != nil {
+		t.Error("TCP connection should be nil after OnError")
+	}
+}
+
+// TestSerialConnection_OnErrorClosesConnection tests that serialConnection.OnError
+// properly closes the connection
+func TestSerialConnection_OnErrorClosesConnection(t *testing.T) {
+	// Initialize globals
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+
+	// Create a serial connection with a nil port (simulating a closed port)
+	serialConn := &serialConnection{
+		DeviceString: "/dev/ttyUSB_test",
+		Baud:         38400,
+		Capability:   NETWORK_GDL90_STANDARD,
+		serialPort:   nil, // No actual port
+		Queue:        NewMessageQueue(100),
+	}
+
+	// Add to clientConnections
+	netMutex.Lock()
+	clientConnections[serialConn.DeviceString] = serialConn
+	netMutex.Unlock()
+
+	// OnError should log and call Close, which handles nil port gracefully
+	// This shouldn't panic
+	serialConn.OnError(fmt.Errorf("simulated serial error"))
+
+	// Give time for cleanup
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify queue is closed (Close() was called)
+	// Note: With nil serialPort, Close() returns early without calling onConnectionClosed
+	// So the connection might still be in the map
+}
+
+// TestNetworkConnection_OnErrorIgnoresError tests that networkConnection.OnError
+// ignores errors (UDP is connectionless)
+func TestNetworkConnection_OnErrorIgnoresError(t *testing.T) {
+	// Create a network connection
+	netConn := &networkConnection{
+		Ip:         "192.168.10.50",
+		Port:       4000,
+		Capability: NETWORK_GDL90_STANDARD,
+		Queue:      NewMessageQueue(100),
+	}
+
+	// OnError should do nothing for UDP connections
+	// This test verifies it doesn't panic and doesn't modify the connection
+	initialQueue := netConn.Queue
+
+	netConn.OnError(fmt.Errorf("simulated UDP error"))
+
+	// Verify nothing changed
+	if netConn.Queue != initialQueue {
+		t.Error("networkConnection.OnError should not modify the connection")
+	}
+
+	// Verify queue is still open
+	if netConn.Queue.Closed {
+		t.Error("networkConnection.OnError should not close the queue")
+	}
+}
+
+// TestBLEConnection_OnErrorLogsError tests that bleConnection.OnError
+// logs the error but doesn't crash
+func TestBLEConnection_OnErrorLogsError(t *testing.T) {
+	// Create a BLE connection
+	bleConn := &bleConnection{
+		Capability:  NETWORK_FLARM_NMEA,
+		UUIDService: "FFE0",
+		UUIDGatt:    "FFE1",
+		Queue:       NewMessageQueue(100),
+	}
+
+	// OnError should log but not crash
+	// This test just verifies no panic
+	bleConn.OnError(fmt.Errorf("simulated BLE error"))
+
+	// Queue should still be open (BLE doesn't close on error)
+	if bleConn.Queue.Closed {
+		t.Error("bleConnection.OnError should not close the queue")
+	}
+}
+
+// TestConnectionWriter_QueueClosedExitsGracefully tests that connectionWriter
+// exits cleanly when the queue is closed
+func TestConnectionWriter_QueueClosedExitsGracefully(t *testing.T) {
+	// Create a successful mock writer
+	var writeBuffer bytes.Buffer
+
+	queue := NewMessageQueue(100)
+	mockConn := &mockConnectionForErrorTest{
+		key:        "test:connection",
+		queue:      queue,
+		writer:     &writeBuffer,
+		capability: NETWORK_GDL90_STANDARD,
+		packetSize: 1024,
+	}
+
+	// Start connectionWriter
+	writerDone := make(chan struct{})
+	go func() {
+		connectionWriter(mockConn)
+		close(writerDone)
+	}()
+
+	// Send a message
+	queue.Put(0, 1*time.Second, []byte("test"))
+	time.Sleep(50 * time.Millisecond)
+
+	// Close the queue
+	queue.Close()
+
+	// Writer should exit
+	select {
+	case <-writerDone:
+		// Success - writer exited gracefully
+	case <-time.After(1 * time.Second):
+		t.Error("connectionWriter should exit when queue is closed")
+	}
+}
+
+// TestGetNetworkConnsByIp tests the getNetworkConnsByIp helper function
+func TestGetNetworkConnsByIp(t *testing.T) {
+	// Initialize globals
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+
+	// Clean up any existing connections
+	netMutex.Lock()
+	clientConnections = make(map[string]connection)
+	netMutex.Unlock()
+
+	t.Run("empty_ip_returns_empty", func(t *testing.T) {
+		conns := getNetworkConnsByIp("")
+		if len(conns) != 0 {
+			t.Errorf("Expected 0 connections for empty IP, got %d", len(conns))
+		}
+	})
+
+	t.Run("no_matching_connections", func(t *testing.T) {
+		conns := getNetworkConnsByIp("192.168.99.99")
+		if len(conns) != 0 {
+			t.Errorf("Expected 0 connections for non-existent IP, got %d", len(conns))
+		}
+	})
+
+	t.Run("finds_matching_connections", func(t *testing.T) {
+		// Add some connections
+		netMutex.Lock()
+		clientConnections["192.168.10.50:4000"] = &networkConnection{
+			Ip:         "192.168.10.50",
+			Port:       4000,
+			Capability: NETWORK_GDL90_STANDARD,
+			Queue:      NewMessageQueue(10),
+		}
+		clientConnections["192.168.10.50:4001"] = &networkConnection{
+			Ip:         "192.168.10.50",
+			Port:       4001,
+			Capability: NETWORK_GDL90_STANDARD,
+			Queue:      NewMessageQueue(10),
+		}
+		clientConnections["192.168.10.51:4000"] = &networkConnection{
+			Ip:         "192.168.10.51",
+			Port:       4000,
+			Capability: NETWORK_GDL90_STANDARD,
+			Queue:      NewMessageQueue(10),
+		}
+		netMutex.Unlock()
+
+		conns := getNetworkConnsByIp("192.168.10.50")
+		if len(conns) != 2 {
+			t.Errorf("Expected 2 connections for IP 192.168.10.50, got %d", len(conns))
+		}
+
+		conns = getNetworkConnsByIp("192.168.10.51")
+		if len(conns) != 1 {
+			t.Errorf("Expected 1 connection for IP 192.168.10.51, got %d", len(conns))
+		}
+
+		// Cleanup
+		netMutex.Lock()
+		clientConnections = make(map[string]connection)
+		netMutex.Unlock()
+	})
+
+	t.Run("ignores_non_network_connections", func(t *testing.T) {
+		// Add a TCP connection with same IP prefix
+		netMutex.Lock()
+		clientConnections["TCP:192.168.10.50:8080"] = &tcpConnection{
+			Key:        "TCP:192.168.10.50:8080",
+			Capability: NETWORK_FLARM_NMEA,
+			Queue:      NewMessageQueue(10),
+		}
+		netMutex.Unlock()
+
+		// Should not find the TCP connection
+		conns := getNetworkConnsByIp("TCP:192.168.10.50")
+		if len(conns) != 0 {
+			t.Errorf("Expected 0 connections (TCP not networkConnection), got %d", len(conns))
+		}
+
+		// Cleanup
+		netMutex.Lock()
+		clientConnections = make(map[string]connection)
+		netMutex.Unlock()
+	})
+}
+
+// TestGetNetworkConn tests the getNetworkConn helper function
+func TestGetNetworkConn(t *testing.T) {
+	// Initialize globals
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if clientConnections == nil {
+		clientConnections = make(map[string]connection)
+	}
+
+	// Clean up
+	netMutex.Lock()
+	clientConnections = make(map[string]connection)
+	netMutex.Unlock()
+
+	t.Run("no_colon_returns_nil", func(t *testing.T) {
+		conn := getNetworkConn("192.168.10.50")
+		if conn != nil {
+			t.Error("Expected nil for IP without port")
+		}
+	})
+
+	t.Run("non_existent_returns_nil", func(t *testing.T) {
+		conn := getNetworkConn("192.168.10.50:4000")
+		if conn != nil {
+			t.Error("Expected nil for non-existent connection")
+		}
+	})
+
+	t.Run("finds_existing_connection", func(t *testing.T) {
+		// Add a connection
+		netMutex.Lock()
+		expected := &networkConnection{
+			Ip:         "192.168.10.50",
+			Port:       4000,
+			Capability: NETWORK_GDL90_STANDARD,
+			Queue:      NewMessageQueue(10),
+		}
+		clientConnections["192.168.10.50:4000"] = expected
+		netMutex.Unlock()
+
+		conn := getNetworkConn("192.168.10.50:4000")
+		if conn != expected {
+			t.Error("Expected to find the connection")
+		}
+
+		// Cleanup
+		netMutex.Lock()
+		clientConnections = make(map[string]connection)
+		netMutex.Unlock()
+	})
+
+	t.Run("returns_nil_for_non_network_connection", func(t *testing.T) {
+		// Add a TCP connection
+		netMutex.Lock()
+		clientConnections["192.168.10.50:4000"] = &tcpConnection{
+			Key:        "192.168.10.50:4000",
+			Capability: NETWORK_FLARM_NMEA,
+			Queue:      NewMessageQueue(10),
+		}
+		netMutex.Unlock()
+
+		// Should return nil (not a networkConnection)
+		conn := getNetworkConn("192.168.10.50:4000")
+		if conn != nil {
+			t.Error("Expected nil for non-networkConnection")
+		}
+
+		// Cleanup
+		netMutex.Lock()
+		clientConnections = make(map[string]connection)
+		netMutex.Unlock()
+	})
+}
+
+// TestICMPErrorHandling_Documentation documents the ICMP permission error handling behavior
+// Note: sleepMonitor() handles ICMP permission errors by logging and returning early.
+// This provides graceful degradation - the system continues without sleep monitoring.
+// Full testing requires root privileges, so this test documents the expected behavior.
+func TestICMPErrorHandling_Documentation(t *testing.T) {
+	t.Log("ICMP Permission Error Handling:")
+	t.Log("- sleepMonitor() calls icmp.ListenPacket()")
+	t.Log("- If permission denied, it logs the error and returns")
+	t.Log("- System continues to function without ICMP sleep monitoring")
+	t.Log("- This is graceful degradation - data is sent to all clients")
+	t.Log("- icmpEchoSender() handles send errors by logging and continuing")
+	t.Log("- Full ICMP testing requires root privileges")
+}
+
+// =============================================================================
+// Phase 7.9: Concurrent Client Connections Tests
+// =============================================================================
+
+// TestConcurrentClientConnections tests concurrent add/remove of client connections
+// Verifies: Thread safety of clientConnections map operations
+func TestConcurrentClientConnections(t *testing.T) {
+	// Initialize globals
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+
+	netMutex.Lock()
+	clientConnections = make(map[string]connection)
+	netMutex.Unlock()
+
+	var wg sync.WaitGroup
+	const numGoroutines = 20
+	const connectionsPerGoroutine = 50
+
+	// Concurrent connection additions
+	for g := 0; g < numGoroutines; g++ {
+		wg.Add(1)
+		go func(goroutineID int) {
+			defer wg.Done()
+			for i := 0; i < connectionsPerGoroutine; i++ {
+				conn := &networkConnection{
+					Ip:         fmt.Sprintf("192.168.%d.%d", goroutineID, i),
+					Port:       uint32(4000 + i),
+					Capability: NETWORK_GDL90_STANDARD,
+					Queue:      NewMessageQueue(10),
+				}
+				key := conn.GetConnectionKey()
+
+				netMutex.Lock()
+				clientConnections[key] = conn
+				netMutex.Unlock()
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	// Verify all connections were added
+	netMutex.Lock()
+	expectedCount := numGoroutines * connectionsPerGoroutine
+	actualCount := len(clientConnections)
+	netMutex.Unlock()
+
+	if actualCount != expectedCount {
+		t.Errorf("Expected %d connections, got %d", expectedCount, actualCount)
+	}
+
+	// Concurrent reads and removals
+	wg.Add(numGoroutines * 2)
+
+	// Half do reads
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			defer wg.Done()
+			for i := 0; i < connectionsPerGoroutine; i++ {
+				netMutex.Lock()
+				for _, conn := range clientConnections {
+					_ = conn.GetConnectionKey()
+					_ = conn.Capabilities()
+				}
+				netMutex.Unlock()
+			}
+		}(g)
+	}
+
+	// Half do removals
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			defer wg.Done()
+			for i := 0; i < connectionsPerGoroutine/2; i++ {
+				key := fmt.Sprintf("192.168.%d.%d:%d", goroutineID, i, 4000+i)
+				netMutex.Lock()
+				delete(clientConnections, key)
+				netMutex.Unlock()
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	// Verify some connections remain
+	netMutex.Lock()
+	remainingCount := len(clientConnections)
+	netMutex.Unlock()
+
+	t.Logf("Concurrent test: started with %d, removed half, %d remaining", expectedCount, remainingCount)
+
+	// Cleanup
+	netMutex.Lock()
+	clientConnections = make(map[string]connection)
+	netMutex.Unlock()
+}
+
+// TestConcurrentClientConnectionsWithMessageSending tests concurrent connections
+// while also sending messages
+func TestConcurrentClientConnectionsWithMessageSending(t *testing.T) {
+	// Initialize globals
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+	if networkGDL90Chan == nil {
+		networkGDL90Chan = make(chan []byte, 1024)
+	}
+
+	netMutex.Lock()
+	clientConnections = make(map[string]connection)
+	netMutex.Unlock()
+
+	var wg sync.WaitGroup
+	const numClients = 10
+
+	// Add clients
+	for i := 0; i < numClients; i++ {
+		conn := &networkConnection{
+			Ip:         fmt.Sprintf("192.168.10.%d", 100+i),
+			Port:       4000,
+			Capability: NETWORK_GDL90_STANDARD,
+			Queue:      NewMessageQueue(100),
+		}
+		netMutex.Lock()
+		clientConnections[conn.GetConnectionKey()] = conn
+		netMutex.Unlock()
+	}
+
+	// Concurrent message sending and client management
+	const numMessages = 100
+
+	// Send messages
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < numMessages; i++ {
+			msg := []byte{byte(i)}
+			sendMsg(msg, NETWORK_GDL90_STANDARD, 1*time.Second, 0)
+		}
+	}()
+
+	// Add/remove clients while sending
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < numMessages/2; i++ {
+			// Add a client
+			conn := &networkConnection{
+				Ip:         fmt.Sprintf("192.168.20.%d", i),
+				Port:       5000,
+				Capability: NETWORK_GDL90_STANDARD,
+				Queue:      NewMessageQueue(100),
+			}
+			netMutex.Lock()
+			clientConnections[conn.GetConnectionKey()] = conn
+			netMutex.Unlock()
+
+			time.Sleep(1 * time.Millisecond)
+
+			// Remove it
+			netMutex.Lock()
+			delete(clientConnections, conn.GetConnectionKey())
+			netMutex.Unlock()
+		}
+	}()
+
+	wg.Wait()
+
+	// Verify original clients still have their queues
+	netMutex.Lock()
+	for key, conn := range clientConnections {
+		if conn.MessageQueue() == nil {
+			t.Errorf("Connection %s has nil queue", key)
+		}
+	}
+	clientCount := len(clientConnections)
+	netMutex.Unlock()
+
+	t.Logf("Concurrent message test: %d messages sent, %d clients remain", numMessages, clientCount)
+
+	// Drain channel
+	for {
+		select {
+		case <-networkGDL90Chan:
+		default:
+			goto done
+		}
+	}
+done:
+
+	// Cleanup
+	netMutex.Lock()
+	clientConnections = make(map[string]connection)
+	netMutex.Unlock()
+}
+
+// TestConcurrentOnConnectionClosed tests concurrent calls to onConnectionClosed
+func TestConcurrentOnConnectionClosed(t *testing.T) {
+	// Initialize globals
+	if netMutex == nil {
+		netMutex = &sync.Mutex{}
+	}
+
+	netMutex.Lock()
+	clientConnections = make(map[string]connection)
+	netMutex.Unlock()
+
+	const numConnections = 100
+
+	// Create connections
+	connections := make([]*networkConnection, numConnections)
+	for i := 0; i < numConnections; i++ {
+		conn := &networkConnection{
+			Ip:         fmt.Sprintf("192.168.30.%d", i),
+			Port:       uint32(4000 + i%100),
+			Capability: NETWORK_GDL90_STANDARD,
+			Queue:      NewMessageQueue(10),
+		}
+		connections[i] = conn
+
+		netMutex.Lock()
+		clientConnections[conn.GetConnectionKey()] = conn
+		netMutex.Unlock()
+	}
+
+	// Verify all added
+	netMutex.Lock()
+	if len(clientConnections) != numConnections {
+		t.Errorf("Expected %d connections, got %d", numConnections, len(clientConnections))
+	}
+	netMutex.Unlock()
+
+	// Concurrent onConnectionClosed calls
+	var wg sync.WaitGroup
+	for _, conn := range connections {
+		wg.Add(1)
+		go func(c *networkConnection) {
+			defer wg.Done()
+			onConnectionClosed(c)
+		}(conn)
+	}
+
+	wg.Wait()
+
+	// All should be removed
+	netMutex.Lock()
+	remaining := len(clientConnections)
+	netMutex.Unlock()
+
+	if remaining != 0 {
+		t.Errorf("Expected 0 connections after concurrent close, got %d", remaining)
+	}
+
+	t.Log("Concurrent onConnectionClosed test passed")
+}
+

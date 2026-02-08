@@ -5059,3 +5059,135 @@ func TestSendTrafficUpdates_NoPositionNoBearingDist(t *testing.T) {
 		t.Errorf("Expected Bearing to be 0 without position, got %f", ti.Bearing)
 	}
 }
+
+// =============================================================================
+// Phase 7.3: Resource Limits Tests
+// =============================================================================
+
+// TestTrafficMapLargeNumberOfTargets tests that the traffic map handles many targets
+// This is a stress test to verify the system doesn't crash or deadlock with high traffic load
+func TestTrafficMapLargeNumberOfTargets(t *testing.T) {
+	// Initialize
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	// Add a large number of traffic targets
+	const numTargets = 2000 // ForeFlight limit mentioned in code is ~1000-2000
+
+	trafficMutex.Lock()
+	for i := uint32(0); i < numTargets; i++ {
+		traffic[i] = TrafficInfo{
+			Icao_addr:      i,
+			Last_source:    TRAFFIC_SOURCE_1090ES,
+			Last_seen:      stratuxClock.GetTime(),
+			Last_alt:       stratuxClock.GetTime(),
+			Position_valid: true,
+			Lat:            43.0 + float32(i%100)*0.01,
+			Lng:            -88.0 + float32(i/100)*0.01,
+			Alt:            5000 + int32(i%100)*100,
+		}
+	}
+	trafficMutex.Unlock()
+
+	// Verify all targets were added
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	if count != numTargets {
+		t.Errorf("Expected %d traffic targets, got %d", numTargets, count)
+	}
+
+	// Test cleanup removes stale entries
+	trafficMutex.Lock()
+	// Mark all entries as old
+	for key := range traffic {
+		ti := traffic[key]
+		ti.Last_seen = stratuxClock.GetTime().Add(-2 * time.Minute)
+		traffic[key] = ti
+	}
+	trafficMutex.Unlock()
+
+	// Run cleanup
+	trafficMutex.Lock()
+	cleanupOldEntries()
+	remainingCount := len(traffic)
+	trafficMutex.Unlock()
+
+	if remainingCount != 0 {
+		t.Errorf("Expected all old entries to be cleaned up, %d remaining", remainingCount)
+	}
+
+	t.Logf("Successfully handled %d traffic targets", numTargets)
+}
+
+// TestTrafficMapConcurrentAccess tests concurrent access to traffic map
+// Verifies mutex protects against race conditions
+func TestTrafficMapConcurrentAccess(t *testing.T) {
+	// Initialize
+	if trafficMutex == nil {
+		trafficMutex = &sync.Mutex{}
+	}
+
+	trafficMutex.Lock()
+	traffic = make(map[uint32]TrafficInfo)
+	trafficMutex.Unlock()
+
+	var wg sync.WaitGroup
+	const numGoroutines = 50
+	const targetsPerGoroutine = 20
+
+	// Concurrent writes
+	for g := 0; g < numGoroutines; g++ {
+		wg.Add(1)
+		go func(goroutineID int) {
+			defer wg.Done()
+			for i := 0; i < targetsPerGoroutine; i++ {
+				icao := uint32(goroutineID*1000 + i)
+				trafficMutex.Lock()
+				traffic[icao] = TrafficInfo{
+					Icao_addr:   icao,
+					Last_source: TRAFFIC_SOURCE_1090ES,
+					Last_seen:   stratuxClock.GetTime(),
+				}
+				trafficMutex.Unlock()
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	// Verify expected count
+	trafficMutex.Lock()
+	count := len(traffic)
+	trafficMutex.Unlock()
+
+	expectedCount := numGoroutines * targetsPerGoroutine
+	if count != expectedCount {
+		t.Errorf("Expected %d traffic entries, got %d", expectedCount, count)
+	}
+
+	// Concurrent reads while writing
+	wg.Add(numGoroutines)
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			defer wg.Done()
+			for i := 0; i < targetsPerGoroutine; i++ {
+				trafficMutex.Lock()
+				_ = len(traffic)
+				for _, ti := range traffic {
+					_ = ti.Icao_addr
+				}
+				trafficMutex.Unlock()
+			}
+		}(g)
+	}
+
+	wg.Wait()
+	t.Logf("Concurrent access test completed with %d entries", count)
+}

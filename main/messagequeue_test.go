@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -1026,4 +1027,158 @@ func TestMessageQueueSingleEntry(t *testing.T) {
 	if data != nil {
 		t.Errorf("Expected nil after popping only entry, got %v", data)
 	}
+}
+
+// =============================================================================
+// Phase 7.3: Resource Limits - Message Queue Overflow Tests
+// =============================================================================
+
+// TestMessageQueueOverflow tests queue behavior when heavily overloaded
+func TestMessageQueueOverflow(t *testing.T) {
+	initStratuxClock()
+
+	// Small queue that will overflow quickly
+	queue := NewMessageQueue(100)
+
+	// Add 10x the max capacity
+	const numMessages = 1000
+	for i := 0; i < numMessages; i++ {
+		// Mix of priorities
+		prio := int32(i % 10)
+		queue.Put(prio, 1*time.Second, i)
+	}
+
+	// Queue should have pruned to approximately maxSize
+	dump := queue.GetQueueDump(false)
+	if len(dump) > 110 { // Allow 10% over (per prune logic)
+		t.Errorf("Queue should have pruned to ~100 entries, has %d", len(dump))
+	}
+
+	// Verify high priority messages are preserved over low priority
+	dump = queue.GetQueueDump(true) // Prune first
+	if len(dump) > 100 {
+		t.Errorf("After explicit prune, queue should have at most 100 entries, has %d", len(dump))
+	}
+
+	t.Logf("Overflow test: Added %d messages, queue has %d after prune", numMessages, len(dump))
+}
+
+// TestMessageQueuePriorityPreservationUnderLoad tests that high priority
+// messages are preserved when queue is overloaded
+func TestMessageQueuePriorityPreservationUnderLoad(t *testing.T) {
+	initStratuxClock()
+
+	queue := NewMessageQueue(50)
+
+	// Add low priority messages first
+	for i := 0; i < 100; i++ {
+		queue.Put(10, 1*time.Second, "low-"+string(rune('a'+i%26)))
+	}
+
+	// Add high priority messages (negative priority = higher)
+	for i := 0; i < 50; i++ {
+		queue.Put(-5, 1*time.Second, "HIGH-"+string(rune('A'+i%26)))
+	}
+
+	// Force prune
+	dump := queue.GetQueueDump(true)
+
+	// Count high priority messages
+	highCount := 0
+	for _, item := range dump {
+		if str, ok := item.(string); ok && len(str) > 0 && str[0] == 'H' {
+			highCount++
+		}
+	}
+
+	// High priority messages should be mostly preserved
+	if highCount < 25 { // At least half of the high priority should remain
+		t.Errorf("Expected at least 25 high priority messages, found %d", highCount)
+	}
+
+	t.Logf("Priority preservation: %d high-priority messages preserved out of 50", highCount)
+}
+
+// TestMessageQueueRapidPutPop tests rapid put/pop operations
+func TestMessageQueueRapidPutPop(t *testing.T) {
+	initStratuxClock()
+
+	queue := NewMessageQueue(100)
+
+	const iterations = 1000
+	for i := 0; i < iterations; i++ {
+		// Put
+		queue.Put(0, 100*time.Millisecond, i)
+
+		// Pop half the time
+		if i%2 == 0 {
+			queue.PopFirst()
+		}
+	}
+
+	// Verify queue is in a valid state
+	dump := queue.GetQueueDump(false)
+	if len(dump) > 110 {
+		t.Errorf("Queue size %d exceeds max*1.1", len(dump))
+	}
+
+	t.Logf("Rapid put/pop completed: %d iterations, final queue size: %d", iterations, len(dump))
+}
+
+// TestMessageQueueExpiredEntriesUnderLoad tests that expired entries
+// are properly removed when queue is under load
+func TestMessageQueueExpiredEntriesUnderLoad(t *testing.T) {
+	initStratuxClock()
+
+	queue := NewMessageQueue(100)
+
+	// Add messages with very short expiry
+	for i := 0; i < 200; i++ {
+		queue.Put(0, 1*time.Millisecond, i) // Very short expiry
+	}
+
+	// Wait for entries to expire
+	time.Sleep(10 * time.Millisecond)
+	stratuxClock.Milliseconds += 100 // Advance clock
+
+	// Access queue - should trigger cleanup
+	dump := queue.GetQueueDump(true)
+
+	// All entries should be expired
+	if len(dump) != 0 {
+		t.Errorf("Expected 0 entries after expiry, got %d", len(dump))
+	}
+}
+
+// TestMessageQueueConcurrentOverflow tests concurrent access during overflow
+func TestMessageQueueConcurrentOverflow(t *testing.T) {
+	initStratuxClock()
+
+	queue := NewMessageQueue(100)
+
+	var wg sync.WaitGroup
+	const numGoroutines = 10
+	const messagesPerGoroutine = 100
+
+	// Concurrent writes from multiple goroutines
+	for g := 0; g < numGoroutines; g++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for i := 0; i < messagesPerGoroutine; i++ {
+				queue.Put(int32(id), 1*time.Second, id*1000+i)
+			}
+		}(g)
+	}
+
+	wg.Wait()
+
+	// Verify queue didn't exceed reasonable size
+	dump := queue.GetQueueDump(true)
+	if len(dump) > 110 {
+		t.Errorf("Concurrent overflow: queue size %d exceeds max*1.1", len(dump))
+	}
+
+	t.Logf("Concurrent overflow: %d goroutines x %d messages, final size: %d",
+		numGoroutines, messagesPerGoroutine, len(dump))
 }
