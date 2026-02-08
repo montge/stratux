@@ -42,9 +42,9 @@ func TestSend(t *testing.T) {
 	t.Run("send_with_valid_broadcaster", func(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: &sync.Mutex{},
-			messages:   make(chan []byte, 1024),
+			messages:  make(chan []byte, 1024),
 		}
 
 		testMsg := []byte("test message")
@@ -76,9 +76,9 @@ func TestSend(t *testing.T) {
 	t.Run("send_with_nil_messages_channel", func(t *testing.T) {
 		// Create broadcaster with nil messages channel
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: nil,
-			messages:   nil, // Nil channel
+			messages:  nil, // Nil channel
 		}
 
 		// Should not panic due to nil check
@@ -91,9 +91,9 @@ func TestSend(t *testing.T) {
 	t.Run("send_multiple_messages", func(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: &sync.Mutex{},
-			messages:   make(chan []byte, 1024),
+			messages:  make(chan []byte, 1024),
 		}
 
 		messages := [][]byte{
@@ -124,9 +124,9 @@ func TestSend(t *testing.T) {
 	t.Run("send_empty_message", func(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: &sync.Mutex{},
-			messages:   make(chan []byte, 1024),
+			messages:  make(chan []byte, 1024),
 		}
 
 		emptyMsg := []byte{}
@@ -147,9 +147,9 @@ func TestSend(t *testing.T) {
 	t.Run("send_large_message", func(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: &sync.Mutex{},
-			messages:   make(chan []byte, 1024),
+			messages:  make(chan []byte, 1024),
 		}
 
 		// Create a large message (10KB)
@@ -178,9 +178,9 @@ func TestSendJSON(t *testing.T) {
 	t.Run("send_json_object", func(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: &sync.Mutex{},
-			messages:   make(chan []byte, 1024),
+			messages:  make(chan []byte, 1024),
 		}
 
 		testObj := map[string]interface{}{
@@ -218,9 +218,9 @@ func TestSendJSON(t *testing.T) {
 	t.Run("send_json_nil_object", func(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: &sync.Mutex{},
-			messages:   make(chan []byte, 1024),
+			messages:  make(chan []byte, 1024),
 		}
 
 		// Send nil object (should marshal to "null")
@@ -242,9 +242,9 @@ func TestSendJSON(t *testing.T) {
 	t.Run("send_json_marshal_error", func(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: &sync.Mutex{},
-			messages:   make(chan []byte, 1024),
+			messages:  make(chan []byte, 1024),
 		}
 
 		// Create an unmarshalable value (channel cannot be JSON marshaled)
@@ -293,9 +293,9 @@ func TestSend_EdgeCases(t *testing.T) {
 	t.Run("send_with_valid_broadcaster_nil_message", func(t *testing.T) {
 		// Create broadcaster without writer goroutine for deterministic testing
 		b := &uibroadcaster{
-			sockets:    make([]*websocket.Conn, 0),
+			sockets:   make([]*websocket.Conn, 0),
 			socketsMu: &sync.Mutex{},
-			messages:   make(chan []byte, 1024),
+			messages:  make(chan []byte, 1024),
 		}
 
 		// Send nil message (this is valid - a nil slice)

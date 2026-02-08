@@ -50,7 +50,7 @@ const (
 	logDir                = "/var/log/"
 	dataLogFile           = "stratux.sqlite"
 	//FlightBox: log to /root.
-	logDirFB           = "/root/"
+	logDirFB            = "/root/"
 	maxDatagramSize     = 8192
 	maxUserMsgQueueSize = 25000 // About 10MB per port per connected client.
 

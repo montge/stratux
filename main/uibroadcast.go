@@ -20,16 +20,16 @@ import (
 )
 
 type uibroadcaster struct {
-	sockets    []*websocket.Conn
+	sockets   []*websocket.Conn
 	socketsMu *sync.Mutex
-	messages   chan []byte
+	messages  chan []byte
 }
 
 func NewUIBroadcaster() *uibroadcaster {
 	ret := &uibroadcaster{
-		sockets:    make([]*websocket.Conn, 0),
+		sockets:   make([]*websocket.Conn, 0),
 		socketsMu: &sync.Mutex{},
-		messages:   make(chan []byte, 1024),
+		messages:  make(chan []byte, 1024),
 	}
 	go ret.writer()
 	return ret

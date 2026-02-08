@@ -600,16 +600,16 @@ func logToDataLogDebug(tbl string, data interface{}) {
 	}
 }
 
-func logSituation()                              { logToDataLog("mySituation", mySituation) }
-func logStatus()                                 { logToDataLog("status", globalStatus) }
-func logSettings()                               { logToDataLog("settings", globalSettings) }
-func logTraffic(ti TrafficInfo)                   { logToDataLog("traffic", ti) }
-func logMsg(m msg)                               { logToDataLog("messages", m) }
-func logESMsg(m esmsg)                           { logToDataLog("es_messages", m) }
-func logGPSAttitude(gpsPerf gpsPerfStats)        { logToDataLog("gps_attitude", gpsPerf) }
+func logSituation()                                { logToDataLog("mySituation", mySituation) }
+func logStatus()                                   { logToDataLog("status", globalStatus) }
+func logSettings()                                 { logToDataLog("settings", globalSettings) }
+func logTraffic(ti TrafficInfo)                    { logToDataLog("traffic", ti) }
+func logMsg(m msg)                                 { logToDataLog("messages", m) }
+func logESMsg(m esmsg)                             { logToDataLog("es_messages", m) }
+func logGPSAttitude(gpsPerf gpsPerfStats)          { logToDataLog("gps_attitude", gpsPerf) }
 func logDump1090TermMessage(m Dump1090TermMessage) { logToDataLogDebug("dump1090_terminal", m) }
-func logPongTermMessage(m PongTermMessage)       { logToDataLogDebug("pong_update", m) }
-func logAISTermMessage(m AISTermMessage)         { logToDataLogDebug("ais_message", m) }
+func logPongTermMessage(m PongTermMessage)         { logToDataLogDebug("pong_update", m) }
+func logAISTermMessage(m AISTermMessage)           { logToDataLogDebug("ais_message", m) }
 
 func initDataLog() {
 	//log.Printf("dataLogStarted = %t. dataLogReadyToWrite = %t\n", dataLogStarted, dataLogReadyToWrite) //REMOVE -- DEBUG
