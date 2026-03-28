@@ -109,19 +109,18 @@
 - [x] Test heartBeatOnce with 7 test cases
 - [x] heartBeatOnce: 0% → tested (LED status, ownship info, FLARM, traffic)
 
-### 5.2 Extract Network Output Logic
-- [ ] Create processNetworkOutput() for single iteration
-- [ ] networkOutWatcher calls processNetworkOutput in loop
-- [ ] Test processNetworkOutput with mock connections
-- [ ] networkOutWatcher: 0% → 80%+
-- **Note**: networkOutWatcher is already minimal (channel read + WebSocket send)
+### 5.2 Extract Network Output Logic (Complete)
+- [x] Create processNetworkOutput() for single iteration
+- [x] networkOutWatcher calls processNetworkOutput in loop
+- [x] Test processNetworkOutput with 3 test cases (normal, empty, nil message)
+- [x] processNetworkOutput: 0% → 100%
+- **Note**: networkOutWatcher loop body was minimal (channel read + WebSocket send)
 
-### 5.3 Extract GPS Serial Logic
-- [ ] Create processSerialData() for single read
-- [ ] gpsSerialReader calls processSerialData in loop
-- [ ] Test processSerialData with mock serial port
-- [ ] gpsSerialReader: 0% → 80%+
-- **Note**: processSerialInput already extracted in Phase 3 (87.5% coverage)
+### 5.3 Extract GPS Serial Logic (No Action Needed)
+- [x] Reviewed gpsSerialReader — no loop body to extract
+- **Note**: processSerialInput() was extracted in Phase 3 (87.5% coverage) and contains the loop.
+  gpsSerialReader is now a linear wrapper (defer close, set flags, call processSerialInput, reset flags).
+  No further extraction needed.
 
 ### 5.4 Extract Other Watchers (Partial)
 - [x] logFileWatcher: Extracted logFileWatcherOnce() with 4 test cases

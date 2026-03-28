@@ -119,10 +119,16 @@ func getDHCPLeases() (map[string]string, error) {
 	return ret, nil
 }
 
+// processNetworkOutput handles a single GDL90 message by sending it
+// to all connected WebSocket clients via the gdl90Update broadcaster.
+func processNetworkOutput(msg []byte) {
+	gdl90Update.SendJSON(msg)
+}
+
 func networkOutWatcher() {
 	for {
 		ch := <-networkGDL90Chan
-		gdl90Update.SendJSON(ch)
+		processNetworkOutput(ch)
 	}
 }
 
