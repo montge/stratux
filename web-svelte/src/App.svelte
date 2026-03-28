@@ -5,6 +5,12 @@
   import Traffic from './routes/Traffic.svelte';
   import Towers from './routes/Towers.svelte';
   import GPS from './routes/GPS.svelte';
+  import Weather from './routes/Weather.svelte';
+  import Radar from './routes/Radar.svelte';
+  import Logs from './routes/Logs.svelte';
+  import Developer from './routes/Developer.svelte';
+  import Settings from './routes/Settings.svelte';
+  import MapPage from './routes/Map.svelte';
   import Placeholder from './routes/Placeholder.svelte';
 
   // Route definitions
@@ -12,13 +18,13 @@
     '/': Status,
     '/traffic': Traffic,
     '/towers': Towers,
-    '/weather': Placeholder,
+    '/weather': Weather,
     '/gps': GPS,
-    '/radar': Placeholder,
-    '/map': Placeholder,
-    '/logs': Placeholder,
-    '/settings': Placeholder,
-    '/developer': Placeholder,
+    '/radar': Radar,
+    '/map': MapPage,
+    '/logs': Logs,
+    '/settings': Settings,
+    '/developer': Developer,
     '*': Placeholder
   };
 </script>
