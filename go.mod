@@ -1,8 +1,6 @@
 module github.com/stratux/stratux
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25.0
 
 require (
 	github.com/BertoldVdb/go-ais v0.4.0
@@ -21,7 +19,7 @@ require (
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
 	github.com/uavionix/serial v0.0.0-19700101022104-87f23b1d3198
 	golang.org/x/exp v0.0.0-20230728194245-b0cb94b80691
-	golang.org/x/net v0.47.0
+	golang.org/x/net v0.50.0
 	gonum.org/v1/plot v0.9.0
 	tinygo.org/x/bluetooth v0.10.0
 )
@@ -57,12 +55,8 @@ require (
 	github.com/tinygo-org/pio v0.0.0-20231216154340-cd888eb58899 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/image v0.18.0 // indirect
-	golang.org/x/mod v0.30.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/telemetry v0.0.0-20251111182119-bc8e575c7b54 // indirect
-	golang.org/x/text v0.31.0 // indirect
-	golang.org/x/tools v0.39.0 // indirect
+	golang.org/x/image v0.38.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )
